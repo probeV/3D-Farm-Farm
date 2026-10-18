@@ -1,0 +1,24 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Django
+db.sqlite3
+*.db
+media/
+staticfiles/
+
+# 환경 변수 / 비밀 값
+.env
+
+# 로컬 데이터 · 백업
+data/
+backups/
+
+# 에디터 / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
