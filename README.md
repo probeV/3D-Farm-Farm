@@ -11,8 +11,26 @@
 - **부자재 관리**: 자석, 나사, 포장재 등 묶음 구매가 → 개당 단가
 
 ## 기술 스택
-- Python, Django
+- Python 3.10+, Django 5.2 (LTS)
 - SQLite (로컬)
+
+## 로컬 실행
+```bash
+# 1. 가상환경 + 의존성
+python -m venv .venv
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2. 환경 변수: .env.example 을 .env 로 복사하고 DJANGO_SECRET_KEY 채우기
+copy .env.example .env          # macOS/Linux: cp .env.example .env
+
+# 3. DB 생성 + 관리자 계정
+python manage.py migrate
+python manage.py createsuperuser
+
+# 4. 실행 → http://127.0.0.1:8000/admin/
+python manage.py runserver
+```
 
 ## 개발 규칙
 
