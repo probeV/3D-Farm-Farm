@@ -1,4 +1,4 @@
-# ERD — Print Farm Farm (프린트팜팜)
+# ERD — 3D Farm Farm (쓰리디팜팜)
 
 > 요구사항: [PRD.md](PRD.md) · DB: SQLite (Django ORM)
 

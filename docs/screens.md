@@ -1,4 +1,4 @@
-# 화면 구성 — Print Farm Farm (프린트팜팜)
+# 화면 구성 — 3D Farm Farm (쓰리디팜팜)
 
 > 요구사항: [PRD.md](PRD.md) · 데이터 구조: [ERD.md](ERD.md)
 > 화면 목업: [mockups/](mockups/) — HTML 파일을 브라우저로 열면 더미 데이터로 동작한다.
@@ -12,7 +12,7 @@
 ## 메뉴 구조
 
 ```
-Print Farm Farm (왼쪽 사이드바)
+3D Farm Farm (왼쪽 사이드바)
 ├─ 제품 원가
 │   └─ [모달] 제품 추가 / 수정
 ├─ 필라멘트

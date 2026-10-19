@@ -1,4 +1,4 @@
-# PRD — Print Farm Farm (프린트팜팜)
+# PRD — 3D Farm Farm (쓰리디팜팜)
 
 > 데이터 구조: [ERD.md](ERD.md) · 화면: [screens.md](screens.md)
 
