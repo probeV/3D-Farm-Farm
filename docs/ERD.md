@@ -20,13 +20,10 @@ erDiagram
         bigint id PK
         varchar name UK "회사 이름"
         varchar logo "대표 이미지 파일 경로 (media/brands/), 빈 값 허용"
-        varchar shop "구매처"
-        text note
     }
     MATERIAL {
         bigint id PK
         varchar name UK "재질 이름 (PLA, PETG-CF ...)"
-        text note
     }
     FILAMENT {
         bigint id PK
@@ -35,7 +32,6 @@ erDiagram
         varchar series "시리즈 (Basic, Matte ...), 빈 값 허용"
         decimal price "기본 스풀 가격, NULL=미입력"
         decimal spool_g "스풀 무게(g), 기본 1000"
-        text note
     }
     COLOR {
         bigint id PK
@@ -43,7 +39,6 @@ erDiagram
         varchar name "색상 이름 (필라멘트 안에서 UK)"
         varchar hex "색상 코드 #RRGGBB"
         decimal price "색상 가격, NULL=필라멘트 가격"
-        text note
     }
     SPOOL {
         bigint id PK
@@ -52,8 +47,8 @@ erDiagram
         varchar status "sealed / open / empty"
         decimal price "실제 구매가"
         date purchased_at "구매일"
-        datetime opened_at "개봉일"
-        datetime finished_at "사용완료일"
+        datetime opened_at "사용 시작일"
+        datetime finished_at "사용 완료일"
         text note
     }
     SPOOL_EVENT {
@@ -147,9 +142,9 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 
 회사별 무게 (PRD SUM-04)
   상태별 kg = 그 상태 스풀 수 × Filament.spool_g ÷ 1000   (필라멘트마다 계산해서 합산)
-  전체 kg   = 미개봉 + 개봉 + 사용완료 kg
+  (재고 / 사용 중 / 사용 완료 각각 표시, 비율 막대는 세 값의 비율)
 
-보유 스풀 평균 구매가 (PRD INV-08) = 미개봉 + 개봉 스풀의 Spool.price 평균
+보유 스풀 평균 구매가 (PRD INV-08) = 재고 + 사용 중 스풀의 Spool.price 평균
 ```
 
 ## 관계와 삭제 규칙
@@ -174,7 +169,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Color (filament, name)` | UNIQUE | 같은 필라멘트 안 색상 이름 중복 방지 |
 | `Color.hex` | 형식 검사 | `#` + 16진수 6자리. 입력은 `F5F5F5` / `#f5f5f5` 모두 받아 `#F5F5F5` 로 저장 |
 | `Spool.code` | UNIQUE | 스풀 코드 |
-| `Spool.status` | CHOICES | `sealed` / `open` / `empty` |
+| `Spool.status` | CHOICES | `sealed`(재고) / `open`(사용 중) / `empty`(사용 완료) |
 | `Spool (color, status)` | INDEX | 색상별 상태 개수 집계 |
 | `SpoolEvent.batch` | INDEX | batch 단위 되돌리기 |
 | `SpoolEvent.spool_id` | INDEX | "이 스풀에 이후 기록이 있는지" 검사 |
