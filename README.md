@@ -18,7 +18,7 @@
 ## 폴더 구조
 ```
 backend/    Django 프로젝트 (manage.py, config/)
-frontend/   React 앱 (예정)
+frontend/   React 앱 (Vite)
 docs/       PRD · ERD · 화면 명세 · 목업
 ```
 
@@ -40,6 +40,16 @@ python manage.py createsuperuser
 # 4. 실행 → http://127.0.0.1:8000/admin/
 python manage.py runserver
 ```
+
+## 로컬 실행 (프론트엔드)
+Node.js 20 이상이 필요해요. 백엔드를 먼저 켜 두고, 다른 터미널에서:
+```bash
+cd frontend
+npm install
+npm run dev                     # → http://localhost:5173
+```
+- 개발 서버가 `/api`, `/admin`, `/static` 요청을 Django(`127.0.0.1:8000`)로 넘겨줘요 (`frontend/vite.config.ts`).
+- 공통 스타일은 `frontend/src/styles/app.css` (필라멘트 목업의 CSS 를 옮긴 것).
 
 ## 개발 규칙
 
