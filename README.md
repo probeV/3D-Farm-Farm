@@ -16,10 +16,16 @@
 
 ## 개발 규칙
 
-### 브랜치 (GitHub Flow)
-- `main`: 항상 동작하는 상태만 유지
-- 작업 브랜치: `종류/작업-내용` 형식으로 만들고, 완료되면 PR 로 `main` 에 병합
-  - 예: `feat/django-setup`, `feat/filament-inventory`, `fix/undo-order`
+### 브랜치 (Git Flow 간소화)
+| 브랜치 | 만드는 곳 → 합치는 곳 | 용도 |
+|---|---|---|
+| `main` | — | 출시된 버전만. 병합 시 버전 태그 (`v0.1.0`) |
+| `develop` | — | 개발 통합 브랜치 (기본 브랜치) |
+| `feature/*` | `develop` → `develop` (PR) | 기능 개발. 예: `feature/django-setup` |
+| `hotfix/*` | `main` → `main` + `develop` | 출시본 긴급 수정 |
+
+- 출시: `develop` → `main` PR 병합 후 버전 태그
+- 1인 개발이라 `release/*` 브랜치는 생략하고, 출시 준비는 `develop` 에서 마무리
 
 ### 커밋 메시지 (Conventional Commits)
 `종류: 한 줄 요약`
