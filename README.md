@@ -2,7 +2,7 @@
 
 3D 프린팅 원가 계산 · 필라멘트 재고 관리 웹앱
 
-> 🚧 Django 로 개발 중입니다.
+> 🚧 Django + React 로 개발 중입니다.
 
 ## 주요 기능 (예정)
 - **제품 원가 계산**: 필라멘트비, 전기료, 프린터 감가상각, 실패 보정, 부자재비, 스마트스토어 수수료를 반영한 순이익·마진율
@@ -11,20 +11,29 @@
 - **부자재 관리**: 자석, 나사, 포장재 등 묶음 구매가 → 개당 단가
 
 ## 기술 스택
-- Python 3.10+, Django 5.2 (LTS)
-- SQLite (로컬)
+- 백엔드: Python 3.10+, Django 5.2 (LTS), Django REST Framework
+- 프론트엔드: React + TypeScript + Vite, TanStack Query
+- DB: SQLite (로컬)
 
-## 로컬 실행
+## 폴더 구조
+```
+backend/    Django 프로젝트 (manage.py, config/)
+frontend/   React 앱 (예정)
+docs/       PRD · ERD · 화면 명세 · 목업
+```
+
+## 로컬 실행 (백엔드)
 ```bash
-# 1. 가상환경 + 의존성
+# 1. 가상환경 (저장소 루트에 만들기) + 의존성
 python -m venv .venv
 .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+cd backend
 pip install -r requirements.txt
 
-# 2. 환경 변수: .env.example 을 .env 로 복사하고 DJANGO_SECRET_KEY 채우기
+# 2. 환경 변수: backend/.env.example 을 backend/.env 로 복사하고 DJANGO_SECRET_KEY 채우기
 copy .env.example .env          # macOS/Linux: cp .env.example .env
 
-# 3. DB 생성 + 관리자 계정
+# 3. DB 생성 + 관리자 계정 (backend/ 에서 실행)
 python manage.py migrate
 python manage.py createsuperuser
 
