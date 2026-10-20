@@ -28,7 +28,7 @@ docs/       PRD · ERD · 화면 명세 · 목업
 python -m venv .venv
 .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 cd backend
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # 실행용(requirements.txt) + 개발 도구(Ruff)
 
 # 2. 환경 변수: backend/.env.example 을 backend/.env 로 복사하고 DJANGO_SECRET_KEY 채우기
 copy .env.example .env          # macOS/Linux: cp .env.example .env
@@ -63,6 +63,27 @@ npm run dev                     # → http://localhost:5173
 
 - 출시: `develop` → `main` PR 병합 후 버전 태그
 - 1인 개발이라 `release/*` 브랜치는 생략하고, 출시 준비는 `develop` 에서 마무리
+
+### 코드 스타일
+커밋 전에 포맷 → 검사 순서로 실행해요.
+
+| 영역 | 도구 | 설정 파일 |
+|---|---|---|
+| 백엔드 | Ruff (린트 + 포맷) | `backend/pyproject.toml` |
+| 프론트엔드 | Prettier (포맷) + ESLint (린트) | `frontend/.prettierrc.json`, `frontend/eslint.config.js` |
+| 공통 | EditorConfig (들여쓰기·인코딩) | `.editorconfig` |
+
+```bash
+# 백엔드 (backend/ 에서)
+ruff format .
+ruff check --fix .
+
+# 프론트엔드 (frontend/ 에서)
+npm run format
+npm run lint
+```
+- 공통: 작은따옴표, 한 줄 최대 120자. 프론트엔드는 세미콜론 없음
+- `migrations/` 는 자동 생성 파일이라 검사하지 않아요
 
 ### 커밋 메시지 (Conventional Commits)
 `종류: 한 줄 요약`
