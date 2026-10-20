@@ -1,0 +1,24 @@
+# 코드 규칙 (Ruff: 린트 + 포맷). backend/ 에서 실행
+#   ruff check .           규칙 검사
+#   ruff check --fix .     고칠 수 있는 것 자동 수정 (import 정렬 등)
+#   ruff format .          포맷 맞추기
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+src = ["."]
+# makemigrations 가 만든 파일은 손대지 않는다
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle (기본 스타일)
+    "F",       # pyflakes (안 쓰는 import·변수, 정의 안 된 이름)
+    "I",       # import 정렬
+    "UP",      # 새 파이썬 문법으로
+    "B",       # 버그가 되기 쉬운 코드
+    "DJ",      # Django 규칙
+]
+
+[tool.ruff.format]
+# Django 가 만든 코드와 맞춰 작은따옴표
+quote-style = "single"
