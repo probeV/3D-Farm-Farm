@@ -91,19 +91,65 @@ class SpoolTests(TestCase):
         )
         self.color = Color.objects.create(filament=filament, name='화이트', hex='#FFFFFF')
 
-    def test_code_generated_from_id(self):
-        spool = Spool.objects.create(color=self.color)
-        self.assertEqual(spool.code, f'S{spool.pk:05d}')
-        spool.refresh_from_db()
-        self.assertEqual(spool.code, f'S{spool.pk:05d}')
-        self.assertEqual(spool.status, Spool.Status.SEALED)
+    def test_code_from_code_no(self):
+        self.assertEqual(Spool(code_no=12).code, 'S00012')
+        self.assertEqual(Spool(code_no=123456).code, 'S123456')
+
+    def test_unsaved_spool_has_no_code(self):
+        self.assertIsNone(Spool().code)
+        self.assertEqual(str(Spool()), '(새 스풀)')
+
+    def test_created_spools_get_next_numbers(self):
+        first = Spool.objects.create(color=self.color)
+        second = Spool.objects.create(color=self.color)
+        self.assertEqual((first.code, second.code), ('S00001', 'S00002'))
+        self.assertEqual(first.status, Spool.Status.SEALED)
+
+    def test_code_no_is_independent_of_id(self):
+        spool = Spool.objects.create(color=self.color, code_no=500)
+        self.assertNotEqual(spool.pk, 500)
+        self.assertEqual(spool.code, 'S00500')
+        self.assertEqual(Spool.objects.create(color=self.color).code_no, 501)
 
     def test_code_kept_on_later_save(self):
         spool = Spool.objects.create(color=self.color)
-        code = spool.code
         spool.note = '메모'
         spool.save()
-        self.assertEqual(spool.code, code)
+        spool.refresh_from_db()
+        self.assertEqual(spool.code, 'S00001')
+
+    def test_deleted_number_can_be_registered_again(self):
+        first = Spool.objects.create(color=self.color)
+        Spool.objects.create(color=self.color)
+        first.delete()
+        self.assertEqual(Spool.objects.create(color=self.color, code_no=1).code, 'S00001')
+
+    def test_code_no_must_be_positive(self):
+        with self.assertRaises(ValidationError):
+            Spool(color=self.color, code_no=0).full_clean()
+
+    def test_duplicate_code_no_rejected(self):
+        Spool.objects.create(color=self.color, code_no=7)
+        with transaction.atomic(), self.assertRaises(IntegrityError):
+            Spool.objects.create(color=self.color, code_no=7)
+
+    def test_bulk_create_needs_code_no(self):
+        # bulk_create 는 save() 를 거치지 않으므로 번호를 직접 넣어야 한다
+        with transaction.atomic(), self.assertRaises(IntegrityError):
+            Spool.objects.bulk_create([Spool(color=self.color)])
+        start = Spool.next_code_no()
+        Spool.objects.bulk_create([Spool(color=self.color, code_no=start + i) for i in range(3)])
+        self.assertEqual([s.code for s in Spool.objects.all()], ['S00001', 'S00002', 'S00003'])
+
+    def test_code_no_from_code(self):
+        self.assertEqual(Spool.code_no_from_code('S00012'), 12)
+        self.assertEqual(Spool.code_no_from_code(' s12 '), 12)
+        self.assertEqual(Spool.code_no_from_code('S123456'), 123456)
+
+    def test_code_no_from_code_rejects_bad_format(self):
+        for bad in ['', None, '12', 'X00012', 'S', 'S12a']:
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                Spool.code_no_from_code(bad)
 
     def test_open_sets_opened_at_once(self):
         spool = Spool(color=self.color)
@@ -149,7 +195,32 @@ class AdminPagesTests(TestCase):
             brand=Brand.objects.create(name='Bambu Lab'),
             material=Material.objects.create(name='PLA'),
         )
-        Spool.objects.create(color=Color.objects.create(filament=filament, name='화이트', hex='#FFFFFF'))
+        self.color = Color.objects.create(filament=filament, name='화이트', hex='#FFFFFF')
+        self.spool = Spool.objects.create(color=self.color)
+        Spool.objects.create(color=self.color)
+
+    def test_spool_search_by_code(self):
+        res = self.client.get('/admin/filaments/spool/', {'q': self.spool.code})
+        self.assertEqual(list(res.context['cl'].result_list), [self.spool])
+
+    def add_spool(self, code_no):
+        return self.client.post(
+            '/admin/filaments/spool/add/',
+            {'color': self.color.pk, 'code_no': code_no, 'status': 'sealed', 'purchased_at': '2026-10-20'},
+        )
+
+    def test_admin_add_with_blank_number_gets_next(self):
+        self.assertEqual(self.add_spool('').status_code, 302)
+        self.assertTrue(Spool.objects.filter(code_no=3).exists())
+
+    def test_admin_add_with_chosen_number(self):
+        self.assertEqual(self.add_spool('500').status_code, 302)
+        self.assertTrue(Spool.objects.filter(code_no=500).exists())
+
+    def test_admin_add_with_used_number_shows_error(self):
+        res = self.add_spool(str(self.spool.code_no))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, '이미 쓰고 있는 스풀 번호예요.')
 
     def test_changelist_and_add_pages_render(self):
         for model in ['brand', 'material', 'filament', 'color', 'spool']:

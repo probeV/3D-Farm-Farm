@@ -7,13 +7,14 @@ import re
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models, transaction
+from django.db import models
 from django.utils import timezone
 
 # 금액은 원 단위, 무게는 g 단위
 MONEY = dict(max_digits=10, decimal_places=0, validators=[MinValueValidator(0)])
 
 HEX_RE = re.compile(r'^#?([0-9A-Fa-f]{6})$')
+SPOOL_CODE_RE = re.compile(r'^[Ss](\d+)$')
 
 
 def normalize_hex(value):
@@ -135,7 +136,12 @@ class Color(models.Model):
 
 
 class Spool(models.Model):
-    """스풀 1개 = 1행"""
+    """스풀 1개 = 1행
+
+    스풀 코드(S00012)는 사용자·라벨용 식별자라서 DB id 와 따로 `code_no` 로 관리한다.
+    id 는 DB 사정(이전·재생성)으로 바뀔 수 있지만, 라벨에 찍힌 코드는 바뀌면 안 되기 때문.
+    번호는 비우면 자동(가장 큰 번호 + 1), 원하면 직접 지정 (중복 불가).
+    """
 
     class Status(models.TextChoices):
         SEALED = 'sealed', '재고'
@@ -143,8 +149,14 @@ class Spool(models.Model):
         EMPTY = 'empty', '사용 완료'
 
     color = models.ForeignKey(Color, on_delete=models.PROTECT, related_name='spools', verbose_name='색상')
-    # 저장 직후 id 로 만든다: S + id 5자리 (S00001)
-    code = models.CharField('스풀 코드', max_length=10, unique=True, null=True, blank=True, editable=False)
+    code_no = models.PositiveIntegerField(
+        '스풀 번호',
+        unique=True,
+        blank=True,  # 비우면 save() 가 다음 번호를 붙인다
+        validators=[MinValueValidator(1)],
+        help_text='비우면 다음 번호를 자동으로 붙여요.',
+        error_messages={'unique': '이미 쓰고 있는 스풀 번호예요.'},
+    )
     status = models.CharField('상태', max_length=10, choices=Status.choices, default=Status.SEALED)
     price = models.DecimalField('구매가', null=True, blank=True, **MONEY)
     purchased_at = models.DateField('구매일', default=timezone.localdate)
@@ -161,12 +173,29 @@ class Spool(models.Model):
     def __str__(self):
         return self.code or '(새 스풀)'
 
-    @transaction.atomic
     def save(self, *args, **kwargs):
+        if self.code_no is None:
+            self.code_no = self.next_code_no()
         super().save(*args, **kwargs)
-        if not self.code:
-            self.code = f'S{self.pk:05d}'
-            super().save(update_fields=['code'])
+
+    @property
+    def code(self):
+        """S + 스풀 번호 (최소 5자리, 넘치면 늘어남): 12 → S00012, 123456 → S123456. 번호 전에는 None"""
+        return None if self.code_no is None else f'S{self.code_no:05d}'
+
+    @staticmethod
+    def next_code_no():
+        """지금 있는 가장 큰 번호 + 1"""
+        largest = Spool.objects.aggregate(largest=models.Max('code_no'))['largest']
+        return (largest or 0) + 1
+
+    @staticmethod
+    def code_no_from_code(code):
+        """스풀 코드를 번호로: `S00012` / `s12` → 12. 형식이 틀리면 ValueError"""
+        match = SPOOL_CODE_RE.match((code or '').strip())
+        if not match:
+            raise ValueError(f'스풀 코드 형식이 아니에요: {code!r} (예: S00012)')
+        return int(match.group(1))
 
     def set_status(self, status, now=None):
         """상태를 바꾸고 날짜 규칙(PRD 3.4)을 적용한다. 저장은 하지 않는다.

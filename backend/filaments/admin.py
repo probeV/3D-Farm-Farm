@@ -44,7 +44,19 @@ class ColorAdmin(admin.ModelAdmin):
 class SpoolAdmin(admin.ModelAdmin):
     list_display = ['code', 'color', 'status', 'price', 'purchased_at', 'opened_at', 'finished_at']
     list_filter = ['status', 'color__filament__brand', 'purchased_at']
-    search_fields = ['code', 'color__name']
+    search_fields = ['color__name']
     list_select_related = ['color__filament__brand', 'color__filament__material']
-    readonly_fields = ['code']
     autocomplete_fields = ['color']
+
+    @admin.display(description='스풀 코드', ordering='code_no')
+    def code(self, obj):
+        return obj.code
+
+    def get_search_results(self, request, queryset, search_term):
+        """색상 이름 검색에 더해, 스풀 코드(S00012)로도 찾기. 코드를 번호로 바꿔서 찾는다"""
+        results, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        try:
+            results |= queryset.filter(code_no=Spool.code_no_from_code(search_term))
+        except ValueError:
+            pass
+        return results, may_have_duplicates
