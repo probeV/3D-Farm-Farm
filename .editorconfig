@@ -1,0 +1,15 @@
+# 에디터 공통 설정 (VS Code 는 EditorConfig 확장 필요). 줄 끝(LF/CRLF)은 git 이 맞추므로 정하지 않는다
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
