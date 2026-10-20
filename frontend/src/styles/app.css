@@ -954,35 +954,6 @@ code {
   border-radius: var(--radius);
 }
 
-/* 최근 기록 */
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-}
-.history-row {
-  display: grid;
-  grid-template-columns: 100px minmax(180px, 1.6fr) minmax(90px, 1fr) minmax(90px, 1fr) 100px;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-.history-row:last-child {
-  border-bottom: 0;
-}
-.history-row.undone {
-  opacity: 0.5;
-}
-.history-row.undone strong {
-  text-decoration: line-through;
-}
-.history-row > :last-child {
-  text-align: right;
-}
-
 /* 대화상자 */
 dialog {
   border: 1px solid var(--border);
@@ -1390,13 +1361,6 @@ input[type='color'] {
   .color-actions {
     grid-column: 1 / -1;
     justify-content: flex-start;
-  }
-  .history-row {
-    grid-template-columns: 1fr auto auto;
-  }
-  .history-row > :nth-child(1),
-  .history-row > :nth-child(4) {
-    display: none;
   }
   .manage {
     grid-template-columns: 1fr;

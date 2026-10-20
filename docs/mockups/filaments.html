@@ -196,13 +196,6 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; backgrou
 .only-list .list-toolbar { margin-top: 0; }
 .empty { padding: 40px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
 
-/* 최근 기록 */
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
-.history-row { display: grid; grid-template-columns: 100px minmax(180px, 1.6fr) minmax(90px, 1fr) minmax(90px, 1fr) 100px; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.history-row:last-child { border-bottom: 0; }
-.history-row.undone { opacity: .5; } .history-row.undone strong { text-decoration: line-through; }
-.history-row > :last-child { text-align: right; }
-
 /* 대화상자 */
 dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
 dialog::backdrop { background: rgba(10,14,20,.45); }
@@ -281,7 +274,6 @@ input[type=color] { width: 44px; height: 36px; padding: 2px; cursor: pointer; }
   .brand-card { width: 220px; } .slide-btn { display: none; }
   .toolbar input[type=search] { width: 100%; }
   .color-row { grid-template-columns: 1fr repeat(3, 52px); } .color-actions { grid-column: 1 / -1; justify-content: flex-start; }
-  .history-row { grid-template-columns: 1fr auto auto; } .history-row > :nth-child(1), .history-row > :nth-child(4) { display: none; }
   .manage { grid-template-columns: 1fr; } .manage-right { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
   .form-grid { grid-template-columns: 1fr; }
   .picker-list { height: auto; min-height: calc(10 * 40px + 9 * 5px); }
@@ -357,7 +349,6 @@ const db = {
   ],
   colors: [],
   spools: [],
-  history: [],
 };
 // 색상: [필라멘트, 이름, hex, 색상 가격, 재고, 사용 중, 사용 완료]
 [
@@ -390,12 +381,6 @@ const db = {
   };
   add("empty", e); add("open", o); add("sealed", s);
 });
-db.history = [
-  { at: "10-19 14:02", color: 2, label: "사용 중", codes: ["S00008"], undone: false, canUndo: true },
-  { at: "10-19 11:40", color: 7, label: "재고 추가 3개", codes: ["S00025", "S00026", "S00027"], undone: false, canUndo: true },
-  { at: "10-18 21:15", color: 1, label: "사용 완료", codes: ["S00002"], undone: false, canUndo: false },
-  { at: "10-18 20:03", color: 4, label: "사용 중 → 재고", codes: ["S00014"], undone: true, canUndo: false },
-];
 
 // ---------------------------------------------------------------- 계산
 const byId = (list, id) => list.find((x) => x.id === Number(id));
@@ -511,10 +496,7 @@ function render() {
       ${state.q || state.brand || state.material ? '<button class="btn small" data-act="clear-filter">필터 지우기</button>' : ""}
     </div>
     ${fils.length ? `<div class="fil-list">${fils.map((x) => filCard(x.f)).join("")}</div>` : `<div class="empty">조건에 맞는 필라멘트가 없어요.</div>`}
-
-    <div class="section-head"><h3>최근 기록</h3></div>
-    <div class="panel">${db.history.map(historyRow).join("")}
-      <div style="margin-top:10px"><button class="btn small" onclick="toast('30건 더 불러와요 (목업)')">더 보기</button></div></div>`;
+`;
 
   bindView();
   bindSlider();
@@ -643,14 +625,6 @@ function closeTileMenu() {
 document.addEventListener("click", (e) => { if (!e.target.closest("#tile-menu, [data-act='tile']")) closeTileMenu(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTileMenu(); });
 addEventListener("scroll", closeTileMenu, { passive: true });
-
-function historyRow(h) {
-  const c = byId(db.colors, h.color), f = filamentOf(c);
-  const right = h.undone ? '<span class="badge">되돌림</span>' : h.canUndo ? `<button class="btn small" onclick="toast('되돌렸어요 (목업)')">되돌리기</button>` : '<span class="hint">이후 기록 있음</span>';
-  return `<div class="history-row ${h.undone ? "undone" : ""}"><span class="muted">${h.at}</span>
-    <span>${swatch(c.hex)} ${esc(c.name)} <span class="muted">${esc(filFullName(f))}</span></span>
-    <strong>${esc(h.label)}</strong><code>${esc(h.codes.length > 2 ? `${h.codes[0]} 외 ${h.codes.length - 1}개` : h.codes.join(", "))}</code><span>${right}</span></div>`;
-}
 
 function bindView() {
   const q = $("#q");
