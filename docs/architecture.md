@@ -24,7 +24,7 @@ frontend/ (React)                          backend/ (Django)
 
 | 앱 | 모델 | 상태 |
 |---|---|---|
-| `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool`, `SpoolEvent` | 모델 일부 완료 (`SpoolEvent` 예정) |
+| `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` | 모델 완료 |
 | `products` | `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 예정 |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
@@ -35,8 +35,8 @@ frontend/ (React)                          backend/ (Django)
 ### 2.2 앱 안의 파일 역할
 | 파일 | 넣는 것 | 넣지 않는 것 |
 |---|---|---|
-| `models.py` | 필드, 제약 조건, **모델 하나로 끝나는 규칙** (예: 색상 코드 정리, 스풀 코드 생성, 상태 변경 날짜 규칙, g당 가격) | 다른 모델까지 바꾸는 동작 |
-| `services.py` | **여러 모델을 함께 바꾸는 동작**. 트랜잭션으로 묶는다 (예: 재고 N개 추가 + 이력 기록, 되돌리기) | HTTP 요청·응답 처리 |
+| `models.py` | 필드, 제약 조건, **모델 하나로 끝나는 규칙** (예: 색상 코드 정리, 스풀 번호 매기기, 상태 변경 날짜 규칙, g당 가격) | 다른 모델까지 바꾸는 동작 |
+| `services.py` | **여러 모델을 함께 바꾸는 동작**. 트랜잭션으로 묶는다 (예: 재고 N개 추가) | HTTP 요청·응답 처리 |
 | `serializers.py` | 모델 ↔ JSON 변환, 입력 검사 | 비즈니스 규칙 (모델이나 서비스를 부른다) |
 | `views.py` | DRF API. 요청 받기 → 서비스/시리얼라이저 호출 → 응답 | 계산·규칙 (얇게 유지) |
 | `urls.py` | 그 앱의 API 주소 | — |
@@ -54,7 +54,7 @@ frontend/ (React)                          backend/ (Django)
   path('api/', include('products.urls')),
   ```
 - 주소는 복수형 명사: `/api/brands/`, `/api/filaments/`, `/api/colors/{id}/`, `/api/spools/`
-- 목록 · 상세 · 추가 · 수정 · 삭제가 아닌 동작은 하위 주소: `/api/colors/{id}/purchase/`, `/api/spool-events/{batch}/undo/`
+- 목록 · 상세 · 추가 · 수정 · 삭제가 아닌 동작은 하위 주소: `/api/colors/{id}/purchase/`
 
 ### 2.4 파일이 커지면
 - 한 파일이 대략 400줄을 넘거나 성격이 다른 것이 섞이면 **같은 이름의 폴더(패키지)** 로 나눈다. 바깥에서 import 하는 경로는 그대로 유지.
