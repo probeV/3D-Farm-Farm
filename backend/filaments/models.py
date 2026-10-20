@@ -2,6 +2,7 @@
 
 회사(Brand) · 재질(Material) → 필라멘트(Filament) → 색상(Color) → 스풀(Spool)
 """
+
 import re
 
 from django.core.exceptions import ValidationError
@@ -29,6 +30,7 @@ def validate_hex(value):
 
 class Brand(models.Model):
     """필라멘트 회사 (Bambu Lab, Esun …)"""
+
     name = models.CharField('이름', max_length=50, unique=True)
     logo = models.ImageField('대표 이미지', upload_to='brands/', blank=True)
 
@@ -43,6 +45,7 @@ class Brand(models.Model):
 
 class Material(models.Model):
     """재질. 회사와 상관없는 공통 목록 (PLA, PETG, PETG-CF …)"""
+
     name = models.CharField('이름', max_length=50, unique=True)
 
     class Meta:
@@ -56,13 +59,17 @@ class Material(models.Model):
 
 class Filament(models.Model):
     """회사 + 재질 + 시리즈 단위의 필라멘트 제품"""
+
     brand = models.ForeignKey(Brand, on_delete=models.PROTECT, related_name='filaments', verbose_name='회사')
     material = models.ForeignKey(Material, on_delete=models.PROTECT, related_name='filaments', verbose_name='재질')
     # NULL 대신 "" — 시리즈 없는 필라멘트도 UNIQUE 조합으로 중복 검사되도록
     series = models.CharField('시리즈', max_length=50, blank=True, default='')
     price = models.DecimalField('스풀 가격', null=True, blank=True, **MONEY)
     spool_g = models.DecimalField(
-        '스풀 무게(g)', max_digits=7, decimal_places=1, default=1000,
+        '스풀 무게(g)',
+        max_digits=7,
+        decimal_places=1,
+        default=1000,
         validators=[MinValueValidator(1)],
     )
 
@@ -72,7 +79,8 @@ class Filament(models.Model):
         ordering = ['brand__name', 'material__name', 'series']
         constraints = [
             models.UniqueConstraint(
-                fields=['brand', 'material', 'series'], name='unique_filament',
+                fields=['brand', 'material', 'series'],
+                name='unique_filament',
                 violation_error_message='같은 회사·재질·시리즈의 필라멘트가 이미 있어요.',
             ),
         ]
@@ -89,6 +97,7 @@ class Filament(models.Model):
 
 class Color(models.Model):
     """필라멘트 안의 색상. 재고는 색상 단위로 센다."""
+
     filament = models.ForeignKey(Filament, on_delete=models.PROTECT, related_name='colors', verbose_name='필라멘트')
     name = models.CharField('이름', max_length=50)
     hex = models.CharField('색상 코드', max_length=7, validators=[validate_hex])
@@ -101,7 +110,8 @@ class Color(models.Model):
         ordering = ['filament_id', 'id']
         constraints = [
             models.UniqueConstraint(
-                fields=['filament', 'name'], name='unique_color_name',
+                fields=['filament', 'name'],
+                name='unique_color_name',
                 violation_error_message='이 필라멘트에 같은 이름의 색상이 이미 있어요.',
             ),
         ]

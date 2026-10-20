@@ -1,4 +1,5 @@
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
+from datetime import timezone as dt_timezone
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -25,7 +26,10 @@ class FilamentModelTests(TestCase):
         self.bambu = Brand.objects.create(name='Bambu Lab')
         self.pla = Material.objects.create(name='PLA')
         self.filament = Filament.objects.create(
-            brand=self.bambu, material=self.pla, series='Matte', price=Decimal('20000'),
+            brand=self.bambu,
+            material=self.pla,
+            series='Matte',
+            price=Decimal('20000'),
         )
 
     def test_display_name(self):
@@ -139,6 +143,7 @@ class SpoolTests(TestCase):
 class AdminPagesTests(TestCase):
     def setUp(self):
         from django.contrib.auth.models import User
+
         self.client.force_login(User.objects.create_superuser('admin', password='x'))
         filament = Filament.objects.create(
             brand=Brand.objects.create(name='Bambu Lab'),
