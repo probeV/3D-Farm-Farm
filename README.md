@@ -19,8 +19,9 @@
 ```
 backend/    Django 프로젝트 (manage.py, config/)
 frontend/   React 앱 (Vite)
-docs/       PRD · ERD · 화면 명세 · 목업
+docs/       PRD · ERD · 화면 명세 · 목업 · 코드 구조
 ```
+무엇을 어디에 두는지는 [docs/architecture.md](docs/architecture.md) 참고.
 
 ## 로컬 실행 (백엔드)
 ```bash
