@@ -3,12 +3,17 @@
 회사(Brand) · 재질(Material) → 필라멘트(Filament) → 색상(Color) → 스풀(Spool)
 """
 
+import os
 import re
+from functools import partial
+from io import BytesIO
 
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
-from django.db import models
+from django.core.files.base import ContentFile
+from django.core.validators import FileExtensionValidator, MinValueValidator
+from django.db import models, transaction
 from django.utils import timezone
+from PIL import Image, ImageOps
 
 # 금액은 원 단위, 무게는 g 단위
 MONEY = dict(max_digits=10, decimal_places=0, validators=[MinValueValidator(0)])
@@ -21,7 +26,7 @@ def normalize_hex(value):
     """`F5F5F5` / `#f5f5f5` 를 `#F5F5F5` 로 맞춘다. 형식이 틀리면 ValidationError."""
     match = HEX_RE.match((value or '').strip())
     if not match:
-        raise ValidationError('색상 코드는 #RRGGBB 형식이어야 해요. (예: #F5F5F5)', code='invalid_hex')
+        raise ValidationError('색상 코드는 #RRGGBB 형식이어야 합니다. (예: #F5F5F5)', code='invalid_hex')
     return '#' + match.group(1).upper()
 
 
@@ -29,11 +34,43 @@ def validate_hex(value):
     normalize_hex(value)
 
 
+LOGO_MAX_PX = 256
+LOGO_MAX_MB = 5
+
+
+def validate_logo_size(file):
+    if file.size > LOGO_MAX_MB * 1024 * 1024:
+        raise ValidationError(f'이미지는 {LOGO_MAX_MB}MB 까지 올릴 수 있습니다.', code='logo_too_big')
+
+
+LOGO_VALIDATORS = [
+    FileExtensionValidator(['png', 'jpg', 'jpeg', 'webp'], message='png, jpg, webp 이미지만 올릴 수 있습니다.'),
+    validate_logo_size,
+]
+
+
+def shrink_image(file, max_px=LOGO_MAX_PX):
+    """비율을 유지해 max_px × max_px 안에 들어가게 줄인다 (작은 이미지는 그대로). 원래 형식(png/jpg/webp)으로 저장"""
+    image = Image.open(file)
+    image_format = image.format
+    image = ImageOps.exif_transpose(image)  # 폰 사진의 회전 정보 반영
+    image.thumbnail((max_px, max_px))
+    if image_format == 'JPEG' and image.mode not in ('RGB', 'L'):
+        image = image.convert('RGB')
+    buffer = BytesIO()
+    image.save(buffer, format=image_format)
+    return ContentFile(buffer.getvalue())
+
+
 class Brand(models.Model):
-    """필라멘트 회사 (Bambu Lab, Esun …)"""
+    """필라멘트 회사 (Bambu Lab, Esun …)
+
+    대표 이미지(로고)는 올릴 때 256×256 이내로 줄여 저장하고, 바꾸거나 지우거나 회사를 삭제하면 이전 파일도 지운다.
+    관리자 화면 · API 어디서 올려도 같게 동작하도록 모델에서 처리한다.
+    """
 
     name = models.CharField('이름', max_length=50, unique=True)
-    logo = models.ImageField('대표 이미지', upload_to='brands/', blank=True)
+    logo = models.ImageField('대표 이미지', upload_to='brands/', blank=True, validators=LOGO_VALIDATORS)
 
     class Meta:
         verbose_name = '회사'
@@ -42,6 +79,26 @@ class Brand(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        old_logo = Brand.objects.filter(pk=self.pk).values_list('logo', flat=True).first() if self.pk else None
+        # 새로 올린 파일 (아직 저장소에 쓰이지 않음) 이면 줄여서 바꿔 넣는다
+        if self.logo and not self.logo._committed:
+            self.logo.save(os.path.basename(self.logo.name), shrink_image(self.logo), save=False)
+        super().save(*args, **kwargs)
+        if old_logo and old_logo != self.logo.name:
+            self._delete_file_after_commit(old_logo)
+
+    def delete(self, *args, **kwargs):
+        logo = self.logo.name
+        result = super().delete(*args, **kwargs)  # 필라멘트가 있으면 여기서 ProtectedError → 파일은 그대로
+        if logo:
+            self._delete_file_after_commit(logo)
+        return result
+
+    def _delete_file_after_commit(self, name):
+        # DB 저장이 확정된 뒤에 지운다 (중간에 실패해서 되돌려지면 파일은 남아 있어야 하므로)
+        transaction.on_commit(partial(self.logo.storage.delete, name))
 
 
 class Material(models.Model):
@@ -82,7 +139,7 @@ class Filament(models.Model):
             models.UniqueConstraint(
                 fields=['brand', 'material', 'series'],
                 name='unique_filament',
-                violation_error_message='같은 회사·재질·시리즈의 필라멘트가 이미 있어요.',
+                violation_error_message='같은 회사·재질·시리즈의 필라멘트가 이미 있습니다.',
             ),
         ]
 
@@ -113,7 +170,7 @@ class Color(models.Model):
             models.UniqueConstraint(
                 fields=['filament', 'name'],
                 name='unique_color_name',
-                violation_error_message='이 필라멘트에 같은 이름의 색상이 이미 있어요.',
+                violation_error_message='이 필라멘트에 같은 이름의 색상이 이미 있습니다.',
             ),
         ]
 
@@ -155,7 +212,7 @@ class Spool(models.Model):
         blank=True,  # 비우면 save() 가 다음 번호를 붙인다
         validators=[MinValueValidator(1)],
         help_text='비우면 다음 번호를 자동으로 붙여요.',
-        error_messages={'unique': '이미 쓰고 있는 스풀 번호예요.'},
+        error_messages={'unique': '이미 쓰고 있는 스풀 번호입니다.'},
     )
     status = models.CharField('상태', max_length=10, choices=Status.choices, default=Status.SEALED)
     price = models.DecimalField('구매가', null=True, blank=True, **MONEY)
@@ -194,7 +251,7 @@ class Spool(models.Model):
         """스풀 코드를 번호로: `S00012` / `s12` → 12. 형식이 틀리면 ValueError"""
         match = SPOOL_CODE_RE.match((code or '').strip())
         if not match:
-            raise ValueError(f'스풀 코드 형식이 아니에요: {code!r} (예: S00012)')
+            raise ValueError(f'스풀 코드 형식이 아닙니다: {code!r} (예: S00012)')
         return int(match.group(1))
 
     def set_status(self, status, now=None):

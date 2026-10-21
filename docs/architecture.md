@@ -12,7 +12,6 @@ Django 의 MTV 중 **T(Template) 자리를 React 가 맡는다.** Django 는 데
 ```
 frontend/ (React)                          backend/ (Django)
   화면 ──fetch──▶ /api/... ──▶ urls.py ─▶ views.py ─▶ serializers.py ─▶ models.py ─▶ SQLite
-                                                   └─▶ services.py ──┘
 ```
 - 개발 중에는 Vite 개발 서버가 `/api` · `/admin` · `/static` · `/media` 를 Django 로 넘긴다 (`frontend/vite.config.ts`).
 - 사용할 때는 React 빌드 결과를 Django 가 함께 제공해 서버 하나로 실행한다 (PRD SYS-04, 구현 예정).
@@ -36,25 +35,37 @@ frontend/ (React)                          backend/ (Django)
 | 파일 | 넣는 것 | 넣지 않는 것 |
 |---|---|---|
 | `models.py` | 필드, 제약 조건, **모델 하나로 끝나는 규칙** (예: 색상 코드 정리, 스풀 번호 매기기, 상태 변경 날짜 규칙, g당 가격) | 다른 모델까지 바꾸는 동작 |
-| `services.py` | **여러 모델을 함께 바꾸는 동작**. 트랜잭션으로 묶는다 (예: 재고 N개 추가) | HTTP 요청·응답 처리 |
-| `serializers.py` | 모델 ↔ JSON 변환, 입력 검사 | 비즈니스 규칙 (모델이나 서비스를 부른다) |
-| `views.py` | DRF API. 요청 받기 → 서비스/시리얼라이저 호출 → 응답 | 계산·규칙 (얇게 유지) |
+| `serializers.py` | 모델 ↔ JSON 변환, 입력 검사 | 비즈니스 규칙 (모델을 부른다), **응답용 조회 쿼리** |
+| `views.py` | DRF API. 요청 받기 → 시리얼라이저로 검사 → 저장 · 동작 → 응답. **응답에 쓸 데이터 조회**(`queryset`, `annotate`). **여러 행을 함께 바꾸는 동작**은 그 API 의 `@action` 에 `@transaction.atomic` 으로 (예: 재고 N개 추가) | 모델 하나로 끝나는 규칙 (모델에) |
 | `urls.py` | 그 앱의 API 주소 | — |
 | `admin.py` | 관리자 화면 등록 | — |
 | `tests.py` | 그 앱의 테스트 | — |
 | `migrations/` | `makemigrations` 가 만든 파일. 손으로 고치지 않는다 | — |
 
-판단이 애매하면: **"HTTP 없이 셸(`manage.py shell`)에서도 똑같이 동작해야 하는가?"** → 그렇다면 `models.py` / `services.py`.
+판단이 애매하면: **"HTTP 없이 셸(`manage.py shell`)에서도 똑같이 동작해야 하는가?"** → 그렇다면 `models.py`.
+
+**서비스 계층(`services.py`)은 두지 않는다** — 지금은 여러 행을 바꾸는 동작이 API 하나에서만 쓰여서 뷰에 둔다.
+같은 동작을 여러 API 에서 쓰게 되면(예: QR 스캔 등록) 그때 `services.py` 로 뺀다.
+
+**조회는 뷰가, 시리얼라이저는 읽기만** — 개수 · 평균 같은 계산값은 뷰의 queryset 에서 `annotate` 로 한 번에 붙이고,
+시리얼라이저의 `get_xxx()` 는 붙어 있는 값을 읽기만 한다 (객체마다 쿼리하면 N+1).
+DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 이 값이 빠질 수 있다. 그런 뷰셋(필라멘트, 색상 추가)만
+`create` / `partial_update` 를 직접 써서 저장 후 queryset 으로 다시 조회해 응답한다.
 
 ### 2.3 URL 규칙
-- 모든 API 는 `/api/` 아래. 앱마다 `urls.py` 를 두고 `config/urls.py` 에서 묶는다.
+- 모든 API 는 버전을 붙여 `/api/v0/` 아래. 앱마다 `urls.py`(DRF 라우터)를 두고 `config/urls.py` 에서 묶는다.
   ```python
   # config/urls.py
-  path('api/', include('filaments.urls')),
-  path('api/', include('products.urls')),
+  path('api/v0/', include('filaments.urls')),
+  path('api/v0/', include('products.urls')),
   ```
-- 주소는 복수형 명사: `/api/brands/`, `/api/filaments/`, `/api/colors/{id}/`, `/api/spools/`
-- 목록 · 상세 · 추가 · 수정 · 삭제가 아닌 동작은 하위 주소: `/api/colors/{id}/purchase/`
+- 주소 · 응답 모양이 바뀌는 변경은 `v1` 을 새로 만들고 `v0` 는 그대로 둔다. 칸을 추가하는 정도는 같은 버전에서
+- 주소는 복수형 명사: `/api/v0/brands/`, `/api/v0/filaments/`, `/api/v0/colors/{id}/`, `/api/v0/spools/`
+- URL 에는 동사를 넣지 않고 명사(자원)로, 동작은 HTTP 메서드로 표현한다. 기본 5개 밖의 요청은 하위 자원으로:
+  `POST /api/v0/colors/{id}/spools/` (이 색상에 스풀 만들기 = 재고 추가), `GET /api/v0/spools/code/{code}/` (코드로 찾기)
+  - 여러 개 삭제는 목록 주소에 DELETE: `DELETE /api/v0/spools/?ids=3,4,5`. DRF 기본 라우터에 없어서
+    `filaments/urls.py` 의 `Router` 가 목록 주소의 DELETE 를 `bulk_destroy` 에 연결한다
+- 엔드포인트 목록과 요청 · 응답 모양은 [api.md](api.md)
 
 ### 2.4 파일이 커지면
 - 한 파일이 대략 400줄을 넘거나 성격이 다른 것이 섞이면 **같은 이름의 폴더(패키지)** 로 나눈다. 바깥에서 import 하는 경로는 그대로 유지.
@@ -62,7 +73,7 @@ frontend/ (React)                          backend/ (Django)
   models.py            →  models/__init__.py   (from .spool import Spool ... 로 다시 내보냄)
                           models/brand.py
                           models/spool.py
-  tests.py             →  tests/test_models.py, tests/test_api.py
+  tests.py             →  tests/test_models.py, tests/test_api.py   (filaments 는 이미 이렇게 나눔)
   ```
 - 처음부터 나누지는 않는다. 커졌을 때 나눈다.
 

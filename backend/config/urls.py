@@ -18,10 +18,12 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # JSON API. 주소가 바뀌는 변경을 하면 v1 을 새로 만들고 v0 는 그대로 둔다
+    path('api/v0/', include('filaments.urls')),
 ]
 
 # 개발 중에는 업로드 파일을 Django 가 직접 제공 (DEBUG=True 일 때만 동작)
