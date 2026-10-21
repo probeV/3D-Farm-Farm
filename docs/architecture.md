@@ -90,10 +90,14 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
 ```
 frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
+                client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
   pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, settings/)
+                화면에서만 쓰는 계산은 그 폴더에 (예: filaments/stock.ts — 상태별 kg, 재고 없음 · 소진)
   components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
+  format.ts     화면 표시용 숫자 모양 (원, kg)
   App.tsx       레이아웃(사이드바) + 화면 전환
+  main.tsx      시작점: TanStack Query, 테마(시스템 설정 따름)
 ```
 - 서버 데이터는 TanStack Query 로만 가져오고, 화면 안 상태(열린 창, 선택한 타일)는 컴포넌트 상태로 둔다.
 - 백엔드 앱과 프론트 폴더 이름을 맞춘다: `filaments` ↔ `api/filaments.ts`, `pages/filaments/`.

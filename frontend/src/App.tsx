@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import FilamentsPage from './pages/filaments/FilamentsPage'
 
 type Page = 'products' | 'filaments' | 'supplies' | 'settings'
 
@@ -59,10 +60,31 @@ function Icon({ children }: { children: ReactNode }) {
   )
 }
 
+// 사이드바 접힘 상태는 브라우저에 기억 (저장할 수 없는 환경이면 기억만 안 함)
+const SIDE_KEY = 'pff-side-collapsed'
+
+function loadCollapsed() {
+  try {
+    return localStorage.getItem(SIDE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>('filaments')
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(loadCollapsed)
   const current = NAV.find((n) => n.page === page)!
+
+  const toggleSide = () => {
+    const next = !collapsed
+    setCollapsed(next)
+    try {
+      localStorage.setItem(SIDE_KEY, next ? '1' : '0')
+    } catch {
+      /* 저장 불가 */
+    }
+  }
 
   return (
     <div className={collapsed ? 'layout collapsed' : 'layout'}>
@@ -83,7 +105,7 @@ export default function App() {
           </button>
         ))}
         <div className="side-bottom">
-          <button className="nav-item" title="사이드바 접기/펼치기" onClick={() => setCollapsed((c) => !c)}>
+          <button className="nav-item" title="사이드바 접기/펼치기" onClick={toggleSide}>
             <Icon>
               <rect x="3" y="4" width="18" height="16" rx="2" />
               <path d="M9 4v16" />
@@ -94,7 +116,7 @@ export default function App() {
       </aside>
       <main>
         <h1 className="page-title">{current.label}</h1>
-        <div className="empty">준비 중인 화면이에요.</div>
+        {page === 'filaments' ? <FilamentsPage /> : <div className="empty">준비 중인 화면이에요.</div>}
       </main>
     </div>
   )
