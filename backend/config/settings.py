@@ -26,7 +26,7 @@ load_dotenv(BASE_DIR / '.env')
 def env(name, default=None):
     value = os.environ.get(name, default)
     if value is None:
-        raise ImproperlyConfigured(f'환경 변수 {name} 가 없어요. .env.example 을 복사해 .env 를 만드세요.')
+        raise ImproperlyConfigured(f'환경 변수 {name} 가 없습니다. .env.example 을 복사해 .env 를 만드세요.')
     return value
 
 
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'filaments',
 ]
 
@@ -136,3 +137,13 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Django REST Framework — 화면(React)이 쓰는 JSON API (/api/v0/)
+REST_FRAMEWORK = {
+    # 로그인 없이 쓰는 앱 (같은 와이파이 안에서만 접속, PRD 1장)
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+    'UNAUTHENTICATED_USER': None,
+    'EXCEPTION_HANDLER': 'config.exceptions.api_exception_handler',
+}

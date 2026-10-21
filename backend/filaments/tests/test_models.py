@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from datetime import timezone as dt_timezone
 from decimal import Decimal
@@ -7,7 +8,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 from django.test import TestCase
 
-from .models import Brand, Color, Filament, Material, Spool, normalize_hex
+from ..models import Brand, Color, Filament, Material, Spool, normalize_hex, validate_logo_size
+from .utils import TempMediaMixin, image_size, make_image
 
 
 class HexTests(TestCase):
@@ -19,6 +21,63 @@ class HexTests(TestCase):
         for bad in ['', '#FFF', 'GGGGGG', '#1234567']:
             with self.subTest(bad=bad), self.assertRaises(ValidationError):
                 normalize_hex(bad)
+
+
+class BrandLogoTests(TempMediaMixin, TestCase):
+    def test_upload_is_shrunk_keeping_ratio(self):
+        brand = Brand.objects.create(name='Bambu Lab', logo=make_image(size=(600, 300)))
+        self.assertTrue(brand.logo.name.startswith('brands/'))
+        self.assertEqual(image_size(brand.logo), (256, 128))
+
+    def test_small_image_is_kept(self):
+        brand = Brand.objects.create(name='Bambu Lab', logo=make_image(size=(100, 50)))
+        self.assertEqual(image_size(brand.logo), (100, 50))
+
+    def test_jpeg_stays_jpeg(self):
+        brand = Brand.objects.create(name='Bambu Lab', logo=make_image('logo.jpg', image_format='JPEG'))
+        self.assertTrue(brand.logo.name.endswith('.jpg'))
+
+    def test_replacing_deletes_old_file(self):
+        brand = Brand.objects.create(name='Bambu Lab', logo=make_image('old.png'))
+        old_path = brand.logo.path
+        with self.captureOnCommitCallbacks(execute=True):
+            brand.logo = make_image('new.png')
+            brand.save()
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(brand.logo.path))
+
+    def test_clearing_deletes_file(self):
+        brand = Brand.objects.create(name='Bambu Lab', logo=make_image())
+        path = brand.logo.path
+        with self.captureOnCommitCallbacks(execute=True):
+            brand.logo = ''
+            brand.save()
+        self.assertFalse(os.path.exists(path))
+
+    def test_deleting_brand_deletes_file(self):
+        brand = Brand.objects.create(name='Bambu Lab', logo=make_image())
+        path = brand.logo.path
+        with self.captureOnCommitCallbacks(execute=True):
+            brand.delete()
+        self.assertFalse(os.path.exists(path))
+
+    def test_protected_brand_keeps_file(self):
+        brand = Brand.objects.create(name='Bambu Lab', logo=make_image())
+        Filament.objects.create(brand=brand, material=Material.objects.create(name='PLA'))
+        with self.captureOnCommitCallbacks(execute=True), self.assertRaises(ProtectedError):
+            brand.delete()
+        self.assertTrue(os.path.exists(brand.logo.path))
+
+    def test_only_png_jpg_webp(self):
+        with self.assertRaises(ValidationError):
+            Brand(name='Bambu Lab', logo=make_image('logo.gif', image_format='GIF')).full_clean()
+
+    def test_size_limit(self):
+        class Big:
+            size = 5 * 1024 * 1024 + 1
+
+        with self.assertRaises(ValidationError):
+            validate_logo_size(Big())
 
 
 class FilamentModelTests(TestCase):
@@ -220,7 +279,7 @@ class AdminPagesTests(TestCase):
     def test_admin_add_with_used_number_shows_error(self):
         res = self.add_spool(str(self.spool.code_no))
         self.assertEqual(res.status_code, 200)
-        self.assertContains(res, '이미 쓰고 있는 스풀 번호예요.')
+        self.assertContains(res, '이미 쓰고 있는 스풀 번호입니다.')
 
     def test_changelist_and_add_pages_render(self):
         for model in ['brand', 'material', 'filament', 'color', 'spool']:
