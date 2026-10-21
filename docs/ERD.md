@@ -10,8 +10,12 @@ erDiagram
     MATERIAL ||--o{ FILAMENT : "재질"
     FILAMENT ||--o{ COLOR : "색상"
     COLOR ||--o{ SPOOL : "스풀"
+    CATEGORY ||--o{ SUBCATEGORY : "세부 분류"
+    CATEGORY |o--o{ PRODUCT : "카테고리"
+    SUBCATEGORY |o--o{ PRODUCT : "세부 분류"
     PRODUCT ||--o{ PRODUCT_FILAMENT : "사용 필라멘트"
     FILAMENT ||--o{ PRODUCT_FILAMENT : "사용됨"
+    COLOR |o--o{ PRODUCT_FILAMENT : "사용 색상"
     PRODUCT ||--o{ PRODUCT_PART : "사용 부자재"
     PART ||--o{ PRODUCT_PART : "사용됨"
 
@@ -59,12 +63,21 @@ erDiagram
         varchar unit "단위, 기본 개"
         text note
     }
+    CATEGORY {
+        bigint id PK
+        varchar name UK "카테고리 이름"
+    }
+    SUBCATEGORY {
+        bigint id PK
+        bigint category_id FK
+        varchar name "세부 분류 이름 (카테고리 안에서 UK)"
+    }
     PRODUCT {
         bigint id PK
-        varchar code "No."
-        varchar category
+        varchar code UK "No."
+        bigint category_id FK "NULL=미분류"
+        bigint subcategory_id FK "NULL=세부 분류 없음"
         varchar name
-        varchar colors "색상 설명"
         decimal print_minutes "출력 시간(분)"
         decimal sale_price "판매가"
         varchar status "on_sale / developing / discontinued"
@@ -76,6 +89,7 @@ erDiagram
         bigint id PK
         bigint product_id FK
         bigint filament_id FK
+        bigint color_id FK "NULL=색상 선택 안 함"
         decimal grams "사용량(g)"
     }
     PRODUCT_PART {
@@ -102,7 +116,7 @@ erDiagram
 | 앱 | 모델 |
 |---|---|
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` |
-| `products` | `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
+| `products` | `Category`, `Subcategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
 
 ## 모델 설명
 
@@ -114,8 +128,10 @@ erDiagram
 | `Color` | 필라멘트 안의 색상. 색상 코드(hex)를 가지며, 가격을 비우면 필라멘트 가격을 따름. 재고는 색상 단위로 셈 |
 | `Spool` | 스풀 1개 = 1행. 스풀 번호, 상태, 날짜, 실제 구매가 |
 | `Part` | 부자재. `price ÷ pack_qty` 가 개당 단가 |
-| `Product` | 판매 제품 |
-| `ProductFilament` | 제품 ↔ 필라멘트 (다대다) + 사용량 |
+| `Category` | 제품 카테고리 (수업 교구, 퍼즐 …) |
+| `Subcategory` | 카테고리 안의 세부 분류 (수업 교구 › 수학 …). 선택 |
+| `Product` | 판매 제품. 카테고리 · 세부 분류는 비워도 됨 (미분류) |
+| `ProductFilament` | 제품 ↔ 필라멘트 (다대다) + 사용량 + 색상(선택). 같은 필라멘트를 색상별로 여러 줄 둘 수 있음 |
 | `ProductPart` | 제품 ↔ 부자재 (다대다) + 수량 |
 | `CostSetting` | 원가 계산 설정값. 항상 1개 행만 존재 (기본값은 PRD 3.8) |
 
@@ -125,6 +141,9 @@ erDiagram
 
 색상의 스풀 가격 = Color.price 가 있으면 그 값, 없으면 Filament.price
 g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
+
+제품 필라멘트비 (PRD 3.6) = Σ ProductFilament.grams × g당 가격
+  g당 가격은 ProductFilament.color 가 있으면 그 색상 기준, 없으면 Filament.price ÷ Filament.spool_g
 
 회사별 무게 (PRD SUM-04)
   상태별 kg = 그 상태 스풀 수 × Filament.spool_g ÷ 1000   (필라멘트마다 계산해서 합산)
@@ -142,6 +161,10 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Spool.color` → `Color` | PROTECT | 스풀이 있으면 색상 삭제 불가 |
 | `ProductFilament.filament` → `Filament` | PROTECT | 제품에서 쓰면 필라멘트 삭제 불가 |
 | `ProductPart.part` → `Part` | PROTECT | 제품에서 쓰면 부자재 삭제 불가 |
+| `ProductFilament.color` → `Color` | SET_NULL | 색상을 지우면 그 줄은 색상 선택 안 함 (필라멘트 가격으로 계산). 지우기 전에 쓰는 제품을 알려 주고 확인 ([TBD-04](TBD.md)) |
+| `Product.category` → `Category` | PROTECT | 제품이 있으면 카테고리 삭제 불가 |
+| `Product.subcategory` → `Subcategory` | PROTECT | 제품이 있으면 세부 분류 삭제 불가 |
+| `Subcategory.category` → `Category` | CASCADE | 카테고리 삭제 시 (제품이 없을 때만 가능) 세부 분류도 함께 삭제 |
 | `ProductFilament.product` → `Product` | CASCADE | 제품 삭제 시 함께 삭제 |
 | `ProductPart.product` → `Product` | CASCADE | 제품 삭제 시 함께 삭제 |
 
@@ -156,6 +179,11 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Spool.code_no` | UNIQUE | 스풀 번호 (= 스풀 코드) 중복 방지 |
 | `Spool.status` | CHOICES | `sealed`(재고) / `open`(사용 중) / `empty`(사용 완료) |
 | `Spool (color, status)` | INDEX | 색상별 상태 개수 집계 |
+| `Category.name` | UNIQUE | 카테고리 이름 중복 방지 |
+| `Subcategory (category, name)` | UNIQUE | 같은 카테고리 안 세부 분류 이름 중복 방지 |
+| `Product.code` | UNIQUE | 제품 No. 중복 방지 |
+| `Product.subcategory` | 검사 | 세부 분류는 그 제품의 카테고리에 속해야 함 (`Product.clean`) |
+| `ProductFilament.color` | 검사 | 색상은 그 줄의 필라멘트에 속해야 함 (`ProductFilament.clean`) |
 
 ## 참고 사항
 - 금액·무게·수량은 `DecimalField` (부동소수점 오차 방지). 원 단위 반올림은 화면/CSV 에서 한다.

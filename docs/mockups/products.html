@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>제품 원가 — 3D Farm Farm 목업</title>
+<!--
+  제품 원가 탭 HTML 목업 (docs/PRD.md 3.6, docs/screens.md 2 기준)
+  - 더미 데이터로 동작하며 새로고침하면 초기화된다.
+  - 설정값은 PRD 3.8 기본값에 프린터 구매가 · 실패율만 넣은 더미 값이다.
+  - 스크린샷용: ?open=product | product-new | product-warn | manage | category,  ?theme=dark | light
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f1f3f6; --border: #e2e5ea;
+  --text: #1c2026; --muted: #6b7380; --accent: #2f6fed; --accent-soft: #e8efff;
+  --good: #1f9254; --warn: #b7791f; --bad: #d64545; --good-soft: #e6f5ec; --warn-soft: #fff6e5; --bad-soft: #fdecec;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
+  --radius: 10px; color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #14161a; --surface: #1c1f24; --surface-2: #24282e; --border: #30353d;
+  --text: #e8eaee; --muted: #9aa2ad; --accent: #6b9bff; --accent-soft: #1f2a44;
+  --good: #4cc38a; --warn: #e5b04a; --bad: #ff6b6b; --good-soft: #1b3127; --warn-soft: #3a3020; --bad-soft: #3d2224;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* 사이드바: 접으면 아이콘만, 펼치면 이름까지 */
+.layout { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; --side-w: 220px; transition: grid-template-columns .15s; }
+.layout.collapsed { --side-w: 64px; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; background: var(--surface); border-right: 1px solid var(--border); overflow: hidden; }
+.side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; font-weight: 700; font-size: 15px; white-space: nowrap; }
+.side-brand .mark { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -.5px; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border: 0; background: none; border-radius: 8px; color: var(--muted); font-weight: 600; white-space: nowrap; cursor: pointer; text-align: left; text-decoration: none; }
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); }
+.nav-item svg { width: 20px; height: 20px; flex: none; }
+.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.layout.collapsed .label { display: none; }
+.layout.collapsed .nav-item, .layout.collapsed .side-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.mock-tag { font-size: 11px; color: var(--muted); padding: 0 10px; white-space: nowrap; }
+.layout.collapsed .mock-tag { display: none; }
+main { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px; }
+.page-title { margin: 0 0 14px; font-size: 20px; }
+
+/* 공통 */
+h4 { margin: 0; font-size: 14px; }
+.hint { color: var(--muted); font-size: 13px; }
+.muted { color: var(--muted); }
+.btn { border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+.btn:disabled { opacity: .4; cursor: default; }
+input, select, textarea { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+input[type=number] { text-align: right; }
+textarea { resize: vertical; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.badge.good { background: var(--good-soft); color: var(--good); }
+.badge.info { background: var(--accent-soft); color: var(--accent); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.icon-btn { border: 0; background: none; cursor: pointer; color: var(--muted); border-radius: 6px; font-size: 15px; width: 32px; height: 32px; }
+.icon-btn:hover { background: var(--surface-2); color: var(--bad); }
+
+/* 요약 카드 */
+/* 상태별 개수: 필라멘트 화면의 전체 요약처럼 맨 위 작은 글씨 한 줄 */
+.stats { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--text); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.stats .bad b { color: var(--bad); }
+.top-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top-row .spacer { flex: 1; }
+.sum-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 4px; padding: 2px; }
+/* div · button 카드 모두 내용을 위에서부터 (button 은 기본이 세로 가운데 정렬) */
+.sum-card { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); text-align: left; }
+.sum-card > span { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.sum-card strong { display: block; font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.sum-card strong small { font-size: 13px; color: var(--muted); font-weight: 600; margin-left: 2px; }
+button.sum-card { cursor: pointer; transition: border-color .1s; }
+button.sum-card:hover { border-color: var(--accent); }
+button.sum-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* 설명 문구는 (?) 에 마우스를 올리면 위로 (아래 숫자를 가리지 않게) */
+.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; }
+.help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: 0; }
+.help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 240px; padding: 6px 10px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; }
+.help:hover::after, .help:focus::after { opacity: 1; }
+.sum-card.warn strong { color: var(--warn); }
+
+/* 도구 모음 */
+/* 목록 제목 줄: 필라멘트 화면의 "필라멘트 목록" 줄과 같은 모양 */
+.section-head { display: flex; align-items: center; gap: 12px; margin: 22px 0 10px; }
+.section-head .spacer { flex: 1; }
+.section-head h3 { margin: 0; font-size: 15px; }
+.list-toolbar { flex-wrap: wrap; }
+.list-toolbar input[type=search] { width: 200px; }
+
+/* 제품 표 */
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface-2); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--surface-2); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.pname { font-weight: 700; font-size: 14px; }
+.pname .badge { margin-left: 6px; vertical-align: 1px; }
+.fils { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.fils small { color: var(--muted); margin-left: 4px; }
+.sub-name { color: var(--muted); font-size: 12px; }
+/* 색상: 실제 색 동그라미 (검정·흰색도 보이게 얇은 테두리), 많으면 +N */
+.swatch { display: inline-block; width: 16px; height: 16px; border-radius: 50%; flex: none; border: 1px solid var(--border); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.swatch.none { background: repeating-linear-gradient(45deg, transparent 0 3px, var(--border) 3px 4px); }
+.swatches { display: inline-flex; align-items: center; gap: 3px; vertical-align: middle; }
+.swatches .more { margin-left: 3px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.m-good { color: var(--good); font-weight: 700; } .m-warn { color: var(--warn); font-weight: 700; } .m-bad { color: var(--bad); font-weight: 700; }
+tr.discontinued td:not(:first-child) { opacity: .55; }
+.empty { padding: 40px; text-align: center; color: var(--muted); }
+
+/* 대화상자 */
+dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+dialog.narrow { width: min(380px, calc(100vw - 32px)); }
+dialog.wide { width: min(760px, calc(100vw - 32px)); }
+dialog.xwide { width: min(1000px, calc(100vw - 32px)); }
+.dlg-head { padding: 14px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+.dlg-body { padding: 16px 20px; overflow-y: auto; max-height: calc(100vh - 150px); }
+.dlg-foot { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.dlg-foot .spacer { flex: 1; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.full { grid-column: 1 / -1; }
+.field > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.with-suffix { display: flex; align-items: center; gap: 6px; }
+.with-suffix input, .with-suffix select { flex: 1; }
+.with-suffix em { font-style: normal; color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+/* 제품 관리: 왼쪽 카테고리 목록, 오른쪽 선택한 카테고리의 제품 (필라멘트 관리 창과 같은 모양) */
+.manage { display: grid; grid-template-columns: 240px 1fr; gap: 16px; min-height: 340px; }
+.list { display: flex; flex-direction: column; gap: 4px; }
+.list-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
+.list-item:hover { background: var(--surface-2); }
+.list-item.active { border-color: var(--accent); background: var(--accent-soft); }
+.list-item .grow { flex: 1; min-width: 0; }
+.list-item small { display: block; color: var(--muted); font-size: 12px; }
+.list-item.uncategorized strong { color: var(--muted); font-weight: 600; }
+/* 세부 분류: 카테고리 아래 들여쓰기 */
+.list-item.sub { margin-left: 16px; padding: 5px 10px; font-size: 13px; }
+.list-item.sub strong { font-weight: 600; }
+.list-item.sub > small { display: inline; }
+.group-label { margin: 10px 0 0; padding-bottom: 4px; font-size: 12px; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--border); }
+.sub-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 32px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.manage-right { border-left: 1px solid var(--border); padding-left: 16px; }
+.manage-right h4 { margin: 2px 0 10px; font-size: 14px; }
+.row-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.row-btns { display: flex; align-items: center; gap: 4px; }
+.row-item:last-of-type { border-bottom: 0; }
+.row-item strong { font-size: 14px; }
+.row-item .badge { margin-left: 4px; }
+.row-item .price { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 제품 추가/수정 (시안 G): 머리 띠 + 왼쪽 재료 표 + 오른쪽 원가 계산 */
+.product-form { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+/* 머리 띠: 창 제목 자리를 옅은 색 띠로, 제품명 크게 · No. 와 상태는 윗줄 · 카테고리 › 세부는 아래 */
+.hero { padding: 14px 20px; border-bottom: 1px solid var(--border); border-radius: 14px 14px 0 0; background: linear-gradient(var(--accent-soft), var(--surface)); }
+.hero-top { display: flex; align-items: center; gap: 10px; }
+/* 창 제목은 따로 없음 (제품명이 제목). 추가 · 복제일 때만 No. 옆에 작게 표시 */
+.hero-top .copy-from { font-size: 12px; color: var(--muted); }
+.hero-top .spacer { flex: 1; }
+.hero .code-wrap { display: inline-flex; align-items: center; color: var(--muted); font-size: 12px; font-weight: 600; }
+.hero .code-wrap input { width: 56px; padding: 2px 6px; text-align: left; font-weight: 600; }
+.title-input { width: 100%; margin-top: 2px; padding: 2px 0 4px; border: 0; border-bottom: 1px dashed transparent; border-radius: 0; background: transparent; font-size: 22px; font-weight: 800; }
+.title-input:hover { border-bottom-color: var(--border); }
+.title-input:focus { outline: 0; border-bottom-color: var(--accent); }
+.hero-meta { display: flex; align-items: center; gap: 4px; margin: 4px 0 0 -8px; color: var(--muted); }
+.hero-meta select { padding: 3px 8px; font-weight: 600; color: var(--text); }
+/* 평소엔 글자처럼, 마우스를 올리면 칸 테두리 */
+.ghost { border: 1px solid transparent; background: transparent; }
+.ghost:hover { border-color: var(--border); background: var(--surface); }
+.ghost:focus { background: var(--surface); }
+/* 상태: 고정 3가지라 드롭다운 대신 점 달린 알약 버튼 */
+.pills { display: flex; gap: 6px; }
+.pills label { position: relative; cursor: pointer; }
+.pills input { position: absolute; opacity: 0; pointer-events: none; }
+.pills span { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.pills span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .5; }
+.pills label:hover span { color: var(--text); }
+.pills input:checked + span { color: var(--text); border-color: currentColor; }
+.pills input:checked + span::before { opacity: 1; }
+.pills .pill-on_sale input:checked + span { color: var(--good); background: var(--good-soft); }
+.pills .pill-developing input:checked + span { color: var(--accent); background: var(--accent-soft); }
+.pills .pill-discontinued input:checked + span { color: var(--muted); background: var(--surface-2); }
+.pills input:focus-visible + span { outline: 2px solid var(--accent); }
+/* 재료 표: 한 줄에 한 항목, 끝에 그 줄 금액 (단가는 금액에 마우스를 올리면) */
+.lines { margin-top: 18px; }
+.lines:first-child { margin-top: 0; }
+.lines-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.lines-head h4 small { color: var(--muted); font-weight: 400; margin-left: 4px; }
+.lines .none { padding: 10px; border: 1px dashed var(--border); border-radius: 8px; text-align: center; color: var(--muted); font-size: 13px; }
+.mat-head, .mat-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 84px 76px 32px; gap: 8px; align-items: center; }
+.mat.parts .mat-head, .mat.parts .mat-row { grid-template-columns: minmax(0, 1fr) 84px 76px 32px; }
+.mat-head { padding: 0 2px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.mat-head .r, .mat-row .amt { text-align: right; }
+.mat-row { margin-bottom: 6px; }
+.mat-row .amt { font-size: 13px; font-variant-numeric: tabular-nums; cursor: help; }
+.mat-row.missing .amt { color: var(--warn); font-weight: 600; }
+.mat-row.missing select { border-color: var(--warn); }
+.mat-total { display: flex; justify-content: flex-end; gap: 10px; padding: 4px 40px 0 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mat-total b { color: var(--text); }
+.color-pick { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.color-pick select { flex: 1; min-width: 0; }
+/* 원가 패널 맨 위: 원가 계산에 쓰는 입력값 (출력 시간 · 판매가) */
+.panel-inputs { display: grid; gap: 10px; padding-bottom: 12px; margin-bottom: 6px; border-bottom: 1px solid var(--border); }
+.time-input { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 6px; }
+.time-input input { width: 100%; }
+.time-input em { font-style: normal; color: var(--muted); font-size: 13px; }
+.cost-panel { position: sticky; top: 0; background: var(--surface-2); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.cost-panel h4 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.cost-panel h4 small { color: var(--muted); font-weight: 400; }
+.cost-line { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.cost-line > span:first-child { color: var(--muted); }
+.cost-line small { color: var(--muted); }
+.cost-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--border); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.cost-total strong { font-size: 18px; }
+.cost-gap { height: 10px; }
+.margin-row { display: flex; justify-content: flex-end; font-size: 13px; }
+.rec { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--surface); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.rec b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.warn-list { margin: 8px 0 0; padding: 10px 12px 10px 30px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 12.5px; }
+.warn-list li + li { margin-top: 2px; }
+
+/* 알림 */
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 600; z-index: 100; }
+.toast[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  main { padding: 16px; } .layout { --side-w: 64px; } .layout .label { display: none; } .layout .nav-item, .layout .side-brand { justify-content: center; padding-left: 0; padding-right: 0; } .mock-tag, [data-act="toggle-side"] { display: none; }
+  .sum-cards { grid-template-columns: 1fr; }
+  .product-form, .form-grid { grid-template-columns: 1fr; }
+  .cost-panel { position: static; }
+  .mat-head { display: none; }
+  .mat-row { grid-template-columns: minmax(0, 1fr) 84px 32px !important; } .mat-row .color-pick { grid-column: 1; grid-row: 2; } .mat-row .amt { grid-column: 2 / -1; grid-row: 2; }
+  .hero-top { flex-wrap: wrap; }
+  .manage { grid-template-columns: 1fr; } .manage-right { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="layout" id="layout">
+  <aside class="sidebar">
+    <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
+    <a class="nav-item active" href="products.html" title="제품 원가">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
+    <a class="nav-item" href="filaments.html" title="필라멘트">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
+    <button class="nav-item" title="부자재" onclick="toast('부자재 화면 (목업 범위 밖)')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></button>
+    <button class="nav-item" title="설정" onclick="toast('설정 화면 (목업 범위 밖)')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="label">설정</span></button>
+    <div class="side-bottom">
+      <span class="mock-tag">목업 · 더미 데이터</span>
+      <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
+    </div>
+  </aside>
+  <main id="view"></main>
+</div>
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+<dialog id="dlg2"><form method="dialog" id="dlg2-form"></form></dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- 더미 데이터
+// 설정 (감가상각 · 실패 보정도 보이도록 프린터 구매가 · 실패율을 넣은 더미 값)
+const settings = {
+  power_kw: 0.36, elec_rate: 215, printer_price: 549000, printer_life_hours: 5000, failure_rate: 5,
+  fee_order: 1.98, fee_sales: 2.73, shipping_cost: 0, target_margin: 40,
+};
+const db = {
+  // 필라멘트 (filaments.html 더미 데이터 일부 + 색상 몇 개 추가). 색상 price 가 있으면 그 색상만 다른 가격
+  filaments: [
+    { id: 1, name: "Bambu Lab › PLA Basic", price: 14400, spool_g: 1000, colors: [
+      { id: 1, name: "화이트", hex: "#F5F5F5" }, { id: 2, name: "블랙", hex: "#1A1A1A", price: 15000 }, { id: 3, name: "그레이", hex: "#8E9196" },
+      { id: 101, name: "레드", hex: "#C62828" }, { id: 102, name: "블루", hex: "#1565C0" }, { id: 103, name: "옐로우", hex: "#F9A825" },
+      { id: 104, name: "그린", hex: "#2E7D32" }, { id: 105, name: "오렌지", hex: "#EF6C00" }] },
+    { id: 2, name: "Bambu Lab › PLA Matte", price: 16000, spool_g: 1000, colors: [{ id: 4, name: "아이보리", hex: "#EDE6D6" }, { id: 5, name: "차콜", hex: "#3B3B3B" }] },
+    { id: 4, name: "Esun › PLA", price: 8000, spool_g: 1000, colors: [{ id: 7, name: "화이트", hex: "#FFFFFF" }, { id: 8, name: "레드", hex: "#D32F2F" }] },
+    { id: 5, name: "Esun › PETG", price: null, spool_g: 1000, colors: [{ id: 9, name: "클리어", hex: "#DDE8EE" }] },
+    { id: 6, name: "Coobean › PLA", price: 9000, spool_g: 1000, colors: [{ id: 10, name: "블루", hex: "#1E5BB8" }, { id: 11, name: "옐로우", hex: "#F2C230" }] },
+    { id: 8, name: "Polymaker › PLA PolyTerra", price: 18000, spool_g: 1000, colors: [{ id: 13, name: "샌드", hex: "#C8B593" }, { id: 14, name: "세이지", hex: "#8A9A7B" }] },
+    { id: 11, name: "Elegoo › PLA+", price: 11000, spool_g: 1000, colors: [{ id: 18, name: "그레이", hex: "#9E9E9E" }] },
+    { id: 12, name: "Kingroon › PLA", price: 7500, spool_g: 1000, colors: [{ id: 19, name: "블랙", hex: "#1C1C1C" }] },
+  ],
+  // 부자재
+  parts: [
+    { id: 1, name: "네오디뮴 자석 6×3mm", price: 12000, pack_qty: 200, unit: "개" },
+    { id: 2, name: "M3 볼트 10mm", price: 5900, pack_qty: 100, unit: "개" },
+    { id: 3, name: "OPP 봉투 15×20", price: 8900, pack_qty: 500, unit: "장" },
+    { id: 4, name: "소형 박스", price: 22000, pack_qty: 50, unit: "개" },
+    { id: 5, name: "USB LED 모듈", price: 35000, pack_qty: 10, unit: "개" },
+    { id: 6, name: "에어캡 완충재", price: null, pack_qty: 1, unit: "롤" },
+    { id: 7, name: "제품 스티커", price: 15000, pack_qty: 1000, unit: "장" },
+  ],
+  // 카테고리 · 세부 분류: 제품 관리 창에서 추가·수정 (인테리어는 아직 제품이 없는 예)
+  categories: [
+    { id: 1, name: "수업 교구" }, { id: 2, name: "퍼즐" }, { id: 3, name: "키링" }, { id: 4, name: "생활용품" }, { id: 5, name: "인테리어" },
+  ],
+  subcategories: [
+    { id: 1, category: 1, name: "수학" }, { id: 2, category: 1, name: "과학" }, { id: 3, category: 2, name: "입체 퍼즐" },
+  ],
+  // category · sub: 카테고리 · 세부 분류 id (null = 없음)
+  // fils: [필라멘트 id, g, 색상 id(null = 선택 안 함)], parts: [부자재 id, 수량]
+  products: [
+    { id: 1, code: "001", category: 1, sub: 1, name: "분수 원판 세트", status: "on_sale", minutes: 200, sale: 18900, note: "자석은 원판 뒷면에 2개씩",
+      fils: [[1, 24, 101], [1, 24, 102], [1, 24, 103], [1, 24, 104], [1, 24, 105], [4, 60, 7]], parts: [[1, 12], [3, 1], [7, 1]] },
+    { id: 2, code: "002", category: 1, sub: 1, name: "정다면체 전개도 모형", status: "on_sale", minutes: 250, sale: 24000, note: "",
+      fils: [[6, 105, 10], [6, 105, 11]], parts: [[1, 20], [4, 1], [7, 1]] },
+    { id: 3, code: "003", category: 2, sub: 3, name: "소마 큐브", status: "on_sale", minutes: 165, sale: 12900, note: "",
+      fils: [[4, 50, 7], [4, 45, 8], [12, 40, 19]], parts: [[3, 1]] },
+    { id: 4, code: "004", category: 3, sub: null, name: "이름 키링", status: "on_sale", minutes: 35, sale: 4900, note: "색상 랜덤 · 이름 각인은 주문 메모로 받음",
+      fils: [[2, 8, null]], parts: [[3, 1]] },
+    { id: 5, code: "005", category: 4, sub: null, name: "USB 무드등", status: "on_sale", minutes: 360, sale: 9900, note: "",
+      fils: [[2, 180, 4]], parts: [[5, 1], [4, 1]] },
+    { id: 6, code: "006", category: 1, sub: 2, name: "기어 원리 키트", status: "developing", minutes: 300, sale: null, note: "PETG 가격 확인 필요",
+      fils: [[5, 150, 9], [1, 40, 2]], parts: [[2, 8], [6, 1]] },
+    { id: 7, code: "007", category: 2, sub: 3, name: "하노이 탑", status: "discontinued", minutes: 300, sale: 5500, note: "원가가 판매가보다 높아 판매 중지",
+      fils: [[8, 120, 13], [8, 100, 14]], parts: [[4, 1]] },
+    { id: 8, code: "008", category: 1, sub: 1, name: "도형 칠교", status: "developing", minutes: null, sale: 8900, note: "",
+      fils: [[11, 0, 18]], parts: [] },
+  ],
+};
+const STATUS = { on_sale: ["판매중", "good"], developing: ["개발중", "info"], discontinued: ["판매중지", ""] };
+
+// ---------------------------------------------------------------- 계산 (PRD 3.6 원가 계산 규칙)
+const byId = (list, id) => list.find((x) => x.id === Number(id));
+const colorOf = (f, cid) => (cid == null ? null : f.colors.find((c) => c.id === Number(cid)) || null);
+// g당 가격: 색상 가격이 있으면 색상 가격, 없으면 필라멘트 가격
+const spoolPrice = (f, col) => col?.price ?? f.price;
+function calc(p) {
+  const S = settings, warn = [];
+  let grams = 0, fil = 0, parts = 0;
+  p.fils.forEach(([id, g, cid]) => {
+    const f = byId(db.filaments, id), price = spoolPrice(f, colorOf(f, cid)); grams += g || 0;
+    if (price == null) warn.push(`${f.name} 가격 미입력`); else fil += (g || 0) * price / f.spool_g;
+  });
+  if (!grams) warn.push("필라멘트 사용량 미입력");
+  if (!p.minutes) warn.push("출력 시간 미입력");
+  p.parts.forEach(([id, q]) => {
+    const x = byId(db.parts, id);
+    if (x.price == null) warn.push(`${x.name} 가격 미입력`); else parts += (q || 0) * x.price / x.pack_qty;
+  });
+  if (!p.sale) warn.push("판매가 미입력");
+  const h = (p.minutes || 0) / 60;
+  const elec = h * S.power_kw * S.elec_rate;
+  const depr = S.printer_price ? h * S.printer_price / S.printer_life_hours : 0;
+  const fail = (fil + elec + depr) * S.failure_rate / 100;
+  const cost = fil + elec + depr + fail + parts;
+  const feeRate = (S.fee_order + S.fee_sales) / 100;
+  const fee = p.sale ? p.sale * feeRate : 0;
+  const net = p.sale ? p.sale - cost - fee - S.shipping_cost : null;
+  const denom = 1 - feeRate - S.target_margin / 100;
+  const rec = denom > 0 ? Math.ceil((cost + S.shipping_cost) / denom / 100) * 100 : null;
+  return { grams, fil, elec, depr, fail, parts, cost, feeRate, fee, net, margin: p.sale ? net / p.sale : null, rec, warn };
+}
+// 제품에 쓰는 색상 (같은 색상은 한 번만)
+function productColors(p) {
+  const seen = new Map();
+  p.fils.forEach(([id, , cid]) => { const col = colorOf(byId(db.filaments, id), cid); if (col && !seen.has(col.id)) seen.set(col.id, col); });
+  return [...seen.values()];
+}
+
+// ---------------------------------------------------------------- 유틸
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const won = (n) => (n == null ? "-" : Math.round(n).toLocaleString("ko-KR") + "원");
+const pct = (r) => (r == null ? "-" : (Math.round(r * 1000) / 10).toLocaleString("ko-KR") + "%");
+const marginCls = (r) => (r == null ? "muted" : r < 0 ? "m-bad" : r < 0.2 ? "m-warn" : "m-good");
+const hm = (min) => (!min ? "-" : min < 60 ? `${min}분` : `${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ""}`);
+const help = (tip) => `<span class="help" tabindex="0" data-tip="${esc(tip)}">?</span>`;
+const statusBadge = (s) => `<span class="badge ${STATUS[s][1]}">${STATUS[s][0]}</span>`;
+const swatch = (hex) => `<span class="swatch" style="background:${esc(hex)}"></span>`;
+// 목록 색상 칸: 실제 색 동그라미, 5개가 넘으면 4개 + "+N"
+const MAX_SWATCH = 5;
+function swatches(p) {
+  const cs = productColors(p);
+  if (!cs.length) return '<span class="muted">-</span>';
+  const shown = cs.length > MAX_SWATCH ? cs.slice(0, MAX_SWATCH - 1) : cs;
+  return `<span class="swatches" title="${esc(cs.map((c) => c.name).join(", "))}">${shown.map((c) => swatch(c.hex)).join("")}${cs.length > shown.length ? `<span class="more">+${cs.length - shown.length}</span>` : ""}</span>`;
+}
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200);
+}
+
+// ---------------------------------------------------------------- 카테고리 · 세부 분류
+const categories = () => [...db.categories].sort((a, b) => a.name.localeCompare(b.name));
+const subsOf = (cid) => db.subcategories.filter((s) => s.category === cid).sort((a, b) => a.name.localeCompare(b.name));
+const catName = (id) => byId(db.categories, id)?.name ?? "";
+const subName = (id) => byId(db.subcategories, id)?.name ?? "";
+// 선택 키: "c:1" = 카테고리, "s:2" = 세부 분류, "none" = 미분류
+const inSel = (p, sel) => {
+  if (!sel) return true;
+  if (sel === "none") return p.category == null;
+  const [k, id] = sel.split(":");
+  return k === "c" ? p.category === Number(id) : p.sub === Number(id);
+};
+const selLabel = (sel) => {
+  if (sel === "none") return "미분류";
+  const [k, id] = sel.split(":");
+  if (k === "c") return catName(id);
+  const s = byId(db.subcategories, id);
+  return `${catName(s.category)} › ${s.name}`;
+};
+
+// ---------------------------------------------------------------- 화면
+const state = { q: "", cat: "", needOnly: false, sort: "code" };
+// 정렬: 필라멘트 목록과 같은 "정렬: …" 선택. 입력이 덜 된 제품의 순마진율은 정확하지 않아 맨 뒤로
+const marginOf = (x) => (x.c.warn.length ? null : x.c.margin);
+const byMargin = (dir) => (a, b) => (marginOf(a) == null) - (marginOf(b) == null) || dir * ((marginOf(a) ?? 0) - (marginOf(b) ?? 0)) || a.p.code.localeCompare(b.p.code);
+const SORTS = [
+  ["code", "No. 순", (a, b) => a.p.code.localeCompare(b.p.code)],
+  ["name", "이름순", (a, b) => a.p.name.localeCompare(b.p.name)],
+  ["marginAsc", "순마진율 낮은 순", byMargin(1)],
+  ["marginDesc", "순마진율 높은 순", byMargin(-1)],
+  ["costDesc", "원가 높은 순", (a, b) => b.c.cost - a.c.cost || a.p.code.localeCompare(b.p.code)],
+];
+
+function render() {
+  const all = db.products.map((p) => ({ p, c: calc(p) }));
+  const done = all.filter((x) => !x.c.warn.length);
+  // 평균 순마진율: 판매중이고 입력이 끝난 제품만 (개발중 · 판매중지는 빼고)
+  const onSale = done.filter((x) => x.p.status === "on_sale");
+  const avg = onSale.length ? onSale.reduce((a, x) => a + x.c.margin, 0) / onSale.length : null;
+  const need = all.length - done.length;
+  const byStatus = (st) => all.filter((x) => x.p.status === st).length;
+
+  const q = state.q.trim().toLowerCase();
+  const rows = all
+    .filter(({ p, c }) => inSel(p, state.cat) && (!state.needOnly || c.warn.length)
+      && (!q || [p.code, p.name, ...productColors(p).map((x) => x.name)].join(" ").toLowerCase().includes(q)))
+    .sort(SORTS.find(([k]) => k === state.sort)[2]);
+
+  $("#view").innerHTML = `
+    <h2 class="page-title">제품 원가</h2>
+    <div class="top-row">
+      <div class="stats">
+        <span>판매중<b>${byStatus("on_sale")}</b></span><span>개발중<b>${byStatus("developing")}</b></span>
+        <span class="${byStatus("discontinued") ? "bad" : ""}">판매중지<b>${byStatus("discontinued")}</b></span>
+      </div>
+      <div class="spacer"></div>
+      <button type="button" class="btn" data-act="manage">제품 관리</button>
+    </div>
+    <div class="sum-cards">
+      <div class="sum-card"><span>등록 제품</span><strong>${all.length}<small>개</small></strong></div>
+      <div class="sum-card"><span>평균 순마진율${help(`판매중이고 입력이 끝난 제품 ${onSale.length}개 기준 · 수수료 반영`)}</span><strong class="${marginCls(avg)}">${pct(avg)}</strong></div>
+      <button type="button" class="sum-card ${need ? "warn" : ""} ${state.needOnly ? "active" : ""}" data-act="need-only">
+        <span>입력 필요${help(state.needOnly ? "입력 필요 제품만 보는 중 · 다시 누르면 해제" : "누르면 입력이 덜 된 제품만 보기")}</span><strong>${need}<small>개</small></strong></button>
+    </div>
+    <div class="section-head list-toolbar"><h3>제품 목록</h3><span class="hint">${rows.length}개</span><div class="spacer"></div>
+      <input type="search" id="q" placeholder="제품명·번호·색상 검색" value="${esc(state.q)}">
+      <select id="f-cat"><option value="">카테고리: 전체</option>${categories().map((c) => `<option value="c:${c.id}" ${state.cat === `c:${c.id}` ? "selected" : ""}>${esc(c.name)}</option>`
+        + subsOf(c.id).map((s) => `<option value="s:${s.id}" ${state.cat === `s:${s.id}` ? "selected" : ""}>　› ${esc(s.name)}</option>`).join("")).join("")}</select>
+      <select id="f-sort">${SORTS.map(([k, label]) => `<option value="${k}" ${k === state.sort ? "selected" : ""}>정렬: ${label}</option>`).join("")}</select>
+      ${state.q || state.cat || state.needOnly ? '<button type="button" class="btn small" data-act="clear">필터 지우기</button>' : ""}
+      <button type="button" class="btn" data-act="csv">엑셀(CSV) 내보내기</button>
+    </div>
+    <div class="table-wrap">
+      ${rows.length ? `<table>
+        <thead><tr><th>No.</th><th>카테고리</th><th>제품명</th><th>색상</th><th>필라멘트</th><th class="num">사용량</th><th class="num">출력시간</th>
+          <th class="num">원가</th><th class="num">판매가</th><th class="num">순이익</th><th class="num">순마진율</th></tr></thead>
+        <tbody>${rows.map(row).join("")}</tbody></table>`
+      : '<div class="empty">조건에 맞는 제품이 없어요.</div>'}
+    </div>`;
+  bindView();
+}
+
+function row({ p, c }) {
+  const filIds = [...new Set(p.fils.map(([id]) => id))];
+  const first = filIds.length ? byId(db.filaments, filIds[0]).name : "-";
+  return `<tr data-id="${p.id}" class="${p.status === "discontinued" ? "discontinued" : ""}">
+    <td class="muted">${esc(p.code)}</td>
+    <td>${p.category == null ? '<span class="muted">미분류</span>' : esc(catName(p.category))}${p.sub ? `<span class="sub-name"> › ${esc(subName(p.sub))}</span>` : ""}</td>
+    <td><span class="pname">${esc(p.name)}</span>${p.status === "on_sale" ? "" : statusBadge(p.status)}</td>
+    <td>${swatches(p)}</td>
+    <td class="fils" title="${esc(p.fils.map(([id, g, cid]) => `${byId(db.filaments, id).name}${colorOf(byId(db.filaments, id), cid) ? ` · ${colorOf(byId(db.filaments, id), cid).name}` : ""} ${g}g`).join("\n"))}">${esc(first)}${filIds.length > 1 ? `<small>+${filIds.length - 1}</small>` : ""}</td>
+    <td class="num">${c.grams ? c.grams.toLocaleString("ko-KR") + "g" : "-"}</td>
+    <td class="num">${hm(p.minutes)}</td>
+    <td class="num">${won(c.cost)}</td>
+    <td class="num">${won(p.sale)}</td>
+    <td class="num">${won(c.net)}</td>
+    <td class="num ${c.warn.length ? "" : marginCls(c.margin)}">${c.warn.length
+      // 입력이 덜 된 제품은 순마진율이 정확하지 않아 그 자리에 배지 (빠진 항목은 마우스를 올리면)
+      ? `<span class="badge warn" title="${esc(c.warn.join("\n"))}">입력 필요</span>` : pct(c.margin)}</td>
+  </tr>`;
+}
+
+function bindView() {
+  const q = $("#q");
+  q.oninput = () => { state.q = q.value; const pos = q.selectionStart; render(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); };
+  $("#f-cat").onchange = (e) => { state.cat = e.target.value; render(); };
+  $("#f-sort").onchange = (e) => { state.sort = e.target.value; render(); };
+  $("#view").onclick = (e) => {
+    if (e.target.closest(".help")) return;  // (?) 를 눌러도 필터가 바뀌지 않게
+    const b = e.target.closest("[data-act]");
+    if (b) {
+      return ({
+        "need-only": () => { state.needOnly = !state.needOnly; render(); },
+        clear: () => { Object.assign(state, { q: "", cat: "", needOnly: false }); render(); },
+        csv: exportCsv,
+        manage: () => openManage(),
+      })[b.dataset.act]();
+    }
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) openProduct(byId(db.products, tr.dataset.id));
+  };
+}
+
+// 제품별 원가 내역 → 엑셀용 CSV (UTF-8 BOM)
+function exportCsv() {
+  const head = ["No.", "카테고리", "세부 분류", "제품명", "색상", "상태", "사용량(g)", "출력시간(분)", "필라멘트비", "전기료", "감가상각", "실패 보정", "부자재비", "원가", "판매가", "수수료", "순이익", "순마진율(%)", "입력 필요"];
+  const lines = db.products.map((p) => {
+    const c = calc(p); const r = (n) => (n == null ? "" : Math.round(n));
+    const colors = productColors(p).map((x) => x.name).join(" · ");
+    return [p.code, catName(p.category), subName(p.sub), p.name, colors, STATUS[p.status][0], c.grams, p.minutes ?? "", r(c.fil), r(c.elec), r(c.depr), r(c.fail), r(c.parts), r(c.cost),
+      p.sale ?? "", r(c.fee), r(c.net), c.margin == null ? "" : (c.margin * 100).toFixed(1), c.warn.join(" / ")];
+  });
+  const csv = "﻿" + [head, ...lines].map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "제품원가_2026-10-21.csv"; a.click(); URL.revokeObjectURL(a.href);
+  toast("CSV 파일을 내려받았어요");
+}
+
+// ---------------------------------------------------------------- 대화상자 공통
+const dlg = { el: $("#dlg"), form: $("#dlg-form") };
+const dlg2 = { el: $("#dlg2"), form: $("#dlg2-form") };
+function show(dl, html, cls = "") {
+  dl.el.className = cls; dl.form.innerHTML = html;
+  dl.form.onclick = dl.form.onchange = dl.form.oninput = dl.form.onsubmit = null;
+  if (!dl.el.open) dl.el.showModal();
+}
+// 저장 후 목록과 (열려 있으면) 제품 관리 창을 함께 갱신
+const refresh = () => { render(); if (dlg.el.open && $("#dlg .manage")) openManage(); };
+
+// ---------------------------------------------------------------- 제품 관리 (카테고리 › 세부 분류 → 제품)
+let manageSel = "c:1";
+function openManage() {
+  const hasNone = db.products.some((p) => p.category == null);
+  const valid = (sel) => sel === "none" ? hasNone : sel.startsWith("c:") ? byId(db.categories, sel.slice(2)) : byId(db.subcategories, sel.slice(2));
+  if (!valid(manageSel)) manageSel = db.categories.length ? `c:${categories()[0].id}` : "none";
+  const count = (sel) => db.products.filter((p) => inSel(p, sel)).length;
+  const prodRow = (p) => {
+    const c = calc(p);
+    return `<div class="row-item"><div><strong>${esc(p.name)}</strong>${p.status === "on_sale" ? "" : statusBadge(p.status)}<div class="hint">No. ${esc(p.code)}</div></div>
+      <div class="price">${won(p.sale)}<div class="${c.warn.length ? "muted" : marginCls(c.margin)}">${c.warn.length ? "입력 필요" : pct(c.margin)}</div></div>
+      <div class="row-btns"><button type="button" class="btn small" data-copy-prod="${p.id}">복제</button><button type="button" class="btn small" data-edit-prod="${p.id}">수정</button>
+        <button type="button" class="icon-btn" data-del-prod="${p.id}" title="제품 삭제">✕</button></div></div>`;
+  };
+  const prods = db.products.filter((p) => inSel(p, manageSel)).sort((a, b) => a.code.localeCompare(b.code));
+  // 카테고리를 고르면 세부 분류별로 묶어서 보여줌
+  let right;
+  const subs = manageSel.startsWith("c:") ? subsOf(Number(manageSel.slice(2))) : [];
+  if (subs.length && prods.length) {
+    const groups = [...subs.map((s) => [s.name, prods.filter((p) => p.sub === s.id)]), ["세부 분류 없음", prods.filter((p) => p.sub == null)]].filter(([, ps]) => ps.length);
+    right = groups.map(([name, ps]) => `<div class="group-label">${esc(name)}</div>${ps.map(prodRow).join("")}`).join("");
+  } else {
+    right = prods.map(prodRow).join("") || '<p class="hint">등록된 제품이 없어요.</p>';
+  }
+  const item = (sel, label, sub, extra = "") => `<div class="list-item ${sub ? "sub" : ""} ${sel === manageSel ? "active" : ""} ${sel === "none" ? "uncategorized" : ""}" data-sel="${sel}">
+      <div class="grow"><strong>${esc(label)}</strong>${sub ? "" : `<small>제품 ${count(sel)}개${extra}</small>`}</div>${sub ? `<small>${count(sel)}</small>` : ""}
+      ${sel.startsWith("c:") ? `<button type="button" class="btn small" data-edit-cat="${sel.slice(2)}">수정</button>` : ""}</div>`;
+  show(dlg, `<div class="dlg-head">제품 관리</div><div class="dlg-body"><div class="manage">
+      <div><div class="list">${categories().map((c) => item(`c:${c.id}`, c.name, false, subsOf(c.id).length ? ` · 세부 ${subsOf(c.id).length}` : "")
+          + subsOf(c.id).map((s) => item(`s:${s.id}`, s.name, true)).join("")).join("")}
+        ${hasNone ? item("none", "미분류", false) : ""}</div>
+        <button type="button" class="btn small" style="margin-top:10px" data-add-cat>+ 카테고리 추가</button></div>
+      <div class="manage-right"><h4>${esc(selLabel(manageSel))} 의 제품</h4>${right}
+        <button type="button" class="btn small" style="margin-top:10px" data-add-prod>+ 제품 추가</button></div>
+    </div></div>
+    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button></div>`, "wide");
+  dlg.form.onclick = (e) => {
+    const t = e.target;
+    if (t.closest("[data-close]")) return dlg.el.close();
+    if (t.closest("[data-edit-cat]")) return openCategory(byId(db.categories, t.closest("[data-edit-cat]").dataset.editCat));
+    if (t.closest("[data-add-cat]")) return openCategory(null);
+    if (t.closest("[data-edit-prod]")) return openProduct(byId(db.products, t.closest("[data-edit-prod]").dataset.editProd), dlg2);
+    if (t.closest("[data-copy-prod]")) return openProduct(null, dlg2, { copyOf: byId(db.products, t.closest("[data-copy-prod]").dataset.copyProd) });
+    const del = t.closest("[data-del-prod]");
+    if (del) {
+      const p = byId(db.products, del.dataset.delProd);
+      if (!confirm(`${p.name} 제품을 삭제할까요?`)) return;
+      db.products = db.products.filter((x) => x !== p); refresh(); return toast(`${p.name} 삭제했어요`);
+    }
+    if (t.closest("[data-add-prod]")) {
+      const [k, id] = manageSel.split(":");
+      const preset = k === "c" ? { category: Number(id) } : k === "s" ? { category: byId(db.subcategories, id).category, sub: Number(id) } : {};
+      return openProduct(null, dlg2, preset);
+    }
+    const it = t.closest("[data-sel]");
+    if (it) { manageSel = it.dataset.sel; openManage(); }
+  };
+}
+
+// 카테고리 추가 / 수정: 이름 + 세부 분류 목록
+function openCategory(c) {
+  const subs = c ? subsOf(c.id).map((s) => ({ id: s.id, name: s.name })) : [];
+  const used = (sid) => db.products.filter((p) => p.sub === sid).length;
+  const subRows = () => subs.map((s, i) => `<div class="sub-row" data-i="${i}">
+      <input data-sub-name value="${esc(s.name)}" placeholder="예: 수학"><span class="hint">${s.id ? `제품 ${used(s.id)}개` : "새로 추가"}</span>
+      <button type="button" class="icon-btn" data-rm-sub title="빼기">✕</button></div>`).join("") || '<p class="hint" style="margin:4px 0">세부 분류 없이 써도 돼요. 필요할 때만 추가하세요.</p>';
+  show(dlg2, `<div class="dlg-head">${c ? "카테고리 수정" : "카테고리 추가"}</div><div class="dlg-body"><div class="form-grid">
+    <label class="field full"><span>카테고리 이름 *</span><input name="name" required value="${esc(c?.name)}" placeholder="예: 수업 교구"></label>
+    <div class="field full"><span>세부 분류</span><div id="sub-rows">${subRows()}</div>
+      <button type="button" class="btn small" style="align-self:flex-start" data-add-sub>+ 세부 분류 추가</button></div></div></div>
+    <div class="dlg-foot">${c ? '<button type="button" class="btn danger" data-del>삭제</button>' : ""}<div class="spacer"></div>
+      <button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div>`, "narrow");
+  const form = dlg2.form;
+  const readSubs = () => form.querySelectorAll("[data-sub-name]").forEach((inp, i) => (subs[i].name = inp.value));
+  form.onclick = (e) => {
+    const t = e.target;
+    if (t.closest("[data-close]")) return dlg2.el.close();
+    if (t.closest("[data-add-sub]")) { readSubs(); subs.push({ id: null, name: "" }); $("#sub-rows").innerHTML = subRows(); return form.querySelector(".sub-row:last-child input").focus(); }
+    const rm = t.closest("[data-rm-sub]");
+    if (rm) {
+      readSubs(); const i = Number(rm.closest(".sub-row").dataset.i);
+      if (subs[i].id && used(subs[i].id)) return toast("제품이 있는 세부 분류는 뺄 수 없어요");
+      subs.splice(i, 1); $("#sub-rows").innerHTML = subRows(); return;
+    }
+    if (t.closest("[data-del]")) {
+      if (db.products.some((p) => p.category === c.id)) return toast("제품이 있어서 삭제할 수 없어요");
+      db.categories = db.categories.filter((x) => x !== c); db.subcategories = db.subcategories.filter((s) => s.category !== c.id);
+      dlg2.el.close(); toast("삭제했어요"); refresh();
+    }
+  };
+  form.onsubmit = (e) => {
+    e.preventDefault(); readSubs();
+    const name = form.elements.name.value.trim();
+    if (db.categories.some((x) => x.name === name && x !== c)) return toast("이미 있는 카테고리예요");
+    const keep = subs.map((s) => ({ ...s, name: s.name.trim() })).filter((s) => s.name);
+    if (new Set(keep.map((s) => s.name)).size !== keep.length) return toast("세부 분류 이름이 겹쳐요");
+    let cat = c;
+    if (cat) cat.name = name;
+    else { cat = { id: Math.max(0, ...db.categories.map((x) => x.id)) + 1, name }; db.categories.push(cat); manageSel = `c:${cat.id}`; }
+    db.subcategories = db.subcategories.filter((s) => s.category !== cat.id || keep.some((k) => k.id === s.id));
+    keep.forEach((k) => {
+      if (k.id) byId(db.subcategories, k.id).name = k.name;
+      else db.subcategories.push({ id: Math.max(0, ...db.subcategories.map((x) => x.id)) + 1, category: cat.id, name: k.name });
+    });
+    dlg2.el.close(); toast("저장했어요"); refresh();
+  };
+}
+
+// ---------------------------------------------------------------- 제품 추가 / 수정
+const nextCode = () => String(Math.max(0, ...db.products.map((p) => Number(p.code) || 0)) + 1).padStart(3, "0");
+
+// dl: 목록에서 열면 dlg, 제품 관리 창에서 열면 그 위에 dlg2
+// preset: 제품 관리에서 추가할 때 고른 카테고리 · 세부 분류, copyOf: 복제할 원본 제품 (재료까지 복사, No. 는 다음 번호 · 상태는 개발중)
+function openProduct(p, dl = dlg, preset = {}) {
+  const src = preset.copyOf;
+  const d = p ? structuredClone(p)
+    : src ? { ...structuredClone(src), id: undefined, code: nextCode(), name: `${src.name} (복사)`, status: "developing" }
+    : { code: nextCode(), category: preset.category ?? null, sub: preset.sub ?? null, name: "", status: "developing", minutes: null, sale: null, note: "", fils: [[db.filaments[0].id, 0, null]], parts: [] };
+  const opt = (list, sel, label) => list.map((x) => `<option value="${x.id}" ${x.id === sel ? "selected" : ""}>${esc(label(x))}</option>`).join("");
+  const subOpts = () => `<option value="">세부 분류 없음</option>${opt(subsOf(d.category), d.sub, (s) => s.name)}`;
+  // 줄 금액 · 단가 안내 (색상 가격이 있으면 색상 가격)
+  const filAmt = ([id, g, cid]) => { const f = byId(db.filaments, id), pr = spoolPrice(f, colorOf(f, cid)); return pr == null ? null : (g || 0) * pr / f.spool_g; };
+  const partAmt = ([id, q]) => { const x = byId(db.parts, id); return x.price == null ? null : (q || 0) * x.price / x.pack_qty; };
+  const filUnit = ([id, , cid]) => { const f = byId(db.filaments, id), col = colorOf(f, cid), pr = spoolPrice(f, col);
+    return pr == null ? "필라멘트 가격 미입력 — 0원으로 계산" : `${col?.price != null ? "색상 가격 " : ""}${won(pr)} / ${f.spool_g}g · g당 ${(pr / f.spool_g).toFixed(1)}원`; };
+  const partUnit = ([id]) => { const x = byId(db.parts, id); return x.price == null ? "부자재 가격 미입력 — 0원으로 계산" : `${x.unit}당 ${won(x.price / x.pack_qty)}`; };
+  const filLines = () => d.fils.length ? `<div class="mat"><div class="mat-head"><span>필라멘트</span><span>색상</span><span>사용량</span><span class="r">금액</span><span></span></div>
+    ${d.fils.map((r, i) => { const f = byId(db.filaments, r[0]), col = colorOf(f, r[2]);
+      return `<div class="mat-row ${filAmt(r) == null ? "missing" : ""}" data-kind="fils" data-i="${i}">
+        <select data-k="id">${opt(db.filaments, r[0], (x) => x.name)}</select>
+        <div class="color-pick">${col ? swatch(col.hex) : '<span class="swatch none"></span>'}<select data-k="c"><option value="">색상 선택 안 함</option>${opt(f.colors, col?.id, (x) => x.name)}</select></div>
+        <div class="with-suffix"><input type="number" data-k="v" min="0" step="1" value="${r[1] || ""}" placeholder="0"><em>g</em></div>
+        <span class="amt" data-amt="fils:${i}" title="${esc(filUnit(r))}"></span>
+        <button type="button" class="icon-btn" data-remove title="빼기">✕</button></div>`; }).join("")}
+    <div class="mat-total"><span>합계</span><b data-total="fils"></b></div></div>` : '<div class="none">사용하는 필라멘트가 없어요</div>';
+  const partLines = () => d.parts.length ? `<div class="mat parts"><div class="mat-head"><span>부자재</span><span>수량</span><span class="r">금액</span><span></span></div>
+    ${d.parts.map((r, i) => { const x = byId(db.parts, r[0]);
+      return `<div class="mat-row ${x.price == null ? "missing" : ""}" data-kind="parts" data-i="${i}">
+        <select data-k="id">${opt(db.parts, r[0], (y) => y.name)}</select>
+        <div class="with-suffix"><input type="number" data-k="v" min="0" step="1" value="${r[1] || ""}" placeholder="0"><em>${esc(x.unit)}</em></div>
+        <span class="amt" data-amt="parts:${i}" title="${esc(partUnit(r))}"></span>
+        <button type="button" class="icon-btn" data-remove title="빼기">✕</button></div>`; }).join("")}
+    <div class="mat-total"><span>합계</span><b data-total="parts"></b></div></div>` : '<div class="none">사용하는 부자재가 없어요</div>';
+
+  show(dl, `<div class="hero">
+      <div class="hero-top"><label class="code-wrap">No.<input class="ghost" name="code" value="${esc(d.code)}"></label>
+        ${p ? "" : src ? `<span class="copy-from">${esc(src.name)}에서 복제</span>` : '<span class="badge info">새 제품</span>'}
+        <div class="spacer"></div>
+        <div class="pills">${Object.entries(STATUS).map(([k, [v]]) => `<label class="pill-${k}"><input type="radio" name="status" value="${k}" ${k === d.status ? "checked" : ""}><span>${v}</span></label>`).join("")}</div></div>
+      <input class="title-input" name="name" required autofocus value="${esc(d.name)}" placeholder="제품명">
+      <div class="hero-meta"><select class="ghost" name="category"><option value="">미분류</option>${opt(categories(), d.category, (c) => c.name)}<option value="new">+ 새 카테고리…</option></select><span>›</span>
+        <select class="ghost" name="sub" id="sub-select" ${subsOf(d.category).length ? "" : "disabled"}>${subOpts()}</select></div>
+    </div>
+    <div class="dlg-body"><div class="product-form">
+      <div>
+        <div class="lines"><div class="lines-head"><h4>사용 필라멘트<small>1개 기준</small></h4><button type="button" class="btn small" data-add="fils">+ 추가</button></div>
+          <div id="fils">${filLines()}</div></div>
+        <div class="lines"><div class="lines-head"><h4>사용 부자재<small>1개 기준</small></h4><button type="button" class="btn small" data-add="parts">+ 추가</button></div>
+          <div id="parts">${partLines()}</div></div>
+        <label class="field full" style="margin-top:18px"><span>메모</span><textarea name="note" rows="2">${esc(d.note)}</textarea></label>
+      </div>
+      <div class="cost-panel">
+        <div class="panel-inputs">
+          <div class="field"><span>출력 시간</span><div class="time-input">
+            <input type="number" name="h" min="0" value="${d.minutes != null ? Math.floor(d.minutes / 60) : ""}" placeholder="0"><em>시간</em>
+            <input type="number" name="m" min="0" max="59" value="${d.minutes != null ? d.minutes % 60 : ""}" placeholder="0"><em>분</em></div></div>
+          <label class="field"><span>판매가</span><div class="with-suffix"><input type="number" name="sale" min="0" step="100" value="${d.sale ?? ""}" placeholder="미입력"><em>원</em></div></label>
+        </div>
+        <div id="cost-lines" class="cost-lines"></div>
+      </div>
+    </div></div>
+    <div class="dlg-foot">${p ? '<button type="button" class="btn danger" data-del>삭제</button>' : ""}<div class="spacer"></div>
+      <button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div>`, "xwide");
+  const form = dl.form;
+
+  // 입력값 → d 에 반영 후 원가 내역 · 줄 금액만 다시 그림 (입력 중 커서 유지)
+  const read = () => {
+    const v = (n) => form.elements[n].value.trim();
+    const num = (n) => (v(n) === "" ? null : Number(v(n)));
+    Object.assign(d, { code: v("code"), name: v("name"), sub: num("sub"), status: v("status"), note: v("note"), sale: num("sale") });
+    d.minutes = num("h") == null && num("m") == null ? null : (num("h") || 0) * 60 + (num("m") || 0);
+    d.fils = [...form.querySelectorAll('[data-kind="fils"]')].map((r) => {
+      const id = Number($("[data-k=id]", r).value), cv = $("[data-k=c]", r).value;
+      // 필라멘트를 바꾸면 이전 필라멘트의 색상은 버림
+      return [id, Number($("[data-k=v]", r).value) || 0, cv && colorOf(byId(db.filaments, id), cv) ? Number(cv) : null];
+    });
+    d.parts = [...form.querySelectorAll('[data-kind="parts"]')].map((r) => [Number($("[data-k=id]", r).value), Number($("[data-k=v]", r).value) || 0]);
+  };
+  const panel = () => {
+    const c = calc(d), S = settings;
+    const line = (label, val, sub = "") => `<div class="cost-line"><span>${label}${sub ? ` <small>${sub}</small>` : ""}</span><span>${won(val)}</span></div>`;
+    $("#cost-lines", form).innerHTML = `
+      <h4>원가 내역 <small>제품 1개 · 저장 전 미리보기</small></h4>
+      ${line("필라멘트비", c.fil, c.grams ? `${c.grams.toLocaleString("ko-KR")}g` : "")}
+      ${line("전기료", c.elec, d.minutes ? hm(d.minutes) : "")}
+      ${c.depr ? line("감가상각", c.depr) : ""}
+      ${c.fail ? line("실패 보정", c.fail, `${S.failure_rate}%`) : ""}
+      ${line("부자재비", c.parts)}
+      <div class="cost-total"><span>원가</span><strong>${won(c.cost)}</strong></div>
+      <div class="cost-gap"></div>
+      ${line("판매가", d.sale)}
+      <div class="cost-line"><span>수수료 <small>${(c.feeRate * 100).toFixed(2)}%</small></span><span>${d.sale ? "−" + won(c.fee) : "-"}</span></div>
+      ${S.shipping_cost ? `<div class="cost-line"><span>배송비 <small>판매자 부담</small></span><span>−${won(S.shipping_cost)}</span></div>` : ""}
+      <div class="cost-total"><span>순이익</span><strong class="${d.sale ? marginCls(c.margin) : ""}">${won(c.net)}</strong></div>
+      <div class="margin-row"><span class="muted">순마진율&nbsp;</span><b class="${marginCls(c.margin)}">${pct(c.margin)}</b></div>
+      <div class="rec"><div><div class="muted" style="font-size:12px">권장 판매가 · 목표 마진 ${S.target_margin}%</div><b>${won(c.rec)}</b></div>
+        ${c.rec && c.rec !== d.sale ? '<button type="button" class="btn small" data-use-rec>판매가로</button>' : ""}</div>
+      ${c.warn.length ? `<ul class="warn-list">${c.warn.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}`;
+    form.querySelectorAll("[data-amt]").forEach((el) => {
+      const [k, i] = el.dataset.amt.split(":"), a = k === "fils" ? filAmt(d.fils[i]) : partAmt(d.parts[i]);
+      el.textContent = a == null ? "가격 없음" : won(a);
+    });
+    form.querySelectorAll("[data-total]").forEach((el) => (el.textContent = won(el.dataset.total === "fils" ? c.fil : c.parts)));
+  };
+  const redrawLines = () => { $("#fils", form).innerHTML = filLines(); $("#parts", form).innerHTML = partLines(); panel(); };
+
+  panel();
+  form.oninput = () => { read(); panel(); };
+  form.onchange = (e) => {
+    const t = e.target;
+    if (t.name === "category") {
+      // 새 카테고리는 제품 관리 창에서 만드는 게 기본. 목업에서는 안내만
+      if (t.value === "new") { toast("새 카테고리 입력창이 열려요 (목업)"); t.value = d.category ?? ""; return; }
+      d.category = t.value ? Number(t.value) : null; d.sub = null;
+      const s = $("#sub-select", form); s.innerHTML = subOpts(); s.disabled = !subsOf(d.category).length;
+      return;
+    }
+    if (t.dataset.k === "id" || t.dataset.k === "c") { read(); redrawLines(); }
+  };
+  form.onclick = (e) => {
+    const t = e.target;
+    if (t.closest("[data-close]")) return dl.el.close();
+    const add = t.closest("[data-add]");
+    if (add) {
+      read();
+      if (add.dataset.add === "fils") d.fils.push([db.filaments[0].id, 0, null]); else d.parts.push([db.parts[0].id, 1]);
+      redrawLines();
+      [...form.querySelectorAll(`[data-kind="${add.dataset.add}"]`)].at(-1)?.querySelector("input")?.focus();
+      return;
+    }
+    const rm = t.closest("[data-remove]");
+    if (rm) { read(); const r = rm.closest("[data-kind]"); d[r.dataset.kind].splice(Number(r.dataset.i), 1); return redrawLines(); }
+    if (t.closest("[data-use-rec]")) { form.elements.sale.value = calc(d).rec; read(); return panel(); }
+    if (t.closest("[data-del]")) {
+      if (!confirm(`${p.name} 제품을 삭제할까요?`)) return;
+      db.products = db.products.filter((x) => x !== p); dl.el.close(); refresh(); toast("삭제했어요");
+    }
+  };
+  form.onsubmit = (e) => {
+    e.preventDefault(); read();
+    if (db.products.some((x) => x.code === d.code && x !== p)) return toast(`No. ${d.code} 는 이미 있어요`);
+    d.fils = d.fils.filter(([, g], i, a) => g || a.length === 1);
+    if (p) Object.assign(p, d); else db.products.push({ ...d, id: Math.max(...db.products.map((x) => x.id)) + 1 });
+    dl.el.close(); refresh(); toast("저장했어요");
+  };
+}
+
+// ---------------------------------------------------------------- 시작
+const params = new URLSearchParams(location.search);
+document.documentElement.dataset.theme = params.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+// 사이드바 접힘 상태는 브라우저에 기억 (filaments.html 과 같은 키)
+function toggleSide(force) {
+  const el = $("#layout");
+  const collapsed = force ?? !el.classList.contains("collapsed");
+  el.classList.toggle("collapsed", collapsed);
+  $("[data-act='toggle-side'] .label").textContent = collapsed ? "펼치기" : "접기";
+  try { localStorage.setItem("pff-side-collapsed", collapsed ? "1" : "0"); } catch { /* 저장 불가 */ }
+}
+let savedSide = null;
+try { savedSide = localStorage.getItem("pff-side-collapsed"); } catch { /* 저장 불가 */ }
+if (params.get("side") === "collapsed" || savedSide === "1") toggleSide(true);
+render();
+({
+  product: () => openProduct(db.products[0]),
+  "product-new": () => openProduct(null),
+  "product-warn": () => openProduct(db.products[5]),
+  manage: () => openManage(),
+  category: () => { openManage(); openCategory(db.categories[0]); },
+})[params.get("open")]?.();
+</script>
+</body>
+</html>
