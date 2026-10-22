@@ -91,6 +91,21 @@ npm run lint
 - 공통: 작은따옴표, 한 줄 최대 120자. 프론트엔드는 세미콜론 없음
 - `migrations/` 는 자동 생성 파일이라 검사하지 않아요
 
+### 테스트
+| 영역 | 도구 | 대상 |
+|---|---|---|
+| 백엔드 | Django `TestCase` | 모델 · API (`backend/<앱>/tests/`) |
+| 프론트엔드 | Vitest (단위 테스트) | 입력 검증 규칙 · 재고 계산 · 표시 모양 (`*.test.ts`, 대상 파일 옆) |
+
+```bash
+# 백엔드 (backend/ 에서)
+python manage.py test
+
+# 프론트엔드 (frontend/ 에서)
+npm test                        # 한 번 실행
+npm run test:watch              # 파일을 고칠 때마다 다시 실행
+```
+
 ### 커밋 메시지 (Conventional Commits)
 `종류: 한 줄 요약`
 

@@ -104,6 +104,8 @@ frontend/src/
 ```
 - 서버 데이터는 TanStack Query 로만 가져오고, 화면 안 상태(열린 창, 선택한 타일)는 컴포넌트 상태로 둔다.
 - 백엔드 앱과 프론트 폴더 이름을 맞춘다: `filaments` ↔ `api/filaments.ts`, `pages/filaments/`.
+- 단위 테스트(Vitest)는 대상 파일 옆에 `이름.test.ts` 로 둔다 (예: `validation.test.ts`, `pages/filaments/stock.test.ts`).
+  프론트에만 있는 로직(검증 규칙 · 계산 · 표시 모양)은 테스트도 함께 추가한다. 실행: `npm test` (frontend/ 에서)
 - 저장 · 삭제 뒤에는 관련 목록을 무효화해서 다시 불러온다 (`useRefreshFilaments`). 화면이 직접 목록을 고치지 않는다.
 - 대화상자 위에 대화상자를 열 때는 안에 넣지 않고 옆에 그린다 (`<form>` 안에 `<form>` 이 들어가지 않도록). 나중에 연 창이 위에 뜬다.
 - 알림은 열린 대화상자가 있으면 가장 위 대화상자 안에 그린다. 모달이 열려 있으면 그 바깥은 클릭할 수 없어서 `되돌리기` 를 누를 수 없기 때문.
