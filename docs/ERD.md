@@ -102,9 +102,6 @@ erDiagram
         bigint id PK "항상 1개 행"
         decimal power_kw
         decimal elec_rate
-        decimal printer_price
-        decimal printer_life_hours
-        decimal failure_rate
         decimal fee_order
         decimal fee_sales
         decimal shipping_cost
@@ -202,5 +199,5 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 - `Filament.series` 는 빈 문자열 허용 (NULL 대신 `""`) — UNIQUE 조합에서 시리즈 없는 필라멘트도 중복 검사되도록.
 - `Product.no`(No.)는 숫자로 저장하고 화면에도 `1, 2, 3 …` 그대로 보여 준다 (글자로 저장하면 자릿수가 다를 때 `10` 이 `2` 보다 앞에 정렬되므로).
   비우면 지금 있는 가장 큰 번호 + 1 (`Product.next_no`), 원하면 직접 지정. 1 이상, 중복 불가.
-- `CostSetting` 의 % 값(실패율 · 수수료 · 목표 마진율)은 퍼센트 숫자 그대로 저장한다 (`1.98` = 1.98%). 0 ~ 100.
+- `CostSetting` 의 % 값(수수료 · 목표 마진율)은 퍼센트 숫자 그대로 저장한다 (`1.98` = 1.98%). 0 ~ 100.
   `CostSetting.load()` 로 읽고, 행이 없으면 기본값(PRD 3.8)으로 만든다.
