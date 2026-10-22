@@ -3,6 +3,10 @@
 // 14400 → "14,400원", 없으면 "-"
 export const won = (n: number | null | undefined) => (n == null ? '-' : Math.round(n).toLocaleString('ko-KR') + '원')
 
+// 개당 단가: 10원 미만은 소수 첫째 자리까지 (8.9 → "8.9원"), 그 이상은 원 단위 (17.8 → "18원"), 없으면 "-"
+export const unitWon = (n: number | null | undefined) =>
+  n == null ? '-' : (n < 10 ? Math.round(n * 10) / 10 : Math.round(n)).toLocaleString('ko-KR') + '원'
+
 // 소수 첫째 자리까지: 2.25 → "2.3", 12 → "12"
 export const kgText = (n: number) => (Math.round(n * 10) / 10).toLocaleString('ko-KR')
 

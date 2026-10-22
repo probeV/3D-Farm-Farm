@@ -1,0 +1,111 @@
+/* 부자재 화면: docs/mockups/parts.html 의 <style> 중 app.css · products.css 에 없는 것만 옮김.
+   색상 토큰은 app.css 에서만 정의 */
+
+/* 부자재 표 */
+.parts-table .unit-price {
+  font-weight: 700;
+}
+.parts-table .used {
+  cursor: help;
+}
+.parts-table .note {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+/* 부자재 관리: 왼쪽 구매처 목록 (제품 관리 창과 같은 모양) */
+.parts-manage {
+  grid-template-columns: 220px 1fr;
+}
+.list-item.no-shop strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* 부자재 추가 / 수정 */
+.dlg-head .copy-from {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.qty-unit {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: 6px;
+}
+.qty-unit input:last-of-type {
+  text-align: center;
+}
+/* 개당 단가 미리보기: 구매가 ÷ 묶음 수량 */
+.unit-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.unit-preview b {
+  font-size: 16px;
+}
+.unit-preview .was {
+  margin-right: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: line-through;
+}
+/* 사용하는 제품: 제품마다 수량과 이 부자재 금액 (가격을 바꾸면 바뀐 금액도) */
+.used-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.used-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.used-row:last-child {
+  border-bottom: 0;
+}
+.used-row .badge {
+  margin-left: 6px;
+}
+.used-row .qty {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.used-row .amt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.used-row .amt .was {
+  color: var(--muted);
+}
+.used-row .amt .up {
+  color: var(--bad);
+  font-weight: 700;
+}
+.used-row .amt .down {
+  color: var(--good);
+  font-weight: 700;
+}
+.foot-note {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .parts-manage {
+    grid-template-columns: 1fr;
+  }
+}

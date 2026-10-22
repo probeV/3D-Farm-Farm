@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import FilamentsPage from './pages/filaments/FilamentsPage'
+import PartsPage from './pages/parts/PartsPage'
 import ProductsPage from './pages/products/ProductsPage'
 
-type Page = 'products' | 'filaments' | 'supplies' | 'settings'
+type Page = 'products' | 'filaments' | 'parts' | 'settings'
 
 const NAV: { page: Page; label: string; icon: ReactNode }[] = [
   {
@@ -28,7 +29,7 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    page: 'supplies',
+    page: 'parts',
     label: '부자재',
     icon: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z" />,
   },
@@ -121,6 +122,8 @@ export default function App() {
           <FilamentsPage />
         ) : page === 'products' ? (
           <ProductsPage />
+        ) : page === 'parts' ? (
+          <PartsPage />
         ) : (
           <div className="empty">준비 중인 화면이에요.</div>
         )}
