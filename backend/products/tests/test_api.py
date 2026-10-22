@@ -316,6 +316,12 @@ class CostSettingApiTests(APITestCase):
         self.assertEqual(CostSetting.objects.count(), 1)
         self.assertEqual(CostSetting.load().shipping_cost, 3000)
 
+    def test_removed_printer_fields_are_ignored(self):
+        res = self.client.patch(f'{API}/cost-setting/', {'printer_price': 549000, 'failure_rate': 5}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertNotIn('printer_price', res.data)
+        self.assertNotIn('failure_rate', res.data)
+
     def test_percent_over_100_rejected(self):
         res = self.client.patch(f'{API}/cost-setting/', {'fee_sales': 101}, format='json')
         self.assertEqual(res.status_code, 400)

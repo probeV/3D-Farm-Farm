@@ -312,17 +312,15 @@
 항상 1개라서 id 없이 주소 하나 (`GET` · `PATCH`, 처음 읽을 때 기본값으로 만들어짐). 바꾸면 모든 제품 원가에 바로 반영 (화면 계산).
 ```json
 {
-  "power_kw": 0.36, "elec_rate": 215, "printer_price": 0, "printer_life_hours": 5000,
-  "failure_rate": 0, "fee_order": 1.98, "fee_sales": 2.73, "shipping_cost": 0, "target_margin": 40
+  "power_kw": 0.36, "elec_rate": 215, "fee_order": 1.98, "fee_sales": 2.73, "shipping_cost": 0, "target_margin": 40
 }
 ```
 | 칸 | 설명 (PRD 3.8) |
 |---|---|
-| `power_kw` | 프린터 소비 전력(kW) |
-| `elec_rate` | 전기료 단가(원/kWh) |
-| `printer_price` | 프린터 구매가 (0 이면 감가상각 안 함) |
-| `printer_life_hours` | 프린터 예상 수명(시간), 1 이상 |
-| `failure_rate` · `fee_order` · `fee_sales` · `target_margin` | % 숫자 그대로 (`1.98` = 1.98%), 0 ~ 100 |
-| `shipping_cost` | 건당 판매자 부담 배송비 |
+| `power_kw` | 프린터 소비 전력(kW). 0 이상, 소수 3자리 |
+| `elec_rate` | 전기료 단가(원/kWh). 0 이상, 소수 1자리 |
+| `fee_order` · `fee_sales` · `target_margin` | % 숫자 그대로 (`1.98` = 1.98%), 0 ~ 100, 소수 2자리 |
+| `shipping_cost` | 건당 판매자 부담 배송비. 0 이상 정수 |
 
 - `PUT` · `DELETE` 는 405
+- 프린터 구매가 · 예상 수명 · 출력 실패율(`printer_price` · `printer_life_hours` · `failure_rate`)은 뺐다 (PRD 3.8). 보내도 무시한다
