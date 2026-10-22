@@ -11,10 +11,19 @@ interface Props {
   showAdd: boolean // 색상 이름으로만 걸린 경우에는 `+ 색상` 타일을 숨김
   selectedColor: number | null // 메뉴가 열린 타일
   onTile: (color: Color, tile: HTMLElement) => void
+  onAddColor: (filament: Filament) => void
 }
 
 // 필라멘트 묶음: 제목 타일 → 색상 타일들 → `+ 색상` 타일 (PRD FIL-10)
-export default function FilamentCard({ filament: f, brand, colors, showAdd, selectedColor, onTile }: Props) {
+export default function FilamentCard({
+  filament: f,
+  brand,
+  colors,
+  showAdd,
+  selectedColor,
+  onTile,
+  onAddColor,
+}: Props) {
   const avg = f.avg_held_price != null ? ` · 보유 스풀 평균 ${won(f.avg_held_price)}` : ''
 
   return (
@@ -38,7 +47,12 @@ export default function FilamentCard({ filament: f, brand, colors, showAdd, sele
           />
         ))}
         {showAdd && (
-          <button type="button" className="tile add-tile" title={`${f.display_name} 에 색상 추가`}>
+          <button
+            type="button"
+            className="tile add-tile"
+            title={`${f.display_name} 에 색상 추가`}
+            onClick={() => onAddColor(f)}
+          >
             <span>+</span>색상
           </button>
         )}

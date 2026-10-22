@@ -5,7 +5,7 @@ import Swatch from './Swatch'
 import { totalOf } from './stock'
 
 // 메뉴에서 여는 창
-export type TileAction = 'purchase' | 'pickOpen' | 'pickFinish' | 'adjust'
+export type TileAction = 'purchase' | 'pickOpen' | 'pickFinish' | 'adjust' | 'editColor'
 
 interface Props {
   color: Color
@@ -69,6 +69,10 @@ export default function TileMenu({ color, anchor, onPick, onClose }: Props) {
       </button>
       <button type="button" disabled={totalOf(n) === 0} onClick={() => onPick('adjust')}>
         ⚙ 스풀 조정
+      </button>
+      <hr />
+      <button type="button" onClick={() => onPick('editColor')}>
+        색상 수정
       </button>
     </div>,
     document.body,

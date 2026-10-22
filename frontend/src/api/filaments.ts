@@ -86,6 +86,41 @@ export const useSpools = (color: number, status?: SpoolStatus) =>
     queryFn: () => api<Spool[]>(`/spools/?color=${color}${status ? `&status=${status}` : ''}`),
   })
 
+// ---------------------------------------------------------------- 쓰기: 회사 · 재질 · 필라멘트 · 색상
+// 삭제할 수 없으면 409 `{"detail": "필라멘트가 있어서 삭제할 수 없습니다."}` (PRD FIL-09)
+
+// 회사: 로고 파일을 올릴 때는 FormData(multipart), 로고를 지울 때는 JSON {"logo": null} (docs/api.md "로고 올리기 · 지우기")
+export const createBrand = (body: FormData | { name: string }) => send<Brand>('POST', '/brands/', body)
+export const updateBrand = (id: number, body: FormData | { name?: string; logo?: null }) =>
+  send<Brand>('PATCH', `/brands/${id}/`, body)
+export const deleteBrand = (id: number) => send<null>('DELETE', `/brands/${id}/`)
+
+export const createMaterial = (body: { name: string }) => send<Material>('POST', '/materials/', body)
+export const updateMaterial = (id: number, body: { name: string }) => send<Material>('PATCH', `/materials/${id}/`, body)
+export const deleteMaterial = (id: number) => send<null>('DELETE', `/materials/${id}/`)
+
+export interface FilamentInput {
+  brand: number
+  material: number
+  series: string
+  price: number | null
+  spool_g: number
+}
+export const createFilament = (body: FilamentInput) => send<Filament>('POST', '/filaments/', body)
+export const updateFilament = (id: number, body: Partial<FilamentInput>) =>
+  send<Filament>('PATCH', `/filaments/${id}/`, body)
+export const deleteFilament = (id: number) => send<null>('DELETE', `/filaments/${id}/`)
+
+export interface ColorInput {
+  filament: number
+  name: string
+  hex: string
+  price: number | null // 비우면 필라멘트 가격을 따름
+}
+export const createColor = (body: ColorInput) => send<Color>('POST', '/colors/', body)
+export const updateColor = (id: number, body: Partial<ColorInput>) => send<Color>('PATCH', `/colors/${id}/`, body)
+export const deleteColor = (id: number) => send<null>('DELETE', `/colors/${id}/`)
+
 // ---------------------------------------------------------------- 쓰기: 스풀
 
 export interface PurchaseInput {

@@ -2,7 +2,9 @@ import { useCallback, useRef, useState } from 'react'
 import { useBrands, useFilaments, useMaterials, type ByStatus, type Color, type Filament } from '../../api/filaments'
 import AdjustDialog from './AdjustDialog'
 import BrandSummary, { type BrandKg } from './BrandSummary'
+import ColorDialog from './ColorDialog'
 import FilamentCard from './FilamentCard'
+import ManageDialog from './ManageDialog'
 import PickDialog from './PickDialog'
 import PurchaseDialog from './PurchaseDialog'
 import { colorState, filamentKg, heldOf, sumByStatus, totalOf } from './stock'
@@ -26,7 +28,10 @@ interface Filter {
 
 const NO_FILTER: Filter = { q: '', brand: null, material: null, sort: 'name' }
 
-type DialogState = { kind: TileAction; colorId: number } // 타일 메뉴에서
+type DialogState =
+  | { kind: TileAction; colorId: number } // 타일 메뉴에서
+  | { kind: 'addColor'; filamentId: number } // `+ 색상` 타일에서
+  | { kind: 'manage' } // `필라멘트 관리` 버튼에서
 
 const byName = (a: string, b: string) => a.localeCompare(b, 'ko')
 
@@ -37,7 +42,7 @@ export default function FilamentsPage() {
   const filaments = useFilaments()
   const [filter, setFilter] = useState<Filter>(NO_FILTER)
   const toolbarRef = useRef<HTMLDivElement>(null)
-  // 열린 타일 메뉴 · 대화상자. 색상은 id 로 기억하고 그릴 때마다 최신 데이터에서 찾는다 (저장하면 목록이 새로 옴)
+  // 열린 타일 메뉴 · 대화상자. 색상 · 필라멘트는 id 로 기억하고 그릴 때마다 최신 데이터에서 찾는다 (저장하면 목록이 새로 옴)
   const [menu, setMenu] = useState<{ colorId: number; anchor: HTMLElement } | null>(null)
   const [dialog, setDialog] = useState<DialogState | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -109,6 +114,10 @@ export default function FilamentsPage() {
             소진된 색상<b>{usedUp}</b>
           </span>
         </div>
+        <div className="spacer" />
+        <button className="btn" onClick={() => setDialog({ kind: 'manage' })}>
+          필라멘트 관리
+        </button>
       </div>
 
       {brandItems.length ? (
@@ -176,6 +185,7 @@ export default function FilamentsPage() {
               showAdd={x.selfMatch}
               selectedColor={menu?.colorId ?? null}
               onTile={onTile}
+              onAddColor={(f) => setDialog({ kind: 'addColor', filamentId: f.id })}
             />
           ))}
         </div>
@@ -198,9 +208,14 @@ export default function FilamentsPage() {
     </>
   )
 
-  // 열린 대화상자. 대상 색상이 지워졌으면 그리지 않는다
+  // 열린 대화상자. 대상(색상 · 필라멘트)이 지워졌으면 그리지 않는다
   function renderDialog() {
     if (!dialog) return null
+    if (dialog.kind === 'manage') return <ManageDialog onClose={closeDialog} />
+    if (dialog.kind === 'addColor') {
+      const filament = fils.find((f) => f.id === dialog.filamentId)
+      return filament && <ColorDialog filament={filament} color={null} onClose={closeDialog} />
+    }
     const target = find(dialog.colorId)
     if (!target) return null
     const { filament, color } = target
@@ -212,6 +227,8 @@ export default function FilamentsPage() {
         return <PickDialog color={color} mode={dialog.kind === 'pickOpen' ? 'open' : 'finish'} onClose={closeDialog} />
       case 'adjust':
         return <AdjustDialog color={color} onClose={closeDialog} />
+      case 'editColor':
+        return <ColorDialog filament={filament} color={color} onClose={closeDialog} />
     }
   }
 }
