@@ -231,11 +231,6 @@ class CostSetting(models.Model):
     elec_rate = models.DecimalField(
         '전기료 단가(원/kWh)', max_digits=8, decimal_places=1, default=215, validators=[MinValueValidator(0)]
     )
-    printer_price = models.DecimalField('프린터 구매가', default=0, **MONEY)
-    printer_life_hours = models.DecimalField(
-        '프린터 예상 수명(시간)', max_digits=8, decimal_places=0, default=5000, validators=[MinValueValidator(1)]
-    )
-    failure_rate = percent(verbose_name='출력 실패율(%)', default=0)
     fee_order = percent(verbose_name='주문관리 수수료(%)', default=Decimal('1.98'))
     fee_sales = percent(verbose_name='판매 수수료(%)', default=Decimal('2.73'))
     shipping_cost = models.DecimalField('건당 판매자 부담 배송비', default=0, **MONEY)

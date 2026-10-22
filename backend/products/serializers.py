@@ -160,9 +160,6 @@ class CostSettingSerializer(BaseModelSerializer):
         fields = [
             'power_kw',
             'elec_rate',
-            'printer_price',
-            'printer_life_hours',
-            'failure_rate',
             'fee_order',
             'fee_sales',
             'shipping_cost',

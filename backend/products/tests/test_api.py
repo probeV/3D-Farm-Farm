@@ -302,9 +302,6 @@ class CostSettingApiTests(APITestCase):
             {
                 'power_kw': 0.36,
                 'elec_rate': 215,
-                'printer_price': 0,
-                'printer_life_hours': 5000,
-                'failure_rate': 0,
                 'fee_order': 1.98,
                 'fee_sales': 2.73,
                 'shipping_cost': 0,
@@ -313,11 +310,11 @@ class CostSettingApiTests(APITestCase):
         )
 
     def test_patch(self):
-        res = self.client.patch(f'{API}/cost-setting/', {'printer_price': 549000, 'failure_rate': 5}, format='json')
+        res = self.client.patch(f'{API}/cost-setting/', {'elec_rate': 230, 'shipping_cost': 3000}, format='json')
         self.assertEqual(res.status_code, 200)
-        self.assertEqual((res.data['printer_price'], res.data['failure_rate']), (549000, 5))
+        self.assertEqual((res.data['elec_rate'], res.data['shipping_cost']), (230, 3000))
         self.assertEqual(CostSetting.objects.count(), 1)
-        self.assertEqual(CostSetting.load().printer_price, 549000)
+        self.assertEqual(CostSetting.load().shipping_cost, 3000)
 
     def test_percent_over_100_rejected(self):
         res = self.client.patch(f'{API}/cost-setting/', {'fee_sales': 101}, format='json')
