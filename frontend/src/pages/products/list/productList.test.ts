@@ -9,8 +9,6 @@ const cost = (c: Partial<Cost> = {}): Cost => ({
   grams: 10,
   filament: 100,
   electricity: 0,
-  depreciation: 0,
-  failure: 0,
   parts: 0,
   cost: 100,
   feeRate: 0,

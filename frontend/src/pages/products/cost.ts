@@ -32,10 +32,8 @@ export interface Cost {
   grams: number // 필라멘트 사용량 합계
   filament: number // 필라멘트비
   electricity: number // 전기료
-  depreciation: number // 감가상각
-  failure: number // 실패 보정
   parts: number // 부자재비
-  cost: number // 원가 = 위 다섯 항목 합계
+  cost: number // 원가 = 위 세 항목 합계
   feeRate: number // 수수료율 (0.0471 = 4.71%)
   fee: number // 수수료 (판매가가 없으면 0)
   net: number | null // 순이익 (판매가가 없으면 null)
@@ -107,9 +105,8 @@ export function calcCost(p: CostInput, catalog: Catalog): Cost {
 
   const hours = (p.print_minutes ?? 0) / 60
   const electricity = hours * S.power_kw * S.elec_rate
-  const depreciation = S.printer_price ? (hours * S.printer_price) / S.printer_life_hours : 0
-  const failure = ((filament + electricity + depreciation) * S.failure_rate) / 100
-  const cost = filament + electricity + depreciation + failure + parts
+  // 프린터 감가상각 · 출력 실패 보정은 계산하지 않는다 (PRD 3.6, 추후 투자 장비 · 이윤 계산에서)
+  const cost = filament + electricity + parts
 
   const sale = p.sale_price || 0
   const feeRate = (S.fee_order + S.fee_sales) / 100
@@ -123,8 +120,6 @@ export function calcCost(p: CostInput, catalog: Catalog): Cost {
     grams,
     filament,
     electricity,
-    depreciation,
-    failure,
     parts,
     cost,
     feeRate,

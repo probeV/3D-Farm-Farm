@@ -74,9 +74,6 @@ export default function CostPanel({ values, errors, change, cost: c, preview, se
       </h4>
       <Line label="필라멘트비" sub={c.grams ? `${c.grams.toLocaleString('ko-KR')}g` : ''} value={won(c.filament)} />
       <Line label="전기료" sub={minutes ? minutesText(minutes) : ''} value={won(c.electricity)} />
-      {/* 0원인 항목은 숨김 */}
-      {c.depreciation > 0 && <Line label="감가상각" value={won(c.depreciation)} />}
-      {c.failure > 0 && <Line label="실패 보정" sub={`${S.failure_rate}%`} value={won(c.failure)} />}
       <Line label="부자재비" value={won(c.parts)} />
       <div className="cost-total">
         <span>원가</span>

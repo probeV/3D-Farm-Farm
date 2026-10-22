@@ -65,9 +65,6 @@ export interface Product {
 export interface CostSetting {
   power_kw: number
   elec_rate: number
-  printer_price: number
-  printer_life_hours: number
-  failure_rate: number
   fee_order: number
   fee_sales: number
   shipping_cost: number
@@ -112,6 +109,9 @@ export const createSubcategory = (body: { category: number; name: string }) =>
 export const updateSubcategory = (id: number, body: { name: string }) =>
   send<Subcategory>('PATCH', `/subcategories/${id}/`, body)
 export const deleteSubcategory = (id: number) => send<null>('DELETE', `/subcategories/${id}/`)
+
+// 원가 설정은 항상 1개라 id 없이 PATCH (PRD 3.8). 범위를 벗어나면 400 칸별 메시지
+export const updateCostSetting = (body: Partial<CostSetting>) => send<CostSetting>('PATCH', '/cost-setting/', body)
 
 // 품목 이름이 겹치면 400 `{"name": ["이미 있는 품목입니다."]}`, 제품에서 쓰면 삭제 시 409 (PART-02)
 export interface PartInput {

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import FilamentsPage from './pages/filaments/FilamentsPage'
 import PartsPage from './pages/parts/PartsPage'
+import SettingsPage from './pages/settings/SettingsPage'
 import ProductsPage from './pages/products/ProductsPage'
 
 type Page = 'products' | 'filaments' | 'parts' | 'settings'
@@ -35,7 +36,7 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
   },
   {
     page: 'settings',
-    label: '설정',
+    label: '제품 원가 설정',
     icon: (
       <>
         <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
@@ -125,7 +126,7 @@ export default function App() {
         ) : page === 'parts' ? (
           <PartsPage />
         ) : (
-          <div className="empty">준비 중인 화면이에요.</div>
+          <SettingsPage />
         )}
       </main>
     </div>
