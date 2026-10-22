@@ -30,3 +30,34 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) throw new ApiError(res.status, body)
   return body as T
 }
+
+// 본문을 보내는 요청 (POST · PATCH · DELETE). 객체는 JSON 으로, FormData(파일 올리기)는 multipart 로
+export const send = <T>(method: 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown) =>
+  api<T>(
+    path,
+    body instanceof FormData
+      ? { method, body } // Content-Type(경계 문자열 포함)은 브라우저가 붙인다
+      : {
+          method,
+          headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        },
+  )
+
+// 400 응답에서 칸 하나의 첫 메시지 (입력칸 아래 빨간 안내용)
+export function fieldError(e: unknown, field: string): string | undefined {
+  if (!(e instanceof ApiError) || e.status !== 400 || !e.body || typeof e.body !== 'object') return undefined
+  const v = (e.body as Record<string, unknown>)[field]
+  const msg = Array.isArray(v) ? v[0] : v
+  return typeof msg === 'string' ? msg : undefined
+}
+
+// 400 응답 → 주어진 칸들의 오류 { name: '이미 있는 회사 이름입니다.' } (해당 칸이 없으면 빈 객체)
+export function fieldErrorsOf(e: unknown, fields: string[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const f of fields) {
+    const msg = fieldError(e, f)
+    if (msg) out[f] = msg
+  }
+  return out
+}

@@ -12,7 +12,7 @@
 
 ## 기술 스택
 - 백엔드: Python 3.10+, Django 5.2 (LTS), Django REST Framework
-- 프론트엔드: React + TypeScript + Vite, TanStack Query
+- 프론트엔드: React + TypeScript + Vite, TanStack Query, Zod (입력 검증)
 - DB: SQLite (로컬)
 
 ## 폴더 구조

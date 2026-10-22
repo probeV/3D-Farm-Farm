@@ -23,7 +23,7 @@
 |---|---|
 | 백엔드 | Python 3.10+, Django 5.2 (LTS), Django REST Framework |
 | DB | SQLite (로컬) |
-| 프론트엔드 | React + TypeScript + Vite, TanStack Query |
+| 프론트엔드 | React + TypeScript + Vite, TanStack Query, Zod (입력 검증) |
 | 저장소 구조 | 모노레포 — `backend/` (Django), `frontend/` (React) |
 
 - 화면은 React, 데이터는 DRF JSON API 로 주고받는다. Django 관리자(`/admin`)는 그대로 사용한다.
