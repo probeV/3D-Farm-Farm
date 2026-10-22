@@ -163,6 +163,10 @@ class ProductMaterialTests(TestCase):
         self.assertEqual(self.magnet.unit_price, Decimal('60'))
         self.assertIsNone(Part(name='에어캡').unit_price)
 
+    def test_part_name_unique(self):
+        with self.assertRaises(IntegrityError):
+            Part.objects.create(name=self.magnet.name)
+
     def test_part_defaults(self):
         part = Part.objects.create(name='에어캡')
         self.assertEqual((part.pack_qty, part.unit), (1, '개'))
