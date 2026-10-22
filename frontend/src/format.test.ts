@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateText, kgText, minutesText, pct, won } from './format'
+import { dateText, kgText, minutesText, pct, unitWon, won } from './format'
 
 describe('화면 표시 모양', () => {
   it('원: 원 단위 반올림 + 천 단위 쉼표, 없으면 "-"', () => {
@@ -7,6 +7,13 @@ describe('화면 표시 모양', () => {
     expect(won(14.4 * 1000.6)).toBe('14,409원')
     expect(won(0)).toBe('0원')
     expect(won(null)).toBe('-')
+  })
+
+  it('개당 단가: 10원 미만은 소수 첫째 자리, 그 이상은 원 단위', () => {
+    expect(unitWon(8.94)).toBe('8.9원')
+    expect(unitWon(17.8)).toBe('18원')
+    expect(unitWon(3500)).toBe('3,500원')
+    expect(unitWon(null)).toBe('-')
   })
 
   it('kg: 소수 첫째 자리까지', () => {

@@ -113,6 +113,19 @@ export const updateSubcategory = (id: number, body: { name: string }) =>
   send<Subcategory>('PATCH', `/subcategories/${id}/`, body)
 export const deleteSubcategory = (id: number) => send<null>('DELETE', `/subcategories/${id}/`)
 
+// 품목 이름이 겹치면 400 `{"name": ["이미 있는 품목입니다."]}`, 제품에서 쓰면 삭제 시 409 (PART-02)
+export interface PartInput {
+  name: string
+  shop: string
+  price: number | null
+  pack_qty: number
+  unit: string
+  note: string
+}
+export const createPart = (body: PartInput) => send<Part>('POST', '/parts/', body)
+export const updatePart = (id: number, body: Partial<PartInput>) => send<Part>('PATCH', `/parts/${id}/`, body)
+export const deletePart = (id: number) => send<null>('DELETE', `/parts/${id}/`)
+
 export interface ProductInput {
   no?: number // 비우면 서버가 다음 번호
   category: number | null

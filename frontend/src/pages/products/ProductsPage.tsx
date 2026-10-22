@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { Product } from '../../api/products'
+import Help from '../../components/Help'
 import { useToast } from '../../components/useToast'
 import { pct, today } from '../../format'
 import { selectionExists } from './categories'
@@ -12,15 +13,6 @@ import { filterProducts, NO_FILTER, SORTS, summarize, type ListFilter, type Sort
 import { useCostData } from './useCostData'
 
 type DialogState = { kind: 'manage' } | { kind: 'product'; productId: number }
-
-// (?) 에 마우스를 올리면 위로 설명 (카드에 설명 문구를 쓰지 않음)
-function Help({ tip }: { tip: string }) {
-  return (
-    <span className="help" tabIndex={0} data-tip={tip} onClick={(e) => e.stopPropagation()}>
-      ?
-    </span>
-  )
-}
 
 // 제품 원가 화면: 상태별 개수 → 요약 카드 → 제품 목록 (docs/screens.md 2장)
 export default function ProductsPage() {
