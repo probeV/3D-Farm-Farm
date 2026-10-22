@@ -43,12 +43,16 @@ class BaseViewSet(viewsets.ModelViewSet):
     # (lookup_value_regex 로 URL 에서 막으면 Django 의 HTML 404 페이지가 나가서 쓰지 않음)
     # 다른 데이터가 이 행을 쓰고 있어서 지울 수 없을 때 (on_delete=PROTECT) 보여줄 문구
     protected_message = '다른 데이터에서 쓰고 있어서 삭제할 수 없습니다.'
+    # 막은 데이터 종류마다 문구를 다르게 할 때 {'앱.모델': 문구}. 다른 앱 모델은 import 하지 않고 이름으로
+    protected_messages = {}
 
     def destroy(self, request, *args, **kwargs):
         try:
             return super().destroy(request, *args, **kwargs)
-        except ProtectedError:
-            return Response({'detail': self.protected_message}, status=status.HTTP_409_CONFLICT)
+        except ProtectedError as e:
+            blocker = next(iter(e.protected_objects))._meta.label
+            message = self.protected_messages.get(blocker, self.protected_message)
+            return Response({'detail': message}, status=status.HTTP_409_CONFLICT)
 
 
 class BrandViewSet(BaseViewSet):
@@ -80,6 +84,7 @@ class FilamentViewSet(BaseViewSet):
     )
     serializer_class = FilamentSerializer
     protected_message = '색상이 있어서 삭제할 수 없습니다.'
+    protected_messages = {'products.ProductFilament': '제품에서 쓰고 있어서 삭제할 수 없습니다.'}
 
     # POST /filaments/
     def create(self, request, *args, **kwargs):

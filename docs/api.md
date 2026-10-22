@@ -3,7 +3,7 @@
 > 요구사항: [PRD.md](PRD.md) · 데이터 구조: [ERD.md](ERD.md) · 코드 구조: [architecture.md](architecture.md)
 
 화면(React)과 서버(Django REST Framework)가 주고받는 JSON API.
-개발 중에는 Vite 개발 서버가 `/api` 요청을 Django 로 넘긴다. 브라우저로 `http://127.0.0.1:8000/api/v0/` 를 열면 목록을 직접 볼 수 있다.
+개발 중에는 Vite 개발 서버가 `/api` 요청을 Django 로 넘긴다. 브라우저로 `http://127.0.0.1:8000/api/v0/` 를 열면 목록을 직접 볼 수 있다 (제품 쪽 주소는 이 목록에 안 나오므로 `/api/v0/products/` 처럼 직접 연다).
 
 ## 공통 규칙
 | 항목 | 규칙 |
@@ -20,7 +20,7 @@
 |---|---|---|
 | 400 | 입력이 틀림 (본문 · 쿼리 파라미터 · 스풀 코드) | 칸별 한국어 메시지 `{"name": ["이미 있는 회사 이름입니다."]}` |
 | 404 | 대상이 없음 (없는 id, 숫자가 아닌 id 포함) | `{"detail": "찾을 수 없습니다."}` |
-| 409 | 다른 데이터가 쓰고 있어서 삭제 불가 (PRD FIL-09) | `{"detail": "필라멘트가 있어서 삭제할 수 없습니다."}` |
+| 409 | 다른 데이터가 쓰고 있어서 삭제 불가 (PRD FIL-09 · PRD-11 · PART-02) | `{"detail": "필라멘트가 있어서 삭제할 수 없습니다."}` |
 
 - 오류 문구는 `~입니다` 체로 쓴다 (DRF 기본 문구 `이 필드는 필수 항목입니다.` 등도 같은 말투)
 
@@ -48,6 +48,15 @@
 | GET · PATCH · DELETE | `/api/v0/spools/{id}/` | 스풀 하나 / 수정 / 삭제 |
 | DELETE | `/api/v0/spools/?ids=3,4,5` | 여러 개 삭제 |
 | GET | `/api/v0/spools/code/{code}/` | 코드로 스풀 찾기 |
+| GET · POST | `/api/v0/categories/` | 카테고리 목록(세부 분류 포함) / 추가 |
+| GET · PATCH · DELETE | `/api/v0/categories/{id}/` | 카테고리 하나 / 수정 / 삭제 |
+| GET · POST | `/api/v0/subcategories/` | 세부 분류 목록 / 추가 |
+| GET · PATCH · DELETE | `/api/v0/subcategories/{id}/` | 세부 분류 하나 / 수정 / 삭제 |
+| GET · POST | `/api/v0/parts/` | 부자재 목록 / 추가 |
+| GET · PATCH · DELETE | `/api/v0/parts/{id}/` | 부자재 하나 / 수정 / 삭제 |
+| GET · POST | `/api/v0/products/` | **제품 원가 화면의 제품 데이터 전부** / 제품 추가 |
+| GET · PATCH · DELETE | `/api/v0/products/{id}/` | 제품 하나 / 수정 / 삭제 |
+| GET · PATCH | `/api/v0/cost-setting/` | 원가 설정 (항상 1개) |
 
 ---
 
@@ -114,7 +123,7 @@
 | `avg_held_price` | — | 보유(재고 + 사용 중) 스풀 구매가 평균, 원 단위 반올림. 없으면 `null` (PRD INV-08) |
 | `colors` | — | 색상 목록 (아래 색상과 같은 모양) |
 
-- 삭제: 색상이 있으면 409 `색상이 있어서 삭제할 수 없습니다.`
+- 삭제: 색상이 있으면 409 `색상이 있어서 삭제할 수 없습니다.`, 제품에서 쓰면 409 `제품에서 쓰고 있어서 삭제할 수 없습니다.`
 - 목록 순서: 회사 이름 → 재질 이름 → 시리즈
 
 ### 화면에서 계산하는 값 (참고)
@@ -137,6 +146,8 @@
 | `counts` | — | 상태별 스풀 개수 `{sealed, open, empty}` |
 
 - 삭제: 스풀이 있으면 409 `스풀이 있어서 삭제할 수 없습니다.`
+- 제품에서 쓰는 색상은 지워진다. 그 제품 줄은 `color: null`(색상 선택 안 함)이 되어 필라멘트 가격으로 계산된다 (TBD-04).
+  지우기 전 확인 창의 "쓰는 제품" 목록은 화면이 제품 목록(`filaments[].color`)에서 찾는다
 
 ### 재고 추가 `POST /api/v0/colors/{id}/spools/`
 ```json
@@ -197,3 +208,120 @@
 | 재고 추가 | `DELETE /spools/?ids=…` — 응답으로 받은 스풀 id 들 |
 | 상태 변경 | `PATCH /spools/{id}/` — 바꾸기 전의 `status` · `opened_at` · `finished_at` 를 함께 |
 | 스풀 삭제 | `POST /spools/` — 지우기 전에 갖고 있던 스풀 내용 그대로 (`code_no` 포함) |
+
+---
+
+# 제품 원가
+
+제품 원가 화면은 **제품 목록 + 필라멘트 목록(`/filaments/`) + 부자재 목록 + 원가 설정** 으로 그린다.
+원가 · 순이익 · 순마진율 · 권장 판매가 · 입력 필요 · 요약 · 정렬 · CSV 는 화면에서 계산한다 (PRD 3.6 원가 계산 규칙).
+입력 중 미리보기(PRD-07)도 같은 계산을 쓰므로 서버에 따로 두지 않는다.
+
+## 카테고리 `categories`
+```json
+{
+  "id": 1, "name": "수업 교구", "product_count": 3,
+  "subcategories": [{ "id": 1, "category": 1, "name": "수학", "product_count": 2 }]
+}
+```
+| 칸 | 쓰기 | 설명 |
+|---|---|---|
+| `name` | ✅ 필수 | 중복 불가 → 400 `이미 있는 카테고리 이름입니다.` |
+| `product_count` | — | 이 카테고리의 제품 수 (세부 분류에 있는 제품 포함) |
+| `subcategories` | — | 세부 분류 목록 (이름순). 추가 · 수정 · 삭제는 `subcategories` 주소로 |
+
+- 삭제: 제품이 있으면(세부 분류에만 있어도) 409 `제품이 있어서 삭제할 수 없습니다.` · 제품이 없으면 세부 분류도 함께 삭제
+- 목록 순서: 이름순
+
+## 세부 분류 `subcategories`
+```json
+{ "id": 1, "category": 1, "name": "수학", "product_count": 2 }
+```
+| 칸 | 쓰기 | 설명 |
+|---|---|---|
+| `category` | ✅ 만들 때만 | 카테고리 id. 만든 뒤에는 못 바꿈 → 400 `세부 분류의 카테고리는 바꿀 수 없습니다.` |
+| `name` | ✅ 필수 | 같은 카테고리 안에서 중복 → 400 `이 카테고리에 같은 이름의 세부 분류가 이미 있습니다.` |
+| `product_count` | — | 이 세부 분류의 제품 수 |
+
+- 삭제: 제품이 있으면 409 `제품이 있어서 삭제할 수 없습니다.`
+
+## 부자재 `parts`
+```json
+{
+  "id": 1, "name": "네오디뮴 자석 6×3mm", "shop": "", "price": 12000, "pack_qty": 200, "unit": "개",
+  "unit_price": 60.0, "note": "", "product_count": 2
+}
+```
+| 칸 | 쓰기 | 설명 |
+|---|---|---|
+| `name` | ✅ 필수 | 품목 |
+| `shop` · `note` | 선택 | 회사/구매처, 메모 |
+| `price` | 선택 | 묶음 구매가. `null` = 미입력 (원가에서 0원 + 경고) |
+| `pack_qty` | 선택 | 묶음 수량, 기본 1. 0 보다 커야 함 |
+| `unit` | 선택 | 단위, 기본 `개` |
+| `unit_price` | — | 개당 단가 = `price ÷ pack_qty` (소수 2자리). 가격이 없으면 `null` |
+| `product_count` | — | 이 부자재를 쓰는 제품 수 |
+
+- 삭제: 제품에서 쓰면 409 `제품에서 쓰고 있어서 삭제할 수 없습니다.`
+- 목록 순서: 품목 이름순
+
+## 제품 `products`
+```json
+{
+  "id": 1, "no": 1,
+  "category": 1, "subcategory": 1,
+  "name": "분수 원판 세트", "status": "on_sale",
+  "print_minutes": 200, "sale_price": 18900, "note": "",
+  "filaments": [
+    { "id": 1, "filament": 1, "color": 101, "grams": 24 },
+    { "id": 2, "filament": 4, "color": null, "grams": 60 }
+  ],
+  "parts": [{ "id": 1, "part": 1, "qty": 12 }],
+  "created_at": "2026-10-22T13:00:00+09:00", "updated_at": "2026-10-22T13:00:00+09:00"
+}
+```
+| 칸 | 쓰기 | 설명 |
+|---|---|---|
+| `no` | 선택 | No. (1 이상). 비우면 지금 가장 큰 번호 + 1. 중복 → 400 `No. 3 는 이미 있습니다.` |
+| `category` · `subcategory` | 선택 | id, `null` = 미분류 / 세부 분류 없음. 세부 분류는 그 카테고리 안의 것만 → 400 (`subcategory` 칸에 `세부 분류는 고른 카테고리 안에서 골라야 합니다.`) |
+| `name` | ✅ 필수 | 제품명 |
+| `status` | 선택 | `on_sale`(판매중) / `developing`(개발중, 기본) / `discontinued`(판매중지) |
+| `print_minutes` | 선택 | 출력 시간(분, 정수). `null` = 미입력 |
+| `sale_price` | 선택 | 판매가. `null` = 미입력 |
+| `note` | 선택 | 메모 |
+| `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상 |
+| `parts` | 선택 | 사용 부자재 줄 `{part, qty}`. `qty` 0 이상 |
+
+- **줄 저장**: `filaments` · `parts` 를 보내면 그 목록으로 통째로 바꾼다 (기존 줄을 지우고 새로 만들어서 줄 `id` 가 바뀐다).
+  보내지 않으면 줄은 그대로 (`PATCH {"status": "discontinued"}` 처럼). 하나라도 틀리면 400, 아무것도 바뀌지 않음
+- **복제** (PRD-04a): 서버 기능 없음. 화면이 원본을 복사해 추가 창에 채우고(`no` 는 비우거나 다음 번호, 이름 `(복사)`, 상태 `developing`) 저장할 때 `POST /products/`
+- 삭제: 줄도 함께 삭제 (204)
+- 목록 순서: No. 순 (숫자 순서)
+
+### 화면에서 계산하는 값 (참고)
+```
+줄의 g당 가격 = (색상.price ?? 필라멘트.price) ÷ 필라멘트.spool_g      ← color 가 null 이면 필라멘트.price
+             (색상.spool_price · price_per_g 가 이미 이 값. /filaments/ 의 colors 에 있음)
+부자재비      = Σ qty × 부자재.unit_price
+그 밖 원가 · 순이익 · 순마진율 · 권장 판매가 = PRD 3.6 원가 계산 규칙 (설정값은 cost-setting)
+목록 색상     = filaments[].color 를 중복 없이 → 색상의 hex 로 동그라미
+```
+
+## 원가 설정 `cost-setting`
+항상 1개라서 id 없이 주소 하나 (`GET` · `PATCH`, 처음 읽을 때 기본값으로 만들어짐). 바꾸면 모든 제품 원가에 바로 반영 (화면 계산).
+```json
+{
+  "power_kw": 0.36, "elec_rate": 215, "printer_price": 0, "printer_life_hours": 5000,
+  "failure_rate": 0, "fee_order": 1.98, "fee_sales": 2.73, "shipping_cost": 0, "target_margin": 40
+}
+```
+| 칸 | 설명 (PRD 3.8) |
+|---|---|
+| `power_kw` | 프린터 소비 전력(kW) |
+| `elec_rate` | 전기료 단가(원/kWh) |
+| `printer_price` | 프린터 구매가 (0 이면 감가상각 안 함) |
+| `printer_life_hours` | 프린터 예상 수명(시간), 1 이상 |
+| `failure_rate` · `fee_order` · `fee_sales` · `target_margin` | % 숫자 그대로 (`1.98` = 1.98%), 0 ~ 100 |
+| `shipping_cost` | 건당 판매자 부담 배송비 |
+
+- `PUT` · `DELETE` 는 405
