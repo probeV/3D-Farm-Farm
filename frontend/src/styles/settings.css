@@ -1,0 +1,153 @@
+/* 제품 원가 설정 화면: docs/mockups/settings.html 의 <style> 중 app.css · products.css 에 없는 것만 옮김.
+   색상 토큰은 app.css 에서만 정의 */
+
+/* 입력 화면이라 다른 화면(1280px)보다 좁게 */
+.settings {
+  max-width: 960px;
+}
+.settings .top-row {
+  margin-bottom: 18px;
+}
+.settings .stats .info b {
+  color: var(--accent);
+}
+
+/* 설정 묶음 */
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.group-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.group-head .calc {
+  font-size: 13px;
+  color: var(--muted);
+}
+.group-head .calc b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.group-head .calc .warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 4px 20px;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.setting:last-child {
+  border-bottom: 0;
+}
+.setting .name {
+  font-weight: 600;
+}
+.setting .desc {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.setting .desc .btn.link {
+  margin-left: 6px;
+}
+.setting .err {
+  grid-column: 2;
+  text-align: right;
+}
+.setting input {
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.setting .with-suffix em {
+  min-width: 48px;
+}
+/* 바꾼 칸은 파란 배경, 틀린 칸은 빨간 테두리 */
+.setting input.changed {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.setting input.invalid {
+  border-color: var(--bad);
+}
+.btn.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 저장 줄: 화면 아래에 붙어 있고, 바뀐 값이 있으면 파란 테두리 · 틀린 값이 있으면 빨간 테두리 */
+.save-bar {
+  position: sticky;
+  bottom: 16px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+}
+.save-bar .spacer {
+  flex: 1;
+}
+.save-bar.dirty {
+  border-color: var(--accent);
+}
+.save-bar.invalid {
+  border-color: var(--bad);
+}
+.save-bar .msg {
+  font-size: 13px;
+  color: var(--muted);
+}
+.save-bar.dirty .msg {
+  color: var(--text);
+  font-weight: 600;
+}
+.save-bar.invalid .msg {
+  color: var(--bad);
+}
+
+@media (max-width: 760px) {
+  .setting {
+    grid-template-columns: 1fr;
+  }
+  .setting .err {
+    grid-column: 1;
+  }
+  /* 좁으면 문구를 윗줄로, 버튼은 아랫줄 오른쪽 */
+  .save-bar {
+    flex-wrap: wrap;
+  }
+  .save-bar .msg {
+    flex-basis: 100%;
+  }
+}

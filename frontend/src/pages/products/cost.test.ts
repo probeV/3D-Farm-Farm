@@ -69,9 +69,6 @@ const parts = [part(1, '네오디뮴 자석', 60), part(2, '에어캡', null)]
 const setting: CostSetting = {
   power_kw: 0.36,
   elec_rate: 215,
-  printer_price: 549000,
-  printer_life_hours: 5000,
-  failure_rate: 5,
   fee_order: 1.98,
   fee_sales: 2.73,
   shipping_cost: 0,
@@ -96,16 +93,14 @@ describe('원가 계산 (PRD 3.6)', () => {
     expect(c.grams).toBe(70)
     expect(c.filament).toBeCloseTo(50 * 14.4 + 20 * 15) // 1,020 (블랙은 색상 가격)
     expect(c.electricity).toBeCloseTo(2 * 0.36 * 215) // 154.8
-    expect(c.depreciation).toBeCloseTo((2 * 549000) / 5000) // 219.6
-    expect(c.failure).toBeCloseTo((1020 + 154.8 + 219.6) * 0.05) // 69.72
     expect(c.parts).toBe(120)
-    expect(c.cost).toBeCloseTo(1584.12)
+    expect(c.cost).toBeCloseTo(1294.8)
     expect(c.feeRate).toBeCloseTo(0.0471)
     expect(c.fee).toBeCloseTo(471)
-    expect(c.net).toBeCloseTo(10000 - 1584.12 - 471)
-    expect(c.margin).toBeCloseTo(0.794488)
-    // (1584.12 + 0) ÷ (1 − 0.0471 − 0.4) = 2865.1… → 100원 단위 올림
-    expect(c.recommended).toBe(2900)
+    expect(c.net).toBeCloseTo(10000 - 1294.8 - 471)
+    expect(c.margin).toBeCloseTo(0.82342)
+    // (1294.8 + 0) ÷ (1 − 0.0471 − 0.4) = 2341.8… → 100원 단위 올림
+    expect(c.recommended).toBe(2400)
     expect(c.warnings).toEqual([])
   })
 
@@ -116,9 +111,8 @@ describe('원가 계산 (PRD 3.6)', () => {
     }
   })
 
-  it('프린터 구매가가 0 이면 감가상각 0, 배송비는 순이익에서 뺀다', () => {
-    const c = calcCost(product(), makeCatalog(filaments, parts, { ...setting, printer_price: 0, shipping_cost: 3000 }))
-    expect(c.depreciation).toBe(0)
+  it('배송비는 순이익에서 뺀다', () => {
+    const c = calcCost(product(), makeCatalog(filaments, parts, { ...setting, shipping_cost: 3000 }))
     expect(c.net).toBeCloseTo(10000 - c.cost - c.fee - 3000)
   })
 
@@ -154,7 +148,7 @@ describe('원가 계산 (PRD 3.6)', () => {
   })
 
   it('입력이 끝난 제품만 순마진율을 쓴다', () => {
-    expect(completeMargin(calcCost(product(), catalog))).toBeCloseTo(0.794488)
+    expect(completeMargin(calcCost(product(), catalog))).toBeCloseTo(0.82342)
     expect(completeMargin(calcCost(product({ print_minutes: 0 }), catalog))).toBeNull()
   })
 
@@ -162,8 +156,6 @@ describe('원가 계산 (PRD 3.6)', () => {
     const plain = {
       ...setting,
       power_kw: 0,
-      printer_price: 0,
-      failure_rate: 0,
       fee_order: 0,
       fee_sales: 0,
       target_margin: 0,

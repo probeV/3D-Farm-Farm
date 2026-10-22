@@ -90,9 +90,10 @@ frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
                 client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
   pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, settings/)
-  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch …)
+  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch, Help …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
                 products.css — 제품 원가 목업 CSS 중 app.css 에 없는 것
+                parts.css · settings.css — 부자재 · 제품 원가 설정 목업 CSS 중 위 두 파일에 없는 것
   format.ts     화면 표시용 숫자 모양 (원, kg)
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
   useForm.ts    폼 공통 흐름 훅: 입력 → 스키마 검사 → 저장 → 서버 오류 표시
@@ -123,6 +124,15 @@ pages/products/
   catalog/             제품 관리 · 카테고리 (PRD-11, screens 2.4): ManageDialog, CategoryDialog, schemas.ts
   form/                제품 추가 · 복제 · 수정 (screens 2.5): ProductDialog(머리 띠 · 저장), MaterialLines(재료 표),
                        CostPanel(원가 미리보기), draft.ts(처음 값 · 미리보기 값), schemas.ts
+
+pages/parts/
+  PartsPage.tsx        화면 진입점: 사용 여부 개수 · 요약 카드 · 부자재 목록, 대화상자 연결
+  usePartsData.ts      부자재 + 제품(부자재 줄)을 함께 불러와 부자재별 사용하는 제품까지 (목록 · 관리 창이 같이 씀)
+  partList.ts          검색 · 정렬 · 요약 · 사용하는 제품 · 구매처 고르기
+  ManageDialog.tsx     부자재 관리 (구매처 → 부자재, screens 3.4), PartDialog.tsx 추가 · 복제 · 수정, schemas.ts
+
+pages/settings/
+  SettingsPage.tsx     제품 원가 설정 (screens 4장): 설정 묶음 · 저장 줄. schemas.ts 에 항목 목록 · 검증 · 계산 예시
 ```
 - 한 기능 폴더에서만 쓰는 것은 그 폴더에, 두 곳 이상에서 쓰면 화면 폴더 바로 아래에, 다른 화면에서도 쓰면 `src/components/` 로 올린다.
 - 폼 검증 스키마는 그 폼이 있는 기능 폴더의 `schemas.ts` 에 둔다.
