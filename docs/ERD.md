@@ -74,12 +74,12 @@ erDiagram
     }
     PRODUCT {
         bigint id PK
-        varchar code UK "No."
+        int no UK "No. 1, 2, 3 ... 비우면 다음 번호"
         bigint category_id FK "NULL=미분류"
         bigint subcategory_id FK "NULL=세부 분류 없음"
         varchar name
-        decimal print_minutes "출력 시간(분)"
-        decimal sale_price "판매가"
+        int print_minutes "출력 시간(분), NULL=미입력"
+        decimal sale_price "판매가, NULL=미입력"
         varchar status "on_sale / developing / discontinued"
         text note
         datetime created_at
@@ -181,7 +181,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Spool (color, status)` | INDEX | 색상별 상태 개수 집계 |
 | `Category.name` | UNIQUE | 카테고리 이름 중복 방지 |
 | `Subcategory (category, name)` | UNIQUE | 같은 카테고리 안 세부 분류 이름 중복 방지 |
-| `Product.code` | UNIQUE | 제품 No. 중복 방지 |
+| `Product.no` | UNIQUE | 제품 No. 중복 방지 |
 | `Product.subcategory` | 검사 | 세부 분류는 그 제품의 카테고리에 속해야 함 (`Product.clean`) |
 | `ProductFilament.color` | 검사 | 색상은 그 줄의 필라멘트에 속해야 함 (`ProductFilament.clean`) |
 
@@ -199,3 +199,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 - `Brand.logo` 는 png · jpg · webp, 5MB 까지. 업로드 시 비율을 유지해 256×256px 이내로 축소해 저장 (Pillow, `Brand.save`).
   회사를 삭제하거나 이미지를 바꾸거나 지우면 이전 파일도 지운다 (DB 저장이 확정된 뒤에).
 - `Filament.series` 는 빈 문자열 허용 (NULL 대신 `""`) — UNIQUE 조합에서 시리즈 없는 필라멘트도 중복 검사되도록.
+- `Product.no`(No.)는 숫자로 저장하고 화면에도 `1, 2, 3 …` 그대로 보여 준다 (글자로 저장하면 자릿수가 다를 때 `10` 이 `2` 보다 앞에 정렬되므로).
+  비우면 지금 있는 가장 큰 번호 + 1 (`Product.next_no`), 원하면 직접 지정. 1 이상, 중복 불가.
+- `CostSetting` 의 % 값(실패율 · 수수료 · 목표 마진율)은 퍼센트 숫자 그대로 저장한다 (`1.98` = 1.98%). 0 ~ 100.
+  `CostSetting.load()` 로 읽고, 행이 없으면 기본값(PRD 3.8)으로 만든다.
