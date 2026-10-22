@@ -113,6 +113,14 @@ class PartApiTests(ApiTestCase):
         self.assertEqual(res.status_code, 201)
         self.assertEqual((res.data['pack_qty'], res.data['unit'], res.data['price']), (1, '개', None))
 
+    def test_duplicate_name(self):
+        res = self.client.post(f'{API}/parts/', {'name': '네오디뮴 자석'})
+        self.assertEqual((res.status_code, res.data['name']), (400, ['이미 있는 품목입니다.']))
+
+    def test_patch_keeps_own_name(self):
+        res = self.client.patch(f'{API}/parts/{self.magnet.pk}/', {'name': '네오디뮴 자석', 'price': 15000})
+        self.assertEqual((res.status_code, res.data['unit_price']), (200, 75.0))
+
     def test_pack_qty_must_be_positive(self):
         res = self.client.post(f'{API}/parts/', {'name': 'M3 볼트', 'pack_qty': 0})
         self.assertEqual(res.status_code, 400)

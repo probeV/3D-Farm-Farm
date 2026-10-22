@@ -49,6 +49,10 @@ class CategorySerializer(BaseModelSerializer):
 
 
 class PartSerializer(BaseModelSerializer):
+    name = serializers.CharField(
+        max_length=100,
+        validators=[UniqueValidator(queryset=Part.objects.all(), message='이미 있는 품목입니다.')],
+    )
     unit_price = serializers.SerializerMethodField()
     product_count = serializers.IntegerField(read_only=True, default=0)
 
