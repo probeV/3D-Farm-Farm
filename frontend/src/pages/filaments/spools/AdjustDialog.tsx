@@ -7,7 +7,7 @@ import { dateText } from '../../../format'
 import { money } from '../../../validation'
 import { useSpoolActions } from './spoolActions'
 import { STATUSES, STATUS_LABEL } from '../stock'
-import Swatch from '../Swatch'
+import Swatch from '../../../components/Swatch'
 
 type View = 'simple' | 'detail'
 

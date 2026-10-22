@@ -1,0 +1,213 @@
+import { describe, expect, it } from 'vitest'
+import type { Color, Filament } from '../../api/filaments'
+import type { CostSetting, Part } from '../../api/products'
+import {
+  calcCost,
+  completeMargin,
+  filamentUnitText,
+  makeCatalog,
+  marginClass,
+  partUnitText,
+  productColors,
+  type CostInput,
+} from './cost'
+
+const counts = { sealed: 0, open: 0, empty: 0 }
+const color = (
+  id: number,
+  filament: number,
+  name: string,
+  price: number | null,
+  spool_price: number | null,
+): Color => ({
+  id,
+  filament,
+  name,
+  hex: '#FFFFFF',
+  price,
+  spool_price,
+  price_per_g: null,
+  counts,
+})
+const filament = (id: number, display_name: string, price: number | null, colors: Color[]): Filament => ({
+  id,
+  brand: 1,
+  brand_name: '',
+  material: 1,
+  material_name: '',
+  series: '',
+  display_name,
+  price,
+  spool_g: 1000,
+  avg_held_price: null,
+  colors,
+})
+const part = (id: number, name: string, unit_price: number | null): Part => ({
+  id,
+  name,
+  shop: '',
+  price: unit_price,
+  pack_qty: 1,
+  unit: '개',
+  unit_price,
+  note: '',
+  product_count: 0,
+})
+
+// 화이트: 색상 가격 없음(필라멘트 가격 14,400) / 블랙: 색상 가격 15,000 / PETG: 가격 미입력
+const WHITE = 11
+const BLACK = 12
+const CLEAR = 21
+const filaments = [
+  filament(1, 'Bambu Lab › PLA Basic', 14400, [
+    color(WHITE, 1, '화이트', null, 14400),
+    color(BLACK, 1, '블랙', 15000, 15000),
+  ]),
+  filament(2, 'Esun › PETG', null, [color(CLEAR, 2, '클리어', null, null)]),
+]
+const parts = [part(1, '네오디뮴 자석', 60), part(2, '에어캡', null)]
+const setting: CostSetting = {
+  power_kw: 0.36,
+  elec_rate: 215,
+  printer_price: 549000,
+  printer_life_hours: 5000,
+  failure_rate: 5,
+  fee_order: 1.98,
+  fee_sales: 2.73,
+  shipping_cost: 0,
+  target_margin: 40,
+}
+const catalog = makeCatalog(filaments, parts, setting)
+
+const product = (p: Partial<CostInput> = {}): CostInput => ({
+  print_minutes: 120,
+  sale_price: 10000,
+  filaments: [
+    { filament: 1, color: WHITE, grams: 50 },
+    { filament: 1, color: BLACK, grams: 20 },
+  ],
+  parts: [{ part: 1, qty: 2 }],
+  ...p,
+})
+
+describe('원가 계산 (PRD 3.6)', () => {
+  it('항목별 금액 · 원가 · 순이익 · 순마진율 · 권장 판매가', () => {
+    const c = calcCost(product(), catalog)
+    expect(c.grams).toBe(70)
+    expect(c.filament).toBeCloseTo(50 * 14.4 + 20 * 15) // 1,020 (블랙은 색상 가격)
+    expect(c.electricity).toBeCloseTo(2 * 0.36 * 215) // 154.8
+    expect(c.depreciation).toBeCloseTo((2 * 549000) / 5000) // 219.6
+    expect(c.failure).toBeCloseTo((1020 + 154.8 + 219.6) * 0.05) // 69.72
+    expect(c.parts).toBe(120)
+    expect(c.cost).toBeCloseTo(1584.12)
+    expect(c.feeRate).toBeCloseTo(0.0471)
+    expect(c.fee).toBeCloseTo(471)
+    expect(c.net).toBeCloseTo(10000 - 1584.12 - 471)
+    expect(c.margin).toBeCloseTo(0.794488)
+    // (1584.12 + 0) ÷ (1 − 0.0471 − 0.4) = 2865.1… → 100원 단위 올림
+    expect(c.recommended).toBe(2900)
+    expect(c.warnings).toEqual([])
+  })
+
+  it('색상을 안 고르거나 다른 필라멘트의 색상이면 필라멘트 가격', () => {
+    for (const colorId of [null, CLEAR]) {
+      const c = calcCost(product({ filaments: [{ filament: 1, color: colorId, grams: 10 }] }), catalog)
+      expect(c.filament).toBeCloseTo(144)
+    }
+  })
+
+  it('프린터 구매가가 0 이면 감가상각 0, 배송비는 순이익에서 뺀다', () => {
+    const c = calcCost(product(), makeCatalog(filaments, parts, { ...setting, printer_price: 0, shipping_cost: 3000 }))
+    expect(c.depreciation).toBe(0)
+    expect(c.net).toBeCloseTo(10000 - c.cost - c.fee - 3000)
+  })
+
+  it('빠진 입력은 0원으로 계산하고 경고 (= 입력 필요)', () => {
+    const c = calcCost(
+      {
+        print_minutes: null,
+        sale_price: null,
+        filaments: [{ filament: 2, color: CLEAR, grams: 30 }],
+        parts: [{ part: 2, qty: 1 }],
+      },
+      catalog,
+    )
+    expect(c.warnings).toEqual(['Esun › PETG 가격 미입력', '출력 시간 미입력', '에어캡 가격 미입력', '판매가 미입력'])
+    expect(c.cost).toBe(0)
+    expect(c.fee).toBe(0)
+    expect(c.net).toBeNull()
+    expect(c.margin).toBeNull()
+    expect(completeMargin(c)).toBeNull()
+  })
+
+  it('사용량이 0 이면 경고, 같은 경고는 한 번', () => {
+    const c = calcCost(
+      product({
+        filaments: [
+          { filament: 2, color: null, grams: 0 },
+          { filament: 2, color: CLEAR, grams: 0 },
+        ],
+      }),
+      catalog,
+    )
+    expect(c.warnings).toEqual(['Esun › PETG 가격 미입력', '필라멘트 사용량 미입력'])
+  })
+
+  it('입력이 끝난 제품만 순마진율을 쓴다', () => {
+    expect(completeMargin(calcCost(product(), catalog))).toBeCloseTo(0.794488)
+    expect(completeMargin(calcCost(product({ print_minutes: 0 }), catalog))).toBeNull()
+  })
+
+  it('권장 판매가: 딱 떨어지면 그대로, 수수료 + 목표 마진이 100% 이상이면 없음', () => {
+    const plain = {
+      ...setting,
+      power_kw: 0,
+      printer_price: 0,
+      failure_rate: 0,
+      fee_order: 0,
+      fee_sales: 0,
+      target_margin: 0,
+    }
+    const rec = (grams: number, s = plain) =>
+      calcCost(
+        product({ filaments: [{ filament: 1, color: WHITE, grams }], parts: [] }),
+        makeCatalog(filaments, parts, s),
+      ).recommended
+    expect(rec(125)).toBe(1800) // 1,800원 그대로
+    expect(rec(130)).toBe(1900) // 1,872원 → 1,900원
+    expect(rec(130, { ...plain, target_margin: 100 })).toBeNull()
+  })
+})
+
+describe('단가 안내 · 색상 · 순마진율 색', () => {
+  it('단가 안내 (금액에 마우스를 올리면)', () => {
+    expect(filamentUnitText(catalog, { filament: 1, color: BLACK, grams: 1 })).toBe(
+      '색상 가격 15,000원 / 1000g · g당 15.0원',
+    )
+    expect(filamentUnitText(catalog, { filament: 1, color: null, grams: 1 })).toBe('14,400원 / 1000g · g당 14.4원')
+    expect(filamentUnitText(catalog, { filament: 2, color: null, grams: 1 })).toBe(
+      '필라멘트 가격 미입력 — 0원으로 계산',
+    )
+    expect(partUnitText(catalog, { part: 1, qty: 1 })).toBe('개당 60원')
+    expect(partUnitText(catalog, { part: 2, qty: 1 })).toBe('부자재 가격 미입력 — 0원으로 계산')
+  })
+
+  it('제품 색상: 고른 색상만, 같은 색상은 한 번', () => {
+    const p = product({
+      filaments: [
+        { filament: 1, color: WHITE, grams: 10 },
+        { filament: 1, color: null, grams: 10 },
+        { filament: 1, color: WHITE, grams: 10 },
+        { filament: 1, color: BLACK, grams: 10 },
+      ],
+    })
+    expect(productColors(p, catalog).map((c) => c.name)).toEqual(['화이트', '블랙'])
+  })
+
+  it('순마진율 색: 0% 미만 빨강 / 20% 미만 주황 / 그 외 초록', () => {
+    expect(marginClass(-0.01)).toBe('m-bad')
+    expect(marginClass(0.19)).toBe('m-warn')
+    expect(marginClass(0.2)).toBe('m-good')
+    expect(marginClass(null)).toBe('muted')
+  })
+})

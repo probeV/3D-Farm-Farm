@@ -53,11 +53,21 @@ export function fieldError(e: unknown, field: string): string | undefined {
 }
 
 // 400 응답 → 주어진 칸들의 오류 { name: '이미 있는 회사 이름입니다.' } (해당 칸이 없으면 빈 객체)
+// 줄 목록 칸의 오류 `{"filaments": [{}, {"color": ["..."]}]}` 는 { 'filaments.1.color': '...' } 로 (validation.ts 와 같은 이름)
 export function fieldErrorsOf(e: unknown, fields: string[]): Record<string, string> {
   const out: Record<string, string> = {}
   for (const f of fields) {
     const msg = fieldError(e, f)
     if (msg) out[f] = msg
+    const rows = e instanceof ApiError && e.status === 400 ? (e.body as Record<string, unknown> | null)?.[f] : undefined
+    if (!Array.isArray(rows)) continue
+    rows.forEach((row, i) => {
+      if (!row || typeof row !== 'object') return
+      for (const [k, v] of Object.entries(row)) {
+        const rowMsg = Array.isArray(v) ? v[0] : v
+        if (typeof rowMsg === 'string') out[`${f}.${i}.${k}`] = rowMsg
+      }
+    })
   }
   return out
 }

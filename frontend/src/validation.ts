@@ -31,6 +31,17 @@ export const intRange = (min: number, max: number) =>
     number.int('정수로 입력하세요').min(min, `${min} 이상으로 입력하세요`).max(max, `${max} 이하로 입력하세요`),
   )
 
+// 비워도 되는 정수 범위 (예: 출력 시간의 분 0~59). 비우면 null
+export const optionalInt = (min: number, max: number) =>
+  z.preprocess(
+    toNumber,
+    number
+      .int('정수로 입력하세요')
+      .min(min, `${min} 이상으로 입력하세요`)
+      .max(max, `${max} 이하로 입력하세요`)
+      .nullable(),
+  )
+
 // 소수 자리 제한이 있는 수 (예: 스풀 무게 1~999999.9 g, 소수 첫째 자리까지). 비우면 오류
 export const decimal = (min: number, max: number, places: number) =>
   z.preprocess(
@@ -62,9 +73,10 @@ export const selectedId = (message: string) =>
     .transform((v) => Number(v))
 
 // 검사 실패 → 칸별 첫 메시지 { quantity: '1 이상으로 입력하세요', ... }
+// 줄 목록 칸은 "목록.순서.칸" 으로: { 'filaments.1.grams': '숫자로 입력하세요' } (제품 창의 사용 필라멘트 줄)
 export function fieldErrors(error: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const issue of error.issues) out[String(issue.path[0] ?? '')] ??= issue.message
+  for (const issue of error.issues) out[issue.path.map(String).join('.')] ??= issue.message
   return out
 }
 

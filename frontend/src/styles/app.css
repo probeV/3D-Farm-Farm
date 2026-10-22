@@ -12,6 +12,7 @@
   --good: #1f9254;
   --warn: #b7791f;
   --bad: #d64545;
+  --good-soft: #e6f5ec;
   --warn-soft: #fff6e5;
   --bad-soft: #fdecec;
   --bar-sealed: #2f6fed;
@@ -33,6 +34,7 @@
   --good: #4cc38a;
   --warn: #e5b04a;
   --bad: #ff6b6b;
+  --good-soft: #1b3127;
   --warn-soft: #3a3020;
   --bad-soft: #3d2224;
   --bar-sealed: #6b9bff;
@@ -43,6 +45,10 @@
 }
 * {
   box-sizing: border-box;
+}
+/* 스크롤바 자리를 항상 비워 둔다. 짧은 화면(스크롤바 없음)과 긴 화면을 오갈 때 가운데 정렬된 내용이 옆으로 밀리지 않게 */
+html {
+  scrollbar-gutter: stable;
 }
 body {
   margin: 0;
