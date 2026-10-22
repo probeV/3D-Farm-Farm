@@ -1,0 +1,200 @@
+import { useState } from 'react'
+import { deleteProduct, useRefreshProducts, type Category, type Product } from '../../../api/products'
+import Dialog from '../../../components/Dialog'
+import { useToast } from '../../../components/useToast'
+import { pct, won } from '../../../format'
+import { findSubcategory, inSelection, selectionExists, selectionLabel, type CategorySel } from '../categories'
+import { completeMargin, marginClass } from '../cost'
+import ProductDialog from '../form/ProductDialog'
+import type { ProductRow } from '../list/productList'
+import StatusBadge from '../StatusBadge'
+import { useCostData } from '../useCostData'
+import CategoryDialog from './CategoryDialog'
+
+// 관리 창 위에 겹쳐 여는 창
+type Sub =
+  | { kind: 'category'; category: Category | null } // null = 추가
+  | { kind: 'product'; product: Product | null; copyOf?: Product }
+
+// 제품 관리 (PRD-04 · PRD-04a · PRD-11, docs/screens.md 2.4)
+// 왼쪽: 카테고리 › 세부 분류 (+ 미분류) / 오른쪽: 고른 것의 제품. 제품 추가 · 복제 · 삭제는 여기서
+export default function ManageDialog({ onClose }: { onClose: () => void }) {
+  const data = useCostData().data
+  const refresh = useRefreshProducts()
+  const toast = useToast()
+  const [picked, setPicked] = useState<CategorySel>('')
+  const [sub, setSub] = useState<Sub | null>(null)
+  const closeSub = () => setSub(null)
+  if (!data) return null
+
+  const { rows, categories } = data
+  const hasUncategorized = rows.some((r) => r.product.category == null)
+  // 고른 것이 없거나 지워졌으면 첫 카테고리 (없으면 미분류)
+  const fallback: CategorySel = categories.length ? `c:${categories[0].id}` : 'none'
+  const sel = picked !== '' && selectionExists(categories, picked, hasUncategorized) ? picked : fallback
+  const count = (s: CategorySel) => rows.filter((r) => inSelection(r.product, s)).length
+  const prods = rows.filter((r) => inSelection(r.product, sel)).sort((a, b) => a.product.no - b.product.no)
+
+  const remove = async (p: Product) => {
+    if (!confirm(`${p.name} 제품을 삭제할까요?`)) return
+    try {
+      await deleteProduct(p.id)
+      await refresh()
+      toast(`${p.name} 삭제했어요`)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  // `+ 제품 추가`: 지금 고른 카테고리 · 세부 분류를 미리 고른 채로
+  const preset = () => {
+    if (sel === 'none') return { category: null, subcategory: null }
+    const id = Number(sel.slice(2))
+    if (sel.startsWith('c:')) return { category: id, subcategory: null }
+    return { category: findSubcategory(categories, id)?.category ?? null, subcategory: id }
+  }
+
+  const productRow = ({ product: p, cost }: ProductRow) => {
+    const margin = completeMargin(cost)
+    return (
+      <div key={p.id} className="row-item">
+        <div>
+          <strong>{p.name}</strong>
+          <StatusBadge status={p.status} />
+          <div className="hint">No. {p.no}</div>
+        </div>
+        <div className="price">
+          {won(p.sale_price)}
+          <div className={cost.warnings.length ? 'muted' : marginClass(margin)}>
+            {cost.warnings.length ? '입력 필요' : pct(margin)}
+          </div>
+        </div>
+        <div className="row-btns">
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => setSub({ kind: 'product', product: null, copyOf: p })}
+          >
+            복제
+          </button>
+          <button type="button" className="btn small" onClick={() => setSub({ kind: 'product', product: p })}>
+            수정
+          </button>
+          <button type="button" className="icon-btn" title="제품 삭제" onClick={() => remove(p)}>
+            ✕
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // 카테고리를 고르면 세부 분류별로 묶어서 (세부 분류 없는 제품은 끝에)
+  const right = () => {
+    const subs = sel.startsWith('c:')
+      ? (categories.find((c) => c.id === Number(sel.slice(2)))?.subcategories ?? [])
+      : []
+    if (!prods.length) return <p className="hint">등록된 제품이 없어요.</p>
+    if (!subs.length) return prods.map(productRow)
+    const groups: [string, ProductRow[]][] = [
+      ...subs.map((s): [string, ProductRow[]] => [s.name, prods.filter((r) => r.product.subcategory === s.id)]),
+      ['세부 분류 없음', prods.filter((r) => r.product.subcategory == null)],
+    ]
+    return groups
+      .filter(([, list]) => list.length)
+      .map(([name, list]) => (
+        <div key={name}>
+          <div className="group-label">{name}</div>
+          {list.map(productRow)}
+        </div>
+      ))
+  }
+
+  const item = (s: CategorySel, label: string, opts: { sub?: boolean; extra?: string; category?: Category } = {}) => (
+    <div
+      key={s}
+      className={[
+        'list-item',
+        opts.sub ? 'sub' : '',
+        s === sel ? 'active' : '',
+        s === 'none' ? 'uncategorized' : '',
+      ].join(' ')}
+      onClick={() => setPicked(s)}
+    >
+      <div className="grow">
+        <strong>{label}</strong>
+        {!opts.sub && (
+          <small>
+            제품 {count(s)}개{opts.extra}
+          </small>
+        )}
+      </div>
+      {opts.sub && <small>{count(s)}</small>}
+      {opts.category && (
+        <button
+          type="button"
+          className="btn small"
+          onClick={(e) => {
+            e.stopPropagation() // 카테고리 선택까지 같이 되지 않도록
+            setSub({ kind: 'category', category: opts.category! })
+          }}
+        >
+          수정
+        </button>
+      )}
+    </div>
+  )
+
+  return (
+    <>
+      <Dialog size="wide" title="제품 관리" onClose={onClose}>
+        <div className="manage">
+          <div>
+            <div className="list">
+              {categories.map((c) => [
+                item(`c:${c.id}`, c.name, {
+                  category: c,
+                  extra: c.subcategories.length ? ` · 세부 ${c.subcategories.length}` : '',
+                }),
+                ...c.subcategories.map((s) => item(`s:${s.id}`, s.name, { sub: true })),
+              ])}
+              {hasUncategorized && item('none', '미분류')}
+            </div>
+            <button
+              type="button"
+              className="btn small"
+              style={{ marginTop: 10 }}
+              onClick={() => setSub({ kind: 'category', category: null })}
+            >
+              + 카테고리 추가
+            </button>
+          </div>
+          <div className="manage-right">
+            <h4>{selectionLabel(categories, sel)} 의 제품</h4>
+            {right()}
+            <button
+              type="button"
+              className="btn small"
+              style={{ marginTop: 10 }}
+              onClick={() => setSub({ kind: 'product', product: null })}
+            >
+              + 제품 추가
+            </button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* 겹쳐 여는 창은 관리 창 안이 아니라 옆에 그린다 (form 안에 form 이 들어가지 않도록) */}
+      {sub?.kind === 'category' && (
+        <CategoryDialog category={sub.category} onClose={closeSub} onSaved={(c) => setPicked(`c:${c.id}`)} />
+      )}
+      {sub?.kind === 'product' && (
+        <ProductDialog
+          product={sub.product}
+          copyOf={sub.copyOf}
+          preset={sub.product || sub.copyOf ? undefined : preset()}
+          onClose={closeSub}
+        />
+      )}
+    </>
+  )
+}
