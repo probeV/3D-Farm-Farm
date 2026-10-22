@@ -65,7 +65,7 @@ class Subcategory(models.Model):
 class Part(models.Model):
     """부자재 (자석, 나사, 포장재 …). 묶음 구매가 ÷ 묶음 수량 = 개당 단가"""
 
-    name = models.CharField('품목', max_length=100)
+    name = models.CharField('품목', max_length=100, unique=True)
     shop = models.CharField('회사/구매처', max_length=100, blank=True)
     price = models.DecimalField('묶음 구매가', null=True, blank=True, **MONEY)
     pack_qty = models.DecimalField(

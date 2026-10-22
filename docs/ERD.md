@@ -56,7 +56,7 @@ erDiagram
     }
     PART {
         bigint id PK
-        varchar name "품목"
+        varchar name UK "품목"
         varchar shop "회사/구매처"
         decimal price "묶음 구매가, NULL=미입력"
         decimal pack_qty "묶음 수량, 기본 1"
@@ -179,6 +179,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Spool.code_no` | UNIQUE | 스풀 번호 (= 스풀 코드) 중복 방지 |
 | `Spool.status` | CHOICES | `sealed`(재고) / `open`(사용 중) / `empty`(사용 완료) |
 | `Spool (color, status)` | INDEX | 색상별 상태 개수 집계 |
+| `Part.name` | UNIQUE | 부자재 품목 이름 중복 방지 |
 | `Category.name` | UNIQUE | 카테고리 이름 중복 방지 |
 | `Subcategory (category, name)` | UNIQUE | 같은 카테고리 안 세부 분류 이름 중복 방지 |
 | `Product.no` | UNIQUE | 제품 No. 중복 방지 |
