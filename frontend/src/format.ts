@@ -15,3 +15,14 @@ export function today() {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
+
+// 비율 → 소수 첫째 자리 %: 0.2534 → "25.3%", 없으면 "-"
+export const pct = (r: number | null) => (r == null ? '-' : (Math.round(r * 1000) / 10).toLocaleString('ko-KR') + '%')
+
+// 분 → "35분" · "3시간" · "3시간 20분", 없거나 0 이면 "-"
+export function minutesText(min: number | null) {
+  if (!min) return '-'
+  if (min < 60) return `${min}분`
+  const rest = min % 60
+  return `${Math.floor(min / 60)}시간${rest ? ` ${rest}분` : ''}`
+}

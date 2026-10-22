@@ -5,7 +5,7 @@ import { today } from '../../../format'
 import { useForm } from '../../../useForm'
 import { purchaseSchema } from './schemas'
 import { useSpoolActions } from './spoolActions'
-import Swatch from '../Swatch'
+import Swatch from '../../../components/Swatch'
 
 // 재고 추가: 수량 · 구매일 · 스풀 1개 구매가 · 번호 지정(선택) (PRD INV-02, docs/screens.md 1.7)
 export default function PurchaseDialog({

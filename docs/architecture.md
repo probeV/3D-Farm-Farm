@@ -90,8 +90,9 @@ frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
                 client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
   pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, settings/)
-  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field …)
+  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
+                products.css — 제품 원가 목업 CSS 중 app.css 에 없는 것
   format.ts     화면 표시용 숫자 모양 (원, kg)
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
   useForm.ts    폼 공통 흐름 훅: 입력 → 스키마 검사 → 저장 → 서버 오류 표시
@@ -112,6 +113,16 @@ pages/filaments/
                        spoolActions.ts(동작 + 되돌리기), schemas.ts(재고 추가 검증)
   catalog/             회사 · 재질 · 필라멘트 · 색상 편집 (PRD 3.1): ManageDialog(필라멘트 관리),
                        BrandDialog, MaterialDialog, FilamentDialog, ColorDialog, schemas.ts
+
+pages/products/
+  ProductsPage.tsx     화면 진입점: 상태별 개수 · 요약 카드 · 제품 목록, 대화상자 연결
+  useCostData.ts       제품 · 카테고리 · 필라멘트 · 부자재 · 설정을 함께 불러와 제품별 원가까지 (목록 · 관리 창 · 제품 창이 같이 씀)
+  cost.ts              원가 계산 (PRD 3.6) — 서버는 계산하지 않음. 목록 · 미리보기 · CSV 가 모두 이것을 씀
+  categories.ts        카테고리 · 세부 분류 고르기 ('c:1' / 's:2' / 'none'), status.ts · StatusBadge.tsx
+  list/                목록 (screens 2.1~2.3): ProductTable, productList.ts(검색 · 필터 · 정렬 · 요약), csv.ts
+  catalog/             제품 관리 · 카테고리 (PRD-11, screens 2.4): ManageDialog, CategoryDialog, schemas.ts
+  form/                제품 추가 · 복제 · 수정 (screens 2.5): ProductDialog(머리 띠 · 저장), MaterialLines(재료 표),
+                       CostPanel(원가 미리보기), draft.ts(처음 값 · 미리보기 값), schemas.ts
 ```
 - 한 기능 폴더에서만 쓰는 것은 그 폴더에, 두 곳 이상에서 쓰면 화면 폴더 바로 아래에, 다른 화면에서도 쓰면 `src/components/` 로 올린다.
 - 폼 검증 스키마는 그 폼이 있는 기능 폴더의 `schemas.ts` 에 둔다.
@@ -135,6 +146,7 @@ pages/filaments/
 | 서버와 맞추기 | 규칙은 시리얼라이저 · 모델과 같게. 스키마 주석에 서버 쪽 위치를 적고, 서버 규칙을 바꾸면 함께 고친다. DB 를 봐야 아는 것(이미 있는 번호 등)은 서버만 검사 |
 | 숫자 칸 | `type="text"` + `inputMode="numeric"` (`type="number"` 는 `-` 같은 글자를 빈칸으로 바꿔 넘겨서 "비움"과 구분이 안 됨). 글자 → 숫자 변환도 스키마가 한다 (빈칸 → `null`, 쉼표 허용) |
 | 오류 표시 | 폼: 그 칸 아래 빨간 글씨 (`Field` 부품). 서버 400 의 칸별 메시지도 같은 자리에 (`fieldErrorsOf`). 한 번 오류가 나면 입력할 때마다 다시 검사 |
+|  | 줄 목록 칸(제품의 사용 필라멘트 · 부자재): `filaments.1.grams` 처럼 "목록.순서.칸" 이름으로 그 줄 아래. 서버 400 의 `{"filaments": [{}, {"grams": [...]}]}` 도 같은 이름으로 바꾼다 |
 |  | 바로 저장하는 칸(스풀 조정의 구매가처럼 줄 안에 글씨 자리가 없는 칸): 원래 값으로 되돌리고 알림 |
 |  | 칸과 상관없는 오류(404 · 409 · 네트워크): 알림 |
 | 문구 | 화면 문구는 `~하세요` / `~요` 체, 서버 문구는 `~입니다` 체 (docs/api.md) |

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import FilamentsPage from './pages/filaments/FilamentsPage'
+import ProductsPage from './pages/products/ProductsPage'
 
 type Page = 'products' | 'filaments' | 'supplies' | 'settings'
 
@@ -116,7 +117,13 @@ export default function App() {
       </aside>
       <main>
         <h1 className="page-title">{current.label}</h1>
-        {page === 'filaments' ? <FilamentsPage /> : <div className="empty">준비 중인 화면이에요.</div>}
+        {page === 'filaments' ? (
+          <FilamentsPage />
+        ) : page === 'products' ? (
+          <ProductsPage />
+        ) : (
+          <div className="empty">준비 중인 화면이에요.</div>
+        )}
       </main>
     </div>
   )

@@ -14,11 +14,13 @@ export function useForm<V extends Record<string, unknown>, S extends z.ZodType>(
   const [busy, setBusy] = useState(false)
 
   // 한 번 오류가 난 뒤에는 입력할 때마다 다시 검사해서, 고치면 바로 사라지게 한다
-  const change = <K extends keyof V>(field: K, value: V[K]) => {
-    const next = { ...values, [field]: value }
+  // 여러 칸을 함께 바꿀 때는 update 로 한 번에 (change 를 연달아 부르면 앞의 변경이 덮임)
+  const update = (patch: Partial<V>) => {
+    const next = { ...values, ...patch }
     setValues(next)
     if (Object.keys(errors).length) setErrors(validate(schema, next))
   }
+  const change = <K extends keyof V>(field: K, value: V[K]) => update({ [field]: value } as unknown as Partial<V>)
 
   // 검사를 통과한 값(스키마가 변환한 값)으로 save 를 부른다
   const submit = async (save: (data: z.output<S>) => Promise<unknown>) => {
@@ -36,5 +38,5 @@ export function useForm<V extends Record<string, unknown>, S extends z.ZodType>(
     }
   }
 
-  return { values, errors, busy, change, submit }
+  return { values, errors, busy, change, update, submit }
 }
