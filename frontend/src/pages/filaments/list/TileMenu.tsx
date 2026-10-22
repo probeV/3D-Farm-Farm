@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { Color } from '../../api/filaments'
-import Swatch from './Swatch'
-import { totalOf } from './stock'
+import type { Color } from '../../../api/filaments'
+import Swatch from '../Swatch'
+import { totalOf } from '../stock'
 
 // 메뉴에서 여는 창
 export type TileAction = 'purchase' | 'pickOpen' | 'pickFinish' | 'adjust' | 'editColor'

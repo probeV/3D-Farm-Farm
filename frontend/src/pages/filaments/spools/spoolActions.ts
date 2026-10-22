@@ -11,9 +11,9 @@ import {
   type PurchaseInput,
   type Spool,
   type SpoolStatus,
-} from '../../api/filaments'
-import { useToast } from '../../components/useToast'
-import { STATUS_LABEL } from './stock'
+} from '../../../api/filaments'
+import { useToast } from '../../../components/useToast'
+import { STATUS_LABEL } from '../stock'
 
 // 만든 스풀 코드 (번호 순서로 옴): 이어진 번호면 "S00041 ~ S00043", 아니면 "S00011, S00051, S00052" (5개 넘으면 "외 N개")
 export function codesText(spools: Spool[]) {

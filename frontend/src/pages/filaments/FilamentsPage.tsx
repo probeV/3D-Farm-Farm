@@ -1,14 +1,14 @@
 import { useCallback, useRef, useState } from 'react'
 import { useBrands, useFilaments, useMaterials, type ByStatus, type Color, type Filament } from '../../api/filaments'
-import AdjustDialog from './AdjustDialog'
-import BrandSummary, { type BrandKg } from './BrandSummary'
-import ColorDialog from './ColorDialog'
-import FilamentCard from './FilamentCard'
-import ManageDialog from './ManageDialog'
-import PickDialog from './PickDialog'
-import PurchaseDialog from './PurchaseDialog'
+import ColorDialog from './catalog/ColorDialog'
+import ManageDialog from './catalog/ManageDialog'
+import BrandSummary, { type BrandKg } from './list/BrandSummary'
+import FilamentCard from './list/FilamentCard'
+import TileMenu, { type TileAction } from './list/TileMenu'
+import AdjustDialog from './spools/AdjustDialog'
+import PickDialog from './spools/PickDialog'
+import PurchaseDialog from './spools/PurchaseDialog'
 import { colorState, filamentKg, heldOf, sumByStatus, totalOf } from './stock'
-import TileMenu, { type TileAction } from './TileMenu'
 
 const SORTS = {
   name: '회사 이름순',

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { createBrand, deleteBrand, updateBrand, useRefreshFilaments, type Brand } from '../../api/filaments'
-import Dialog from '../../components/Dialog'
-import Field from '../../components/Field'
-import { useToast } from '../../components/useToast'
-import { useForm } from '../../useForm'
-import BrandLogo from './BrandLogo'
+import { createBrand, deleteBrand, updateBrand, useRefreshFilaments, type Brand } from '../../../api/filaments'
+import Dialog from '../../../components/Dialog'
+import Field from '../../../components/Field'
+import { useToast } from '../../../components/useToast'
+import { useForm } from '../../../useForm'
+import BrandLogo from '../BrandLogo'
 import { brandSchema } from './schemas'
 
 interface Props {

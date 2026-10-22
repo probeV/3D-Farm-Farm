@@ -1,8 +1,14 @@
-import { createMaterial, deleteMaterial, updateMaterial, useRefreshFilaments, type Material } from '../../api/filaments'
-import Dialog from '../../components/Dialog'
-import Field from '../../components/Field'
-import { useToast } from '../../components/useToast'
-import { useForm } from '../../useForm'
+import {
+  createMaterial,
+  deleteMaterial,
+  updateMaterial,
+  useRefreshFilaments,
+  type Material,
+} from '../../../api/filaments'
+import Dialog from '../../../components/Dialog'
+import Field from '../../../components/Field'
+import { useToast } from '../../../components/useToast'
+import { useForm } from '../../../useForm'
 import { materialSchema } from './schemas'
 
 interface Props {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Spool } from '../../api/filaments'
+import type { Spool } from '../../../api/filaments'
 import { codesText } from './spoolActions'
 
 describe('재고 추가 알림의 스풀 코드 표시', () => {

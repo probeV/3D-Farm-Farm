@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react'
-import type { Brand, Color, Filament } from '../../api/filaments'
-import { kgText, won } from '../../format'
-import BrandLogo from './BrandLogo'
-import { STATUS_LABEL, colorState, heldOf, totalOf } from './stock'
+import type { Brand, Color, Filament } from '../../../api/filaments'
+import { kgText, won } from '../../../format'
+import BrandLogo from '../BrandLogo'
+import { STATUS_LABEL, colorState, heldOf, totalOf } from '../stock'
 
 interface Props {
   filament: Filament

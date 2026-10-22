@@ -7,10 +7,10 @@ import {
   type MouseEvent,
   type PointerEvent,
 } from 'react'
-import type { Brand, ByStatus } from '../../api/filaments'
-import { kgText } from '../../format'
-import BrandLogo from './BrandLogo'
-import { heldOf, totalOf } from './stock'
+import type { Brand, ByStatus } from '../../../api/filaments'
+import { kgText } from '../../../format'
+import BrandLogo from '../BrandLogo'
+import { heldOf, totalOf } from '../stock'
 
 export interface BrandKg {
   brand: Brand

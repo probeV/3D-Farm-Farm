@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useSpools, type Color, type Spool } from '../../api/filaments'
-import Dialog from '../../components/Dialog'
-import Pager, { PAGE_SIZE } from '../../components/Pager'
-import { dateText } from '../../format'
+import { useSpools, type Color, type Spool } from '../../../api/filaments'
+import Dialog from '../../../components/Dialog'
+import Pager, { PAGE_SIZE } from '../../../components/Pager'
+import { dateText } from '../../../format'
 import { useSpoolActions } from './spoolActions'
-import { STATUS_LABEL } from './stock'
-import Swatch from './Swatch'
+import { STATUS_LABEL } from '../stock'
+import Swatch from '../Swatch'
 
 // 사용 시작할 / 사용 완료할 스풀을 코드로 직접 선택 (PRD INV-03). 줄을 누르면 바로 처리하고 닫힘
 export default function PickDialog({

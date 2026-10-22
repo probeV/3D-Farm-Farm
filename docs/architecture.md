@@ -83,17 +83,13 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
 - 모델 · 서비스를 추가하면 테스트도 함께: `python manage.py test` (backend/ 에서)
 - 코드 모양은 Ruff · Prettier 가 맞춘다. 실행 방법은 README 의 "코드 스타일"
 
-## 3. 프론트엔드 (`frontend/`) — 안(案)
-
-필라멘트 화면을 만들 때 확정한다.
+## 3. 프론트엔드 (`frontend/`)
 
 ```
 frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
                 client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
   pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, settings/)
-                화면에서만 쓰는 계산은 그 폴더에 (예: filaments/stock.ts — 상태별 kg, 재고 없음 · 소진)
-                폼 검증 스키마도 그 폴더에 (filaments/schemas.ts)
   components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
   format.ts     화면 표시용 숫자 모양 (원, kg)
@@ -102,6 +98,25 @@ frontend/src/
   App.tsx       레이아웃(사이드바) + 화면 전환
   main.tsx      시작점: TanStack Query, 테마(시스템 설정 따름)
 ```
+### 화면 폴더 안 (`pages/<화면>/`)
+파일이 많아지면 **기능별 폴더**로 나눈다 (계층별 `components/` 폴더 하나로 모으지 않는다). 기능 폴더 이름은 PRD · 화면 명세의 묶음을 따른다.
+
+```
+pages/filaments/
+  FilamentsPage.tsx    화면 진입점: 목록을 그리고, 타일 메뉴 · 대화상자를 연결
+  stock.ts             재고 계산 (상태별 kg, 재고 없음 · 소진) — 여러 기능 폴더에서 씀
+  BrandLogo.tsx        여러 기능 폴더에서 쓰는 작은 표시 부품
+  Swatch.tsx
+  list/                목록 (screens 1.2~1.4): BrandSummary(회사별 요약), FilamentCard(필라멘트 묶음 · 색상 타일), TileMenu
+  spools/              스풀 동작 (PRD 3.4 · 3.5): PurchaseDialog, PickDialog, AdjustDialog,
+                       spoolActions.ts(동작 + 되돌리기), schemas.ts(재고 추가 검증)
+  catalog/             회사 · 재질 · 필라멘트 · 색상 편집 (PRD 3.1): ManageDialog(필라멘트 관리),
+                       BrandDialog, MaterialDialog, FilamentDialog, ColorDialog, schemas.ts
+```
+- 한 기능 폴더에서만 쓰는 것은 그 폴더에, 두 곳 이상에서 쓰면 화면 폴더 바로 아래에, 다른 화면에서도 쓰면 `src/components/` 로 올린다.
+- 폼 검증 스키마는 그 폼이 있는 기능 폴더의 `schemas.ts` 에 둔다.
+
+### 규칙
 - 서버 데이터는 TanStack Query 로만 가져오고, 화면 안 상태(열린 창, 선택한 타일)는 컴포넌트 상태로 둔다.
 - 백엔드 앱과 프론트 폴더 이름을 맞춘다: `filaments` ↔ `api/filaments.ts`, `pages/filaments/`.
 - 단위 테스트(Vitest)는 대상 파일 옆에 `이름.test.ts` 로 둔다 (예: `validation.test.ts`, `pages/filaments/stock.test.ts`).

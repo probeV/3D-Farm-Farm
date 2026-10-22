@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { z } from 'zod'
-import { materialSchema, purchaseSchema } from './pages/filaments/schemas'
+import { materialSchema } from './pages/filaments/catalog/schemas'
+import { purchaseSchema } from './pages/filaments/spools/schemas'
 import { date, decimal, fieldErrors, intRange, money, selectedId, text, validate } from './validation'
 
 // 성공하면 변환된 값, 실패하면 첫 오류 문구
