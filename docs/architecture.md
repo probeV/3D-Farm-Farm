@@ -83,17 +83,58 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
 - 모델 · 서비스를 추가하면 테스트도 함께: `python manage.py test` (backend/ 에서)
 - 코드 모양은 Ruff · Prettier 가 맞춘다. 실행 방법은 README 의 "코드 스타일"
 
-## 3. 프론트엔드 (`frontend/`) — 안(案)
-
-필라멘트 화면을 만들 때 확정한다.
+## 3. 프론트엔드 (`frontend/`)
 
 ```
 frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
+                client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
   pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, settings/)
-  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager …)
+  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
+  format.ts     화면 표시용 숫자 모양 (원, kg)
+  validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
+  useForm.ts    폼 공통 흐름 훅: 입력 → 스키마 검사 → 저장 → 서버 오류 표시
   App.tsx       레이아웃(사이드바) + 화면 전환
+  main.tsx      시작점: TanStack Query, 테마(시스템 설정 따름)
 ```
+### 화면 폴더 안 (`pages/<화면>/`)
+파일이 많아지면 **기능별 폴더**로 나눈다 (계층별 `components/` 폴더 하나로 모으지 않는다). 기능 폴더 이름은 PRD · 화면 명세의 묶음을 따른다.
+
+```
+pages/filaments/
+  FilamentsPage.tsx    화면 진입점: 목록을 그리고, 타일 메뉴 · 대화상자를 연결
+  stock.ts             재고 계산 (상태별 kg, 재고 없음 · 소진) — 여러 기능 폴더에서 씀
+  BrandLogo.tsx        여러 기능 폴더에서 쓰는 작은 표시 부품
+  Swatch.tsx
+  list/                목록 (screens 1.2~1.4): BrandSummary(회사별 요약), FilamentCard(필라멘트 묶음 · 색상 타일), TileMenu
+  spools/              스풀 동작 (PRD 3.4 · 3.5): PurchaseDialog, PickDialog, AdjustDialog,
+                       spoolActions.ts(동작 + 되돌리기), schemas.ts(재고 추가 검증)
+  catalog/             회사 · 재질 · 필라멘트 · 색상 편집 (PRD 3.1): ManageDialog(필라멘트 관리),
+                       BrandDialog, MaterialDialog, FilamentDialog, ColorDialog, schemas.ts
+```
+- 한 기능 폴더에서만 쓰는 것은 그 폴더에, 두 곳 이상에서 쓰면 화면 폴더 바로 아래에, 다른 화면에서도 쓰면 `src/components/` 로 올린다.
+- 폼 검증 스키마는 그 폼이 있는 기능 폴더의 `schemas.ts` 에 둔다.
+
+### 규칙
 - 서버 데이터는 TanStack Query 로만 가져오고, 화면 안 상태(열린 창, 선택한 타일)는 컴포넌트 상태로 둔다.
 - 백엔드 앱과 프론트 폴더 이름을 맞춘다: `filaments` ↔ `api/filaments.ts`, `pages/filaments/`.
+- 단위 테스트(Vitest)는 대상 파일 옆에 `이름.test.ts` 로 둔다 (예: `validation.test.ts`, `pages/filaments/stock.test.ts`).
+  프론트에만 있는 로직(검증 규칙 · 계산 · 표시 모양)은 테스트도 함께 추가한다. 실행: `npm test` (frontend/ 에서)
+- 저장 · 삭제 뒤에는 관련 목록을 무효화해서 다시 불러온다 (`useRefreshFilaments`). 화면이 직접 목록을 고치지 않는다.
+- 대화상자 위에 대화상자를 열 때는 안에 넣지 않고 옆에 그린다 (`<form>` 안에 `<form>` 이 들어가지 않도록). 나중에 연 창이 위에 뜬다.
+- 알림은 열린 대화상자가 있으면 가장 위 대화상자 안에 그린다. 모달이 열려 있으면 그 바깥은 클릭할 수 없어서 `되돌리기` 를 누를 수 없기 때문.
+
+### 3.1 입력 검증
+화면(1차)에서 먼저 걸러 빨리 알려 주고, 서버(2차, 시리얼라이저)가 최종 판정한다. 화면을 거치지 않은 요청도 서버가 막는다.
+
+| 항목 | 규칙 |
+|---|---|
+| 검사 방법 | 모든 폼이 같은 순서: **입력칸 글자 → Zod 스키마 `safeParse` → 성공하면 서버로 / 실패하면 오류 표시**. 폼은 이 흐름을 `useForm` 훅으로 쓴다. 브라우저 기본 검사(`required` · `min` 말풍선)는 쓰지 않는다 (`Dialog` 의 form 은 `noValidate`) |
+| 규칙 위치 | 공통 규칙은 `src/validation.ts` (`money`, `intRange`, `date`), 폼 스키마는 화면 폴더의 `schemas.ts`. 같은 칸은 어느 창에서든 같은 규칙을 쓴다 (예: 구매가 = `money`) |
+| 서버와 맞추기 | 규칙은 시리얼라이저 · 모델과 같게. 스키마 주석에 서버 쪽 위치를 적고, 서버 규칙을 바꾸면 함께 고친다. DB 를 봐야 아는 것(이미 있는 번호 등)은 서버만 검사 |
+| 숫자 칸 | `type="text"` + `inputMode="numeric"` (`type="number"` 는 `-` 같은 글자를 빈칸으로 바꿔 넘겨서 "비움"과 구분이 안 됨). 글자 → 숫자 변환도 스키마가 한다 (빈칸 → `null`, 쉼표 허용) |
+| 오류 표시 | 폼: 그 칸 아래 빨간 글씨 (`Field` 부품). 서버 400 의 칸별 메시지도 같은 자리에 (`fieldErrorsOf`). 한 번 오류가 나면 입력할 때마다 다시 검사 |
+|  | 바로 저장하는 칸(스풀 조정의 구매가처럼 줄 안에 글씨 자리가 없는 칸): 원래 값으로 되돌리고 알림 |
+|  | 칸과 상관없는 오류(404 · 409 · 네트워크): 알림 |
+| 문구 | 화면 문구는 `~하세요` / `~요` 체, 서버 문구는 `~입니다` 체 (docs/api.md) |

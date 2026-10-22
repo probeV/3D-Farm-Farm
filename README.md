@@ -12,7 +12,7 @@
 
 ## 기술 스택
 - 백엔드: Python 3.10+, Django 5.2 (LTS), Django REST Framework
-- 프론트엔드: React + TypeScript + Vite, TanStack Query
+- 프론트엔드: React + TypeScript + Vite, TanStack Query, Zod (입력 검증)
 - DB: SQLite (로컬)
 
 ## 폴더 구조
@@ -22,6 +22,11 @@ frontend/   React 앱 (Vite)
 docs/       PRD · ERD · 화면 명세 · 목업 · 코드 구조 · API
 ```
 무엇을 어디에 두는지는 [docs/architecture.md](docs/architecture.md), API 는 [docs/api.md](docs/api.md) 참고.
+
+## 바로 실행 (Windows)
+처음 한 번 아래 "로컬 실행" 준비(가상환경 · `backend/.env` · Node.js)를 마친 뒤에는 저장소 루트의 **`start.bat`** 을 더블클릭하면 돼요.
+- DB 변경 사항 적용(`migrate`) · 프론트 패키지 설치(`npm install`)를 한 뒤, 백엔드 · 프론트 서버를 각각 새 창으로 켜고 브라우저(`http://localhost:5173`)를 열어요.
+- 끌 때는 두 서버 창을 닫거나 각 창에서 `Ctrl+C`.
 
 ## 로컬 실행 (백엔드)
 ```bash
@@ -85,6 +90,21 @@ npm run lint
 ```
 - 공통: 작은따옴표, 한 줄 최대 120자. 프론트엔드는 세미콜론 없음
 - `migrations/` 는 자동 생성 파일이라 검사하지 않아요
+
+### 테스트
+| 영역 | 도구 | 대상 |
+|---|---|---|
+| 백엔드 | Django `TestCase` | 모델 · API (`backend/<앱>/tests/`) |
+| 프론트엔드 | Vitest (단위 테스트) | 입력 검증 규칙 · 재고 계산 · 표시 모양 (`*.test.ts`, 대상 파일 옆) |
+
+```bash
+# 백엔드 (backend/ 에서)
+python manage.py test
+
+# 프론트엔드 (frontend/ 에서)
+npm test                        # 한 번 실행
+npm run test:watch              # 파일을 고칠 때마다 다시 실행
+```
 
 ### 커밋 메시지 (Conventional Commits)
 `종류: 한 줄 요약`

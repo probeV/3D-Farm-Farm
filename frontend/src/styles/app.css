@@ -233,7 +233,9 @@ textarea:focus {
   outline: 2px solid var(--accent-soft);
   border-color: var(--accent);
 }
-input[type='number'] {
+input[type='number'],
+input[inputmode='numeric'],
+input[inputmode='decimal'] {
   text-align: right;
 }
 code {
