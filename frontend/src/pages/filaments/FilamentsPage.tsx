@@ -1,8 +1,12 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useBrands, useFilaments, useMaterials, type ByStatus, type Color, type Filament } from '../../api/filaments'
+import AdjustDialog from './AdjustDialog'
 import BrandSummary, { type BrandKg } from './BrandSummary'
 import FilamentCard from './FilamentCard'
+import PickDialog from './PickDialog'
+import PurchaseDialog from './PurchaseDialog'
 import { colorState, filamentKg, heldOf, sumByStatus, totalOf } from './stock'
+import TileMenu, { type TileAction } from './TileMenu'
 
 const SORTS = {
   name: '회사 이름순',
@@ -22,6 +26,8 @@ interface Filter {
 
 const NO_FILTER: Filter = { q: '', brand: null, material: null, sort: 'name' }
 
+type DialogState = { kind: TileAction; colorId: number } // 타일 메뉴에서
+
 const byName = (a: string, b: string) => a.localeCompare(b, 'ko')
 
 // 필라멘트 화면: 전체 요약 → 회사별 요약 → 필라멘트 목록 (docs/screens.md 1장)
@@ -31,6 +37,11 @@ export default function FilamentsPage() {
   const filaments = useFilaments()
   const [filter, setFilter] = useState<Filter>(NO_FILTER)
   const toolbarRef = useRef<HTMLDivElement>(null)
+  // 열린 타일 메뉴 · 대화상자. 색상은 id 로 기억하고 그릴 때마다 최신 데이터에서 찾는다 (저장하면 목록이 새로 옴)
+  const [menu, setMenu] = useState<{ colorId: number; anchor: HTMLElement } | null>(null)
+  const [dialog, setDialog] = useState<DialogState | null>(null)
+  const closeMenu = useCallback(() => setMenu(null), [])
+  const closeDialog = useCallback(() => setDialog(null), [])
 
   const failed = [brands, materials, filaments].find((r) => r.isError)
   if (failed) {
@@ -46,7 +57,11 @@ export default function FilamentsPage() {
   if (!brands.data || !materials.data || !filaments.data) return <div className="empty">불러오는 중…</div>
 
   const fils = filaments.data
-  const set = (patch: Partial<Filter>) => setFilter((f) => ({ ...f, ...patch }))
+  // 목록이 바뀌면 열린 메뉴의 타일이 사라질 수 있으므로 메뉴를 닫는다
+  const set = (patch: Partial<Filter>) => {
+    setFilter((f) => ({ ...f, ...patch }))
+    setMenu(null)
+  }
 
   // 전체 요약 · 회사별 요약은 검색 · 필터와 무관하게 전체 기준
   const colors = fils.flatMap((f) => f.colors)
@@ -66,6 +81,16 @@ export default function FilamentsPage() {
 
   const list = filterFilaments(fils, filter)
   const filtered = filter.q !== '' || filter.brand != null || filter.material != null
+
+  // 같은 타일을 다시 누르면 닫고, 다른 타일이면 그 타일로 연다
+  const onTile = (color: Color, anchor: HTMLElement) =>
+    setMenu((m) => (m?.colorId === color.id ? null : { colorId: color.id, anchor }))
+  const find = (colorId: number) => {
+    const filament = fils.find((f) => f.colors.some((c) => c.id === colorId))
+    const color = filament?.colors.find((c) => c.id === colorId)
+    return filament && color ? { filament, color } : null
+  }
+  const menuTarget = menu && find(menu.colorId)
 
   return (
     <>
@@ -149,14 +174,46 @@ export default function FilamentsPage() {
               brand={brands.data.find((b) => b.id === x.filament.brand)}
               colors={x.colors}
               showAdd={x.selfMatch}
+              selectedColor={menu?.colorId ?? null}
+              onTile={onTile}
             />
           ))}
         </div>
       ) : (
         <div className="empty">{fils.length ? '조건에 맞는 필라멘트가 없어요.' : '등록된 필라멘트가 없어요.'}</div>
       )}
+
+      {menu && menuTarget && (
+        <TileMenu
+          color={menuTarget.color}
+          anchor={menu.anchor}
+          onPick={(kind) => {
+            setMenu(null)
+            setDialog({ kind, colorId: menu.colorId })
+          }}
+          onClose={closeMenu}
+        />
+      )}
+      {renderDialog()}
     </>
   )
+
+  // 열린 대화상자. 대상 색상이 지워졌으면 그리지 않는다
+  function renderDialog() {
+    if (!dialog) return null
+    const target = find(dialog.colorId)
+    if (!target) return null
+    const { filament, color } = target
+    switch (dialog.kind) {
+      case 'purchase':
+        return <PurchaseDialog filament={filament} color={color} onClose={closeDialog} />
+      case 'pickOpen':
+      case 'pickFinish':
+        return <PickDialog color={color} mode={dialog.kind === 'pickOpen' ? 'open' : 'finish'} onClose={closeDialog} />
+      case 'adjust':
+        return <AdjustDialog color={color} onClose={closeDialog} />
+    }
+  }
 }
 
 interface Row {

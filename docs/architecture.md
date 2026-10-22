@@ -93,6 +93,7 @@ frontend/src/
                 client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
   pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, settings/)
                 화면에서만 쓰는 계산은 그 폴더에 (예: filaments/stock.ts — 상태별 kg, 재고 없음 · 소진)
+                폼 검증 스키마도 그 폴더에 (filaments/schemas.ts)
   components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
   format.ts     화면 표시용 숫자 모양 (원, kg)
@@ -103,6 +104,7 @@ frontend/src/
 ```
 - 서버 데이터는 TanStack Query 로만 가져오고, 화면 안 상태(열린 창, 선택한 타일)는 컴포넌트 상태로 둔다.
 - 백엔드 앱과 프론트 폴더 이름을 맞춘다: `filaments` ↔ `api/filaments.ts`, `pages/filaments/`.
+- 저장 · 삭제 뒤에는 관련 목록을 무효화해서 다시 불러온다 (`useRefreshFilaments`). 화면이 직접 목록을 고치지 않는다.
 - 대화상자 위에 대화상자를 열 때는 안에 넣지 않고 옆에 그린다 (`<form>` 안에 `<form>` 이 들어가지 않도록). 나중에 연 창이 위에 뜬다.
 - 알림은 열린 대화상자가 있으면 가장 위 대화상자 안에 그린다. 모달이 열려 있으면 그 바깥은 클릭할 수 없어서 `되돌리기` 를 누를 수 없기 때문.
 

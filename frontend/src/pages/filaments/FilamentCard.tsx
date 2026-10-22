@@ -9,10 +9,12 @@ interface Props {
   brand: Brand | undefined
   colors: Color[] // 검색에 맞는 색상만
   showAdd: boolean // 색상 이름으로만 걸린 경우에는 `+ 색상` 타일을 숨김
+  selectedColor: number | null // 메뉴가 열린 타일
+  onTile: (color: Color, tile: HTMLElement) => void
 }
 
 // 필라멘트 묶음: 제목 타일 → 색상 타일들 → `+ 색상` 타일 (PRD FIL-10)
-export default function FilamentCard({ filament: f, brand, colors, showAdd }: Props) {
+export default function FilamentCard({ filament: f, brand, colors, showAdd, selectedColor, onTile }: Props) {
   const avg = f.avg_held_price != null ? ` · 보유 스풀 평균 ${won(f.avg_held_price)}` : ''
 
   return (
@@ -27,7 +29,13 @@ export default function FilamentCard({ filament: f, brand, colors, showAdd }: Pr
           </div>
         </div>
         {colors.map((c) => (
-          <ColorTile key={c.id} color={c} spoolG={f.spool_g} />
+          <ColorTile
+            key={c.id}
+            color={c}
+            spoolG={f.spool_g}
+            selected={c.id === selectedColor}
+            onClick={(tile) => onTile(c, tile)}
+          />
         ))}
         {showAdd && (
           <button type="button" className="tile add-tile" title={`${f.display_name} 에 색상 추가`}>
@@ -40,7 +48,14 @@ export default function FilamentCard({ filament: f, brand, colors, showAdd }: Pr
 }
 
 // 색상 타일: 왼쪽 색 선 · 이름 · 상태 배지 · 보유 kg · 비율 막대 · 상태별 개수
-function ColorTile({ color: c, spoolG }: { color: Color; spoolG: number }) {
+interface TileProps {
+  color: Color
+  spoolG: number
+  selected: boolean
+  onClick: (tile: HTMLElement) => void
+}
+
+function ColorTile({ color: c, spoolG, selected, onClick }: TileProps) {
   const n = c.counts
   const state = colorState(c)
   const parts = [
@@ -50,7 +65,14 @@ function ColorTile({ color: c, spoolG }: { color: Color; spoolG: number }) {
   ] as const
 
   return (
-    <button type="button" className="tile" title={c.name} style={{ '--c': c.hex } as CSSProperties}>
+    <button
+      type="button"
+      className={selected ? 'tile selected' : 'tile'}
+      data-color={c.id}
+      title={c.name}
+      style={{ '--c': c.hex } as CSSProperties}
+      onClick={(e) => onClick(e.currentTarget)}
+    >
       <span className="tile-head">
         <span className="tname">{c.name}</span>
         {state === 'usedUp' && <span className="badge bad">소진</span>}

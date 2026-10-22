@@ -5,3 +5,13 @@ export const won = (n: number | null | undefined) => (n == null ? '-' : Math.rou
 
 // 소수 첫째 자리까지: 2.25 → "2.3", 12 → "12"
 export const kgText = (n: number) => (Math.round(n * 10) / 10).toLocaleString('ko-KR')
+
+// 날짜만: "2026-10-20T13:33:30+09:00" → "2026-10-20" (서버가 서울 시간으로 줌), 없으면 "-"
+export const dateText = (v: string | null) => (v ? v.slice(0, 10) : '-')
+
+// 오늘 날짜 "2026-10-21" (이 PC 시간 기준)
+export function today() {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
