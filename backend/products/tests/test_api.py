@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from filaments.models import Brand, Color, Filament, Material, Spool
 
-from ..models import Category, CostSetting, Part, Product, ProductFilament, ProductPart, Subcategory
+from ..models import Category, CostSetting, Part, PartCategory, Product, ProductFilament, ProductPart, Subcategory
 
 API = '/api/v0'
 
@@ -130,6 +130,80 @@ class PartApiTests(ApiTestCase):
         ProductPart.objects.create(product=Product.objects.create(name='분수 원판 세트'), part=self.magnet)
         res = self.client.delete(f'{API}/parts/{self.magnet.pk}/')
         self.assertEqual((res.status_code, res.data['detail']), (409, '제품에서 쓰고 있어서 삭제할 수 없습니다.'))
+
+
+class PartCategoryApiTests(ApiTestCase):
+    def test_initial_categories_and_counts(self):
+        # 마이그레이션이 처음 카테고리(부품 · 포장재 · 기타)를 만든다
+        self.magnet.category = PartCategory.objects.get(name='부품')
+        self.magnet.save()
+        res = self.client.get(f'{API}/part-categories/')
+        self.assertEqual([(c['name'], c['part_count']) for c in res.data], [('기타', 0), ('부품', 1), ('포장재', 0)])
+
+    def test_duplicate_name(self):
+        res = self.client.post(f'{API}/part-categories/', {'name': '부품'})
+        self.assertEqual((res.status_code, res.data['name']), (400, ['이미 있는 카테고리 이름입니다.']))
+
+    def test_delete_makes_parts_uncategorized(self):
+        packing = PartCategory.objects.get(name='포장재')
+        box = Part.objects.create(name='소형 박스', category=packing)
+        self.assertEqual(self.client.delete(f'{API}/part-categories/{packing.pk}/').status_code, 204)
+        box.refresh_from_db()
+        self.assertIsNone(box.category)
+
+
+class PartFieldsApiTests(ApiTestCase):
+    def test_category_and_buy_url(self):
+        packing = PartCategory.objects.get(name='포장재')
+        res = self.client.post(
+            f'{API}/parts/', {'name': 'OPP 봉투', 'category': packing.pk, 'buy_url': 'https://example.com/opp'}
+        )
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual((res.data['category'], res.data['buy_url']), (packing.pk, 'https://example.com/opp'))
+
+    def test_bad_buy_url(self):
+        res = self.client.post(f'{API}/parts/', {'name': 'OPP 봉투', 'buy_url': 'example'})
+        self.assertEqual((res.status_code, res.data['buy_url']), (400, ['https:// 로 시작하는 주소로 입력하세요.']))
+
+
+class ReplacePartApiTests(ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.big = Part.objects.create(name='네오디뮴 자석 (대용량)', price=Decimal('20000'), pack_qty=500)
+        self.a = Product.objects.create(name='분수 원판 세트')
+        self.b = Product.objects.create(name='소마 큐브')
+        self.c = Product.objects.create(name='이름 키링')
+        for p, qty in [(self.a, 12), (self.b, 4), (self.c, 2)]:
+            ProductPart.objects.create(product=p, part=self.magnet, qty=qty)
+        ProductPart.objects.create(product=self.c, part=self.big, qty=3)
+
+    def replace(self, **data):
+        return self.client.post(f'{API}/parts/{self.magnet.pk}/replace/', data, format='json')
+
+    def rows(self, product):
+        return [(r.part_id, r.qty) for r in product.parts.order_by('id')]
+
+    def test_replace_all_merges_existing_row(self):
+        res = self.replace(to=self.big.pk)
+        self.assertEqual((res.status_code, res.data), (200, {'replaced': 3}))
+        self.assertEqual(self.rows(self.a), [(self.big.pk, 12)])
+        self.assertEqual(self.rows(self.c), [(self.big.pk, 5)])  # 이미 있던 줄에 더함
+        self.assertFalse(self.magnet.product_parts.exists())
+        self.assertTrue(Part.objects.filter(pk=self.magnet.pk).exists())  # 부자재 자체는 그대로
+
+    def test_replace_picked_products_only(self):
+        res = self.replace(to=self.big.pk, products=[self.b.pk])
+        self.assertEqual(res.data, {'replaced': 1})
+        self.assertEqual(self.rows(self.a), [(self.magnet.pk, 12)])
+        self.assertEqual(self.rows(self.b), [(self.big.pk, 4)])
+
+    def test_bad_input(self):
+        self.assertEqual(self.replace(to=self.magnet.pk).data['to'], ['다른 부자재를 고르세요.'])
+        self.assertEqual(self.replace(to=999).data['to'], ['없는 부자재입니다.'])
+        other = Product.objects.create(name='하노이 탑')
+        res = self.replace(to=self.big.pk, products=[other.pk])
+        self.assertEqual((res.status_code, res.data['products']), (400, ['이 부자재를 쓰는 제품을 고르세요.']))
+        self.assertEqual(self.rows(self.a), [(self.magnet.pk, 12)])
 
 
 class ProductApiTests(ApiTestCase):

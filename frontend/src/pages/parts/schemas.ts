@@ -3,11 +3,17 @@
 import { z } from 'zod'
 import { decimal, money, text } from '../../validation'
 
-// 서버: Part — name max_length=100(중복 불가), shop max_length=100, price MONEY(비우면 미입력),
+// 서버: Part — name max_length=100(중복 불가), category(비우면 미분류), shop max_length=100, buy_url URLField(max_length=500), price MONEY(비우면 미입력),
 //       pack_qty DecimalField(max_digits=10, decimal_places=2, 0.01 이상), unit max_length=10
 export const partSchema = z.object({
   name: text(100),
+  category: z.string().transform((v) => (v === '' ? null : Number(v))), // 빈칸 = 미분류
   shop: text(100, false),
+  // 구매 링크: 비워도 됨. 넣으면 https:// (또는 http://) 로 시작하는 주소
+  buy_url: text(500, false).refine(
+    (v) => !v || /^https?:\/\/\S+\.\S+$/.test(v),
+    'https:// 로 시작하는 주소로 입력하세요',
+  ),
   price: money,
   pack_qty: decimal(0.01, 99_999_999.99, 2),
   unit: text(10, false).transform((v) => v || '개'), // 비우면 기본 단위
