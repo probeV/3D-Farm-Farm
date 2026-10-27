@@ -12,9 +12,10 @@ interface Props {
   selectedColor: number | null // 메뉴가 열린 타일
   onTile: (color: Color, tile: HTMLElement) => void
   onAddColor: (filament: Filament) => void
+  onEdit: (filament: Filament) => void // 제목 타일을 누르면 필라멘트 수정
 }
 
-// 필라멘트 묶음: 제목 타일 → 색상 타일들 → `+ 색상` 타일 (PRD FIL-10)
+// 필라멘트 묶음: 제목 타일 → 색상 타일들 → `+ 색상` 타일 (PRD FIL-10). 제목 타일을 누르면 필라멘트 수정
 export default function FilamentCard({
   filament: f,
   brand,
@@ -23,20 +24,26 @@ export default function FilamentCard({
   selectedColor,
   onTile,
   onAddColor,
+  onEdit,
 }: Props) {
   const avg = f.avg_held_price != null ? ` · 보유 스풀 평균 ${won(f.avg_held_price)}` : ''
 
   return (
     <section className="fil-card">
       <div className="tiles">
-        <div className="fil-head" title={f.display_name + avg}>
+        <button
+          type="button"
+          className="fil-head"
+          title={`${f.display_name}${avg} · 누르면 수정`}
+          onClick={() => onEdit(f)}
+        >
           <BrandLogo brand={brand ?? { name: f.brand_name, logo: null }} />
           <div className="fil-brand">{f.brand_name}</div>
           <div className="fil-title">{f.series ? `${f.material_name} ${f.series}` : f.material_name}</div>
           <div className={f.price == null ? 'fil-meta none' : 'fil-meta'}>
             {f.price == null ? '가격 미입력' : `${won(f.price)} / ${kgText(f.spool_g / 1000)}kg`}
           </div>
-        </div>
+        </button>
         {colors.map((c) => (
           <ColorTile
             key={c.id}

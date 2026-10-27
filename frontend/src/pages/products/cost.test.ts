@@ -4,6 +4,7 @@ import type { CostSetting, Part } from '../../api/products'
 import {
   calcCost,
   completeMargin,
+  costFormulas,
   filamentUnitText,
   makeCatalog,
   marginClass,
@@ -168,6 +169,25 @@ describe('원가 계산 (PRD 3.6)', () => {
     expect(rec(125)).toBe(1800) // 1,800원 그대로
     expect(rec(130)).toBe(1900) // 1,872원 → 1,900원
     expect(rec(130, { ...plain, target_margin: 100 })).toBeNull()
+  })
+})
+
+describe('원가 내역 계산식 (TBD-19)', () => {
+  it('그 제품 값으로 식을 채운다', () => {
+    const p = product()
+    const f = costFormulas(p, calcCost(p, catalog), setting)
+    expect(f.electricity).toBe('2시간 × 0.36kW × 215원/kWh = 155원')
+    expect(f.cost).toBe('필라멘트비 + 전기료 + 부자재비\n= 1,020원 + 155원 + 120원')
+    expect(f.fee).toBe('판매가 × (주문관리 1.98% + 판매 2.73%)\n= 10,000원 × 4.71%')
+    expect(f.net).toBe('판매가 − 원가 − 수수료\n= 10,000원 − 1,295원 − 471원')
+    expect(f.recommended).toContain('= (1,295원 + 0원) ÷ (1 − 4.71% − 40%)')
+  })
+
+  it('배송비가 있으면 순이익 식에 배송비', () => {
+    const p = product()
+    const s = { ...setting, shipping_cost: 3000 }
+    const f = costFormulas(p, calcCost(p, makeCatalog(filaments, parts, s)), s)
+    expect(f.net).toBe('판매가 − 원가 − 수수료 − 배송비\n= 10,000원 − 1,295원 − 471원 − 3,000원')
   })
 })
 

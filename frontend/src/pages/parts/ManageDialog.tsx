@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { deletePart, useRefreshProducts, type Part } from '../../api/products'
 import Dialog from '../../components/Dialog'
+import ManageColumn from '../../components/ManageColumn'
+import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { unitWon } from '../../format'
 import PartDialog from './PartDialog'
@@ -16,6 +18,8 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const data = usePartsData().data
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const [picked, setPicked] = useState<ShopSel>('')
   const [sub, setSub] = useState<Sub | null>(null)
   const closeSub = () => setSub(null)
@@ -32,7 +36,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const remove = async (p: Part) => {
     // 제품에서 쓰면 서버도 막는다 (409)
     if (p.product_count) return toast(`제품 ${p.product_count}개에서 쓰고 있어서 삭제할 수 없어요`)
-    if (!confirm(`${p.name} 을(를) 삭제할까요?`)) return
+    if (!(await confirm({ title: '부자재 삭제', message: `${p.name} 을(를) 삭제할까요?`, danger: true }))) return
     try {
       await deletePart(p.id)
       await refresh()
@@ -57,15 +61,22 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Dialog size="wide" title="부자재 관리" onClose={onClose}>
+      <Dialog size="wide" fixed title="부자재 관리" onClose={onClose}>
         <div className="manage parts-manage">
-          <div className="list">
-            {item('', '전체')}
-            {shops.map((s) => item(`s:${s}`, s))}
-            {hasNoShop && item('none', '구매처 없음')}
-          </div>
-          <div className="manage-right">
-            <h4>{selName ? `${selName} 의 부자재` : '전체 부자재'}</h4>
+          <ManageColumn title="구매처" count={shops.length}>
+            <div className="list">
+              {item('', '전체')}
+              {shops.map((s) => item(`s:${s}`, s))}
+              {hasNoShop && item('none', '구매처 없음')}
+            </div>
+          </ManageColumn>
+          <ManageColumn
+            className="manage-right"
+            title={selName ? `${selName} 의 부자재` : '전체 부자재'}
+            count={list.length}
+            addLabel="+ 부자재 추가"
+            onAdd={() => setSub({ part: null })}
+          >
             {list.length ? (
               list.map((p) => (
                 <div key={p.id} className="row-item">
@@ -108,15 +119,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
             ) : (
               <p className="hint">등록된 부자재가 없어요.</p>
             )}
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ part: null })}
-            >
-              + 부자재 추가
-            </button>
-          </div>
+          </ManageColumn>
         </div>
       </Dialog>
 

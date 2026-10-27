@@ -67,7 +67,7 @@ describe('제품 폼 검증 (PRD-04 · PRD-05 · PRD-06)', () => {
         minutes: '60',
         filaments: [
           { key: 1, filament: '4', color: '', grams: '10' },
-          { key: 2, filament: '4', color: '', grams: '1.25' },
+          { key: 2, filament: '4', color: '', grams: '1.255' },
         ],
       }),
     )
@@ -77,7 +77,7 @@ describe('제품 폼 검증 (PRD-04 · PRD-05 · PRD-06)', () => {
         no: '1 이상으로 입력하세요',
         name: '입력하세요',
         minutes: '59 이하로 입력하세요',
-        'filaments.1.grams': '소수 1자리까지 입력하세요',
+        'filaments.1.grams': '소수 2자리까지 입력하세요',
       })
   })
 })

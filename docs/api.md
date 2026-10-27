@@ -145,9 +145,8 @@
 | `price_per_g` | — | g당 가격 (소수 2자리) |
 | `counts` | — | 상태별 스풀 개수 `{sealed, open, empty}` |
 
-- 삭제: 스풀이 있으면 409 `스풀이 있어서 삭제할 수 없습니다.`
-- 제품에서 쓰는 색상은 지워진다. 그 제품 줄은 `color: null`(색상 선택 안 함)이 되어 필라멘트 가격으로 계산된다 (TBD-04).
-  지우기 전 확인 창의 "쓰는 제품" 목록은 화면이 제품 목록(`filaments[].color`)에서 찾는다
+- 삭제: 막는 것 없음 (204). 그 색상의 스풀도 함께 삭제되고, 제품에서 쓰던 줄은 `color: null`(색상 선택 안 함)이 되어 필라멘트 가격으로 계산된다 (PRD FIL-09).
+  지우기 전 확인 창의 스풀 개수는 `counts`, "쓰는 제품" 목록은 화면이 제품 목록(`filaments[].color`)에서 찾는다
 
 ### 재고 추가 `POST /api/v0/colors/{id}/spools/`
 ```json
@@ -274,7 +273,7 @@
   "name": "분수 원판 세트", "status": "on_sale",
   "print_minutes": 200, "sale_price": 18900, "note": "",
   "filaments": [
-    { "id": 1, "filament": 1, "color": 101, "grams": 24 },
+    { "id": 1, "filament": 1, "color": 101, "grams": 24.37 },
     { "id": 2, "filament": 4, "color": null, "grams": 60 }
   ],
   "parts": [{ "id": 1, "part": 1, "qty": 12 }],
@@ -290,7 +289,7 @@
 | `print_minutes` | 선택 | 출력 시간(분, 정수). `null` = 미입력 |
 | `sale_price` | 선택 | 판매가. `null` = 미입력 |
 | `note` | 선택 | 메모 |
-| `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상 |
+| `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상, 소수 2자리까지 |
 | `parts` | 선택 | 사용 부자재 줄 `{part, qty}`. `qty` 0 이상 |
 
 - **줄 저장**: `filaments` · `parts` 를 보내면 그 목록으로 통째로 바꾼다 (기존 줄을 지우고 새로 만들어서 줄 `id` 가 바뀐다).

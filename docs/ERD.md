@@ -90,7 +90,7 @@ erDiagram
         bigint product_id FK
         bigint filament_id FK
         bigint color_id FK "NULL=색상 선택 안 함"
-        decimal grams "사용량(g)"
+        decimal grams "사용량(g) 소수 2자리"
     }
     PRODUCT_PART {
         bigint id PK
@@ -155,10 +155,10 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Filament.brand` → `Brand` | PROTECT | 필라멘트가 있으면 회사 삭제 불가 |
 | `Filament.material` → `Material` | PROTECT | 필라멘트가 있으면 재질 삭제 불가 |
 | `Color.filament` → `Filament` | PROTECT | 색상이 있으면 필라멘트 삭제 불가 |
-| `Spool.color` → `Color` | PROTECT | 스풀이 있으면 색상 삭제 불가 |
+| `Spool.color` → `Color` | CASCADE | 색상을 지우면 그 색상의 스풀도 함께 삭제. 지우기 전에 스풀 개수를 알려 주고 2차 확인 |
 | `ProductFilament.filament` → `Filament` | PROTECT | 제품에서 쓰면 필라멘트 삭제 불가 |
 | `ProductPart.part` → `Part` | PROTECT | 제품에서 쓰면 부자재 삭제 불가 |
-| `ProductFilament.color` → `Color` | SET_NULL | 색상을 지우면 그 줄은 색상 선택 안 함 (필라멘트 가격으로 계산). 지우기 전에 쓰는 제품을 알려 주고 확인 ([TBD-04](TBD.md)) |
+| `ProductFilament.color` → `Color` | SET_NULL | 색상을 지우면 그 줄은 색상 선택 안 함 (필라멘트 가격으로 계산). 지우기 전에 쓰는 제품을 알려 주고 확인 ([TBD-04](plans/v1.1.0.md)) |
 | `Product.category` → `Category` | PROTECT | 제품이 있으면 카테고리 삭제 불가 |
 | `Product.subcategory` → `Subcategory` | PROTECT | 제품이 있으면 세부 분류 삭제 불가 |
 | `Subcategory.category` → `Category` | CASCADE | 카테고리 삭제 시 (제품이 없을 때만 가능) 세부 분류도 함께 삭제 |

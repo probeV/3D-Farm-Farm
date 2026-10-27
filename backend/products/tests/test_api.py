@@ -143,7 +143,7 @@ class ProductApiTests(ApiTestCase):
             'sale_price': 18900,
             'filaments': [
                 {'filament': self.filament.pk, 'color': self.red.pk, 'grams': 24},
-                {'filament': self.filament.pk, 'color': None, 'grams': 60.5},
+                {'filament': self.filament.pk, 'color': None, 'grams': 24.37},
             ],
             'parts': [{'part': self.magnet.pk, 'qty': 12}],
             **overrides,
@@ -158,7 +158,7 @@ class ProductApiTests(ApiTestCase):
         self.assertEqual(res.data['no'], 1)
         self.assertEqual(
             [(r['color'], r['grams']) for r in res.data['filaments']],
-            [(self.red.pk, 24), (None, 60.5)],
+            [(self.red.pk, 24), (None, 24.37)],
         )
         self.assertEqual([(r['part'], r['qty']) for r in res.data['parts']], [(self.magnet.pk, 12)])
         self.assertEqual(ProductFilament.objects.count(), 2)
@@ -214,6 +214,11 @@ class ProductApiTests(ApiTestCase):
 
     def test_negative_grams_rejected(self):
         res = self.create(filaments=[{'filament': self.filament.pk, 'grams': -1}])
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('grams', res.data['filaments'][0])
+
+    def test_grams_up_to_two_decimals(self):
+        res = self.create(filaments=[{'filament': self.filament.pk, 'grams': 24.375}])
         self.assertEqual(res.status_code, 400)
         self.assertIn('grams', res.data['filaments'][0])
 
@@ -287,10 +292,15 @@ class FilamentInProductApiTests(ApiTestCase):
         row.refresh_from_db()
         self.assertIsNone(row.color)
 
-    def test_color_with_spools_still_protected(self):
+    def test_color_with_spools_and_products(self):
+        row = ProductFilament.objects.create(
+            product=Product.objects.create(name='소마 큐브'), filament=self.filament, color=self.red, grams=20
+        )
         Spool.objects.create(color=self.red)
-        res = self.client.delete(f'{API}/colors/{self.red.pk}/')
-        self.assertEqual(res.status_code, 409)
+        self.assertEqual(self.client.delete(f'{API}/colors/{self.red.pk}/').status_code, 204)
+        row.refresh_from_db()
+        self.assertIsNone(row.color)
+        self.assertFalse(Spool.objects.exists())
 
 
 class CostSettingApiTests(APITestCase):

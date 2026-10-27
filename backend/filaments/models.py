@@ -205,7 +205,8 @@ class Spool(models.Model):
         OPEN = 'open', '사용 중'
         EMPTY = 'empty', '사용 완료'
 
-    color = models.ForeignKey(Color, on_delete=models.PROTECT, related_name='spools', verbose_name='색상')
+    # 색상을 지우면 그 색상의 스풀도 함께 삭제 (화면에서 개수를 보여 주고 2차 확인, PRD FIL-09)
+    color = models.ForeignKey(Color, on_delete=models.CASCADE, related_name='spools', verbose_name='색상')
     code_no = models.PositiveIntegerField(
         '스풀 번호',
         unique=True,

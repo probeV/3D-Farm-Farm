@@ -7,12 +7,11 @@ import './styles/parts.css'
 import './styles/settings.css'
 import App from './App.tsx'
 import ToastProvider from './components/Toast.tsx'
+import ConfirmProvider from './components/Confirm.tsx'
+import { applyTheme, loadTheme } from './theme.ts'
 
-// 테마: 시스템 설정을 따르고, 바뀌면 바로 반영 (색상 토큰은 styles/app.css)
-const dark = matchMedia('(prefers-color-scheme: dark)')
-const applyTheme = () => (document.documentElement.dataset.theme = dark.matches ? 'dark' : 'light')
-applyTheme()
-dark.addEventListener('change', applyTheme)
+// 테마: 고른 값(기본 시스템)을 첫 화면 전에 적용. 바꾸기는 사이드바 (App.tsx)
+applyTheme(loadTheme())
 
 // 같은 PC 의 서버라 실패하면 한 번만 다시 시도
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1 } } })
@@ -21,7 +20,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <App />
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,
