@@ -212,6 +212,8 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
             cost={cost}
             preview={preview}
             setting={catalog.setting}
+            catalog={catalog}
+            partCategories={data.partCategories}
           />
         </div>
       </Dialog>

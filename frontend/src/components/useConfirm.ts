@@ -14,6 +14,7 @@ export interface ConfirmOptions {
   danger?: boolean // 삭제: 빨간 버튼. 아니면 파란 버튼 (스풀 되돌리기 등)
   twice?: boolean // 2차 확인: 누르면 같은 창에서 `정말 삭제` 로 바뀌고 한 번 더 눌러야 실행 (다른 데이터도 바뀌는 삭제)
   okLabel?: string // 기본 `삭제`
+  againLabel?: string // 2차 확인 버튼. 기본 `정말 삭제`
 }
 
 // if (!(await confirm({ title: '부자재 삭제', message: '…을(를) 삭제할까요?', danger: true }))) return

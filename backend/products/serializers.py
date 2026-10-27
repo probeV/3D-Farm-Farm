@@ -6,7 +6,7 @@ from rest_framework.validators import UniqueValidator
 
 from filaments.serializers import BaseModelSerializer
 
-from .models import Category, CostSetting, Part, Product, ProductFilament, ProductPart, Subcategory
+from .models import Category, CostSetting, Part, PartCategory, Product, ProductFilament, ProductPart, Subcategory
 
 
 class SubcategorySerializer(BaseModelSerializer):
@@ -48,6 +48,18 @@ class CategorySerializer(BaseModelSerializer):
         fields = ['id', 'name', 'product_count', 'subcategories']
 
 
+class PartCategorySerializer(BaseModelSerializer):
+    name = serializers.CharField(
+        max_length=50,
+        validators=[UniqueValidator(queryset=PartCategory.objects.all(), message='이미 있는 카테고리 이름입니다.')],
+    )
+    part_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = PartCategory
+        fields = ['id', 'name', 'part_count']
+
+
 class PartSerializer(BaseModelSerializer):
     name = serializers.CharField(
         max_length=100,
@@ -58,11 +70,44 @@ class PartSerializer(BaseModelSerializer):
 
     class Meta:
         model = Part
-        fields = ['id', 'name', 'shop', 'price', 'pack_qty', 'unit', 'unit_price', 'note', 'product_count']
+        fields = [
+            'id',
+            'name',
+            'category',
+            'shop',
+            'buy_url',
+            'price',
+            'pack_qty',
+            'unit',
+            'unit_price',
+            'note',
+            'product_count',
+        ]
+        extra_kwargs = {'buy_url': {'error_messages': {'invalid': 'https:// 로 시작하는 주소로 입력하세요.'}}}
 
     def get_unit_price(self, obj):
         value = obj.unit_price
         return None if value is None else round(float(value), 2)
+
+
+class ReplacePartSerializer(serializers.Serializer):
+    """제품의 부자재 바꾸기 입력: 바꿀 부자재 + 바꿀 제품 (비우면 이 부자재를 쓰는 제품 전부)"""
+
+    to = serializers.PrimaryKeyRelatedField(
+        queryset=Part.objects.all(), error_messages={'does_not_exist': '없는 부자재입니다.'}
+    )
+    products = serializers.ListField(child=serializers.IntegerField(), required=False)
+
+    def validate_to(self, value):
+        if value == self.context['part']:
+            raise serializers.ValidationError('다른 부자재를 고르세요.')
+        return value
+
+    def validate_products(self, value):
+        using = set(self.context['part'].product_parts.values_list('product_id', flat=True))
+        if not value or not set(value) <= using:
+            raise serializers.ValidationError('이 부자재를 쓰는 제품을 고르세요.')
+        return value
 
 
 class ProductFilamentSerializer(BaseModelSerializer):

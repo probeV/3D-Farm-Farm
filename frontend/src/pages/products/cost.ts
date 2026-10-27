@@ -1,7 +1,7 @@
 // 제품 원가 계산 (PRD 3.6 "원가 계산 규칙", 제품 1개 기준). 목록 · 제품 창 미리보기 · CSV 가 모두 이 계산을 쓴다
 // 서버는 원가를 계산하지 않는다 (docs/api.md "화면에서 계산하는 값")
 import type { Color, Filament } from '../../api/filaments'
-import type { CostSetting, Part } from '../../api/products'
+import type { CostSetting, Part, PartCategory } from '../../api/products'
 import { minutesText, won } from '../../format'
 
 // 계산에 필요한 목록을 id 로 찾을 수 있게 모아 둔 것
@@ -130,6 +130,18 @@ export function calcCost(p: CostInput, catalog: Catalog): Cost {
     recommended,
     warnings: [...warnings],
   }
+}
+
+// 부자재비를 카테고리별로 (TBD-17): [{ name: '부품', amount: 720 }, …] 카테고리 이름순, 미분류는 맨 뒤.
+// 가격 미입력은 0원 (원가 계산과 같음). 원가 내역에서 부자재비 아래 작은 글씨로 (카테고리가 2개 이상일 때만)
+export function partsByCategory(p: CostInput, catalog: Catalog, categories: PartCategory[]) {
+  const sums = new Map<number | null, number>()
+  for (const row of p.parts) {
+    const key = catalog.parts.get(row.part)?.category ?? null
+    sums.set(key, (sums.get(key) ?? 0) + (partAmount(catalog, row) ?? 0))
+  }
+  const named = categories.filter((c) => sums.has(c.id)).map((c) => ({ name: c.name, amount: sums.get(c.id)! }))
+  return sums.has(null) ? [...named, { name: '미분류', amount: sums.get(null)! }] : named
 }
 
 // 원가 내역 (?) 에 보여 줄 계산식: 위 calcCost 와 같은 식을 그 제품 값으로 (TBD-19).

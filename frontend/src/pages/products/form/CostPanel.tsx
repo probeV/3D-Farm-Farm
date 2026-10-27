@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import type { CostSetting } from '../../../api/products'
+import type { CostSetting, PartCategory } from '../../../api/products'
 import Help from '../../../components/Help'
 import { gramsText, minutesText, pct, won } from '../../../format'
-import { costFormulas, marginClass, type Cost, type CostInput } from '../cost'
+import { costFormulas, marginClass, partsByCategory, type Catalog, type Cost, type CostInput } from '../cost'
 import type { Values } from './draft'
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
   cost: Cost
   preview: CostInput // 입력 중인 값 (출력 시간 · 판매가)
   setting: CostSetting
+  catalog: Catalog
+  partCategories: PartCategory[]
 }
 
 // 원가 내역 한 줄: 이름 (+ 계산식 (?)) (+ 작은 설명) … 금액
@@ -29,12 +31,22 @@ function Line({ label, tip, sub, value }: { label: string; tip?: string; sub?: R
 }
 
 // 오른쪽 원가 패널: 맨 위에 원가 입력값(출력 시간 · 판매가), 아래에 원가 내역 실시간 미리보기 (PRD-07 · PRD-08)
-export default function CostPanel({ values, errors, change, cost: c, preview, setting: S }: Props) {
+export default function CostPanel({
+  values,
+  errors,
+  change,
+  cost: c,
+  preview,
+  setting: S,
+  catalog,
+  partCategories,
+}: Props) {
   const sale = preview.sale_price
   const minutes = preview.print_minutes
   const timeError = errors.hours ?? errors.minutes
   // (?) 계산식. 판매가가 없으면 수수료 · 순이익 · 순마진율 식은 숨김
   const f = costFormulas(preview, c, S)
+  const byCategory = partsByCategory(preview, catalog, partCategories)
 
   return (
     <div className="cost-panel">
@@ -80,6 +92,9 @@ export default function CostPanel({ values, errors, change, cost: c, preview, se
       <Line label="필라멘트비" sub={c.grams ? `${gramsText(c.grams)}g` : ''} value={won(c.filament)} />
       <Line label="전기료" tip={f.electricity} sub={minutes ? minutesText(minutes) : ''} value={won(c.electricity)} />
       <Line label="부자재비" value={won(c.parts)} />
+      {byCategory.length > 1 && (
+        <div className="cost-sub">{byCategory.map((x) => `${x.name} ${won(x.amount)}`).join(' · ')}</div>
+      )}
       <div className="cost-total">
         <span className="label">
           원가

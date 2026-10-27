@@ -89,7 +89,11 @@ function ConfirmDialog({ options: o, onAnswer }: { options: ConfirmOptions; onAn
               ))}
             </div>
           )}
-          {o.twice && armed && <div className="again">한 번 더 누르면 삭제돼요. 되돌릴 수 없어요.</div>}
+          {o.twice && armed && (
+            <div className="again">
+              {o.danger ? '한 번 더 누르면 삭제돼요. 되돌릴 수 없어요.' : '한 번 더 누르면 실행돼요.'}
+            </div>
+          )}
         </div>
         <div className="dlg-foot">
           <div className="spacer" />
@@ -97,7 +101,7 @@ function ConfirmDialog({ options: o, onAnswer }: { options: ConfirmOptions; onAn
             취소
           </button>
           <button type="button" ref={okRef} className={okClass} onClick={ok}>
-            {o.twice && armed ? '정말 삭제' : (o.okLabel ?? '삭제')}
+            {o.twice && armed ? (o.againLabel ?? '정말 삭제') : (o.okLabel ?? '삭제')}
           </button>
         </div>
       </form>

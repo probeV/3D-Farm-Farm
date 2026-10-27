@@ -3,17 +3,22 @@
 화면은 제품 목록 + 필라멘트 목록(/filaments/) + 부자재 + 설정을 받아 원가 · 순마진율 · 요약 · CSV 를 직접 계산한다.
 """
 
+from django.db import transaction
 from django.db.models import Count, Prefetch
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from filaments.views import BaseViewSet
 
-from .models import Category, CostSetting, Part, Product, Subcategory
+from .models import Category, CostSetting, Part, PartCategory, Product, ProductPart, Subcategory
 from .serializers import (
     CategorySerializer,
     CostSettingSerializer,
+    PartCategorySerializer,
     PartSerializer,
     ProductSerializer,
+    ReplacePartSerializer,
     SubcategorySerializer,
 )
 
@@ -43,11 +48,45 @@ class SubcategoryViewSet(BaseViewSet):
     protected_message = '제품이 있어서 삭제할 수 없습니다.'
 
 
+class PartCategoryViewSet(BaseViewSet):
+    """부자재 카테고리. 지우면 그 부자재는 미분류 (SET_NULL, 막는 것 없음)"""
+
+    queryset = PartCategory.objects.annotate(part_count=Count('parts')).order_by('name')
+    serializer_class = PartCategorySerializer
+
+
 class PartViewSet(BaseViewSet):
     # 같은 제품에 같은 부자재를 두 줄 둘 수도 있으므로 제품 수는 distinct
     queryset = Part.objects.annotate(product_count=Count('product_parts__product', distinct=True)).order_by('name')
     serializer_class = PartSerializer
     protected_message = '제품에서 쓰고 있어서 삭제할 수 없습니다.'
+
+    # POST /parts/{id}/replace/ {to, products?} — 제품에서 쓰는 이 부자재 줄을 다른 부자재로 (TBD-23)
+    @action(detail=True, methods=['post'])
+    @transaction.atomic  # 하나라도 실패하면 아무것도 바꾸지 않음
+    def replace(self, request, pk=None):
+        """제품의 부자재 바꾸기 → {replaced: 바꾼 제품 수}.
+        수량은 그대로, 그 제품에 이미 바꿀 부자재가 있으면 수량을 더해 한 줄로"""
+        part = self.get_object()
+        data = ReplacePartSerializer(data=request.data, context={'part': part})
+        data.is_valid(raise_exception=True)
+        to = data.validated_data['to']
+        products = data.validated_data.get('products')
+        rows = ProductPart.objects.select_related('product').filter(part=part)
+        if products is not None:
+            rows = rows.filter(product_id__in=products)
+        replaced = set()
+        for row in rows:
+            same = ProductPart.objects.filter(product=row.product, part=to).first()
+            if same:
+                same.qty += row.qty
+                same.save(update_fields=['qty'])
+                row.delete()
+            else:
+                row.part = to
+                row.save(update_fields=['part'])
+            replaced.add(row.product_id)
+        return Response({'replaced': len(replaced)}, status=status.HTTP_200_OK)
 
 
 class ProductViewSet(BaseViewSet):

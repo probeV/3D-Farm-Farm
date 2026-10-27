@@ -52,8 +52,11 @@
 | GET · PATCH · DELETE | `/api/v0/categories/{id}/` | 카테고리 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/subcategories/` | 세부 분류 목록 / 추가 |
 | GET · PATCH · DELETE | `/api/v0/subcategories/{id}/` | 세부 분류 하나 / 수정 / 삭제 |
+| GET · POST | `/api/v0/part-categories/` | 부자재 카테고리 목록 / 추가 |
+| GET · PATCH · DELETE | `/api/v0/part-categories/{id}/` | 부자재 카테고리 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/parts/` | 부자재 목록 / 추가 |
 | GET · PATCH · DELETE | `/api/v0/parts/{id}/` | 부자재 하나 / 수정 / 삭제 |
+| POST | `/api/v0/parts/{id}/replace/` | 제품의 부자재 바꾸기 (이 부자재 → 다른 부자재) |
 | GET · POST | `/api/v0/products/` | **제품 원가 화면의 제품 데이터 전부** / 제품 추가 |
 | GET · PATCH · DELETE | `/api/v0/products/{id}/` | 제품 하나 / 수정 / 삭제 |
 | GET · PATCH | `/api/v0/cost-setting/` | 원가 설정 (항상 1개) |
@@ -247,14 +250,17 @@
 ## 부자재 `parts`
 ```json
 {
-  "id": 1, "name": "네오디뮴 자석 6×3mm", "shop": "", "price": 12000, "pack_qty": 200, "unit": "개",
+  "id": 1, "name": "네오디뮴 자석 6×3mm", "category": 1, "shop": "", "buy_url": "https://…",
+  "price": 12000, "pack_qty": 200, "unit": "개",
   "unit_price": 60.0, "note": "", "product_count": 2
 }
 ```
 | 칸 | 쓰기 | 설명 |
 |---|---|---|
 | `name` | ✅ 필수 | 품목. 중복 불가 → 400 `이미 있는 품목입니다.` |
+| `category` | 선택 | 부자재 카테고리 id. `null` = 미분류 |
 | `shop` · `note` | 선택 | 회사/구매처, 메모 |
+| `buy_url` | 선택 | 구매 링크 (최대 500자). 주소 형식이 아니면 400 `https:// 로 시작하는 주소로 입력하세요.` |
 | `price` | 선택 | 묶음 구매가. `null` = 미입력 (원가에서 0원 + 경고) |
 | `pack_qty` | 선택 | 묶음 수량, 기본 1. 0 보다 커야 함 |
 | `unit` | 선택 | 단위, 기본 `개` |
@@ -264,6 +270,24 @@
 - 삭제: 제품에서 쓰면 409 `제품에서 쓰고 있어서 삭제할 수 없습니다.`
 - 목록 순서: 품목 이름순
 - 부자재 화면의 사용하는 제품 목록 · 제품당 평균 부자재비는 제품 목록(`/products/`)의 `parts` 줄로 화면에서 계산한다
+
+### 제품의 부자재 바꾸기 `POST /api/v0/parts/{id}/replace/`
+```json
+{ "to": 9, "products": [1, 3] }
+```
+- 제품에서 쓰는 이 부자재 줄을 `to` 로 바꾼다. `products` 를 빼면 이 부자재를 쓰는 제품 전부
+- 수량은 그대로. 그 제품에 이미 `to` 줄이 있으면 수량을 더해 한 줄로
+- 한 번에 처리 (하나라도 실패하면 아무것도 바꾸지 않음). 부자재 자체는 지우거나 바꾸지 않는다
+- 응답 200 `{"replaced": 2}` (바꾼 제품 수)
+- 400: `to` 가 자기 자신 `다른 부자재를 고르세요.` · 없는 id `없는 부자재입니다.` / `products` 에 이 부자재를 안 쓰는 제품 `이 부자재를 쓰는 제품을 고르세요.`
+
+## 부자재 카테고리 `part-categories`
+```json
+{ "id": 1, "name": "부품", "part_count": 4 }
+```
+- `name` 필수, 중복 → 400 `이미 있는 카테고리 이름입니다.`. `part_count` 는 이 카테고리의 부자재 수
+- 삭제: 막는 것 없음 (204). 그 부자재는 `category: null`(미분류)
+- 처음에는 `부품` · `포장재` · `기타` (마이그레이션이 만든다). 목록 순서: 이름순
 
 ## 제품 `products`
 ```json
