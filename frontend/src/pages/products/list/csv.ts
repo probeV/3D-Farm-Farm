@@ -36,7 +36,7 @@ export function productsCsv(rows: ProductRow[], categories: Category[]) {
       p.name,
       colors.map((x) => x.name).join(' · '),
       STATUS_LABEL[p.status],
-      c.grams,
+      Math.round(c.grams * 100) / 100, // 소수 2자리까지 (더하면서 생기는 끝자리 오차 없이)
       p.print_minutes ?? '',
       round(c.filament),
       round(c.electricity),

@@ -22,6 +22,44 @@
   margin: 18px 0 4px;
   padding: 2px;
 }
+.sum-cards.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* 상태별 개수 줄 끝 `입력 필요 N`: 누르면 입력이 덜 된 제품만 (TBD-11) */
+.stats .need {
+  border: 0;
+  background: none;
+  padding: 2px 8px;
+  margin-left: -4px;
+  border-radius: 99px;
+  color: var(--warn);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stats .need b {
+  color: var(--warn);
+}
+.stats .need:hover {
+  background: var(--warn-soft);
+}
+.stats .need.active {
+  background: var(--warn);
+  color: #fff;
+}
+.stats .need.active b {
+  color: #fff;
+}
+.stats .need.zero {
+  color: var(--muted);
+  cursor: default;
+}
+.stats .need.zero b {
+  color: var(--muted);
+}
+.stats .need.zero:hover {
+  background: none;
+}
 /* div · button 카드 모두 내용을 위에서부터 (button 은 기본이 세로 가운데 정렬) */
 .sum-card {
   display: flex;
@@ -83,6 +121,7 @@ button.sum-card.active {
   color: var(--muted);
   cursor: help;
   vertical-align: 1px;
+  top: -1px; /* 한글은 글자 상자 위쪽에 그려져서 (?) 가 낮아 보이지 않게 */
 }
 .help:hover,
 .help:focus {
@@ -114,6 +153,35 @@ button.sum-card.active {
 .help:hover::after,
 .help:focus::after {
   opacity: 1;
+}
+/* 숨어 있는 말풍선도 스크롤 영역을 넓히므로(제품 창 가로 스크롤), 보일 때만 그린다 */
+.help:not(:hover):not(:focus)::after {
+  display: none;
+}
+/* 원가 패널: 말풍선을 그 줄 폭에 맞춰 (패널 밖으로 나가지 않게), 계산식은 줄바꿈 유지 */
+.cost-panel .help {
+  position: static;
+}
+.cost-line,
+.cost-total,
+.rec {
+  position: relative;
+}
+.cost-line .label,
+.cost-total .label {
+  display: inline-flex;
+  align-items: center;
+}
+.cost-panel .help::after {
+  left: -4px;
+  right: -4px;
+  bottom: calc(100% + 4px);
+  transform: none;
+  width: auto;
+  max-width: none;
+  white-space: pre-line;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
 }
 
 /* 제품 표 */
@@ -515,6 +583,85 @@ dialog.xwide .dlg-body {
 .mat-total b {
   color: var(--text);
 }
+/* 합계 줄: 구분선 · 옅은 배경 · 굵은 금액, 왼쪽에 개수 (TBD-21) */
+.mat-total {
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 4px;
+  padding: 8px 40px 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 0 0 8px 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+.mat-total > span:last-child b {
+  font-size: 15px;
+  font-weight: 800;
+}
+.mat-total .cnt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.mat-total .cnt b {
+  font-weight: 700;
+}
+.lines-head .head-btns {
+  display: flex;
+  gap: 6px;
+}
+
+/* 다른 제품에서 부자재 가져오기 (TBD-22) */
+.pick-prod {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 14px;
+  min-height: 280px;
+}
+.pick-prod .plist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.pick-prod .plist button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid transparent;
+  background: none;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pick-prod .plist button:hover {
+  background: var(--surface-2);
+}
+.pick-prod .plist button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.pick-prod .plist small {
+  color: var(--muted);
+}
+.pick-prod .preview {
+  border-left: 1px solid var(--border);
+  padding-left: 14px;
+}
+.pick-prod .preview h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.pick-prod .prow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
 .color-pick {
   display: flex;
   align-items: center;
@@ -602,11 +749,6 @@ dialog.xwide .dlg-body {
 .cost-gap {
   height: 10px;
 }
-.margin-row {
-  display: flex;
-  justify-content: flex-end;
-  font-size: 13px;
-}
 .rec {
   margin-top: 8px;
   padding: 10px 12px;
@@ -634,7 +776,8 @@ dialog.xwide .dlg-body {
 }
 
 @media (max-width: 760px) {
-  .sum-cards {
+  .sum-cards,
+  .sum-cards.two {
     grid-template-columns: 1fr;
   }
   .product-form {

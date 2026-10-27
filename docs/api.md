@@ -273,7 +273,7 @@
   "name": "분수 원판 세트", "status": "on_sale",
   "print_minutes": 200, "sale_price": 18900, "note": "",
   "filaments": [
-    { "id": 1, "filament": 1, "color": 101, "grams": 24 },
+    { "id": 1, "filament": 1, "color": 101, "grams": 24.37 },
     { "id": 2, "filament": 4, "color": null, "grams": 60 }
   ],
   "parts": [{ "id": 1, "part": 1, "qty": 12 }],
@@ -289,7 +289,7 @@
 | `print_minutes` | 선택 | 출력 시간(분, 정수). `null` = 미입력 |
 | `sale_price` | 선택 | 판매가. `null` = 미입력 |
 | `note` | 선택 | 메모 |
-| `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상 |
+| `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상, 소수 2자리까지 |
 | `parts` | 선택 | 사용 부자재 줄 `{part, qty}`. `qty` 0 이상 |
 
 - **줄 저장**: `filaments` · `parts` 를 보내면 그 목록으로 통째로 바꾼다 (기존 줄을 지우고 새로 만들어서 줄 `id` 가 바뀐다).
