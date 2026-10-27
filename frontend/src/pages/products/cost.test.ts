@@ -5,6 +5,7 @@ import {
   calcCost,
   completeMargin,
   costFormulas,
+  partsByCategory,
   filamentUnitText,
   makeCatalog,
   marginClass,
@@ -46,7 +47,9 @@ const filament = (id: number, display_name: string, price: number | null, colors
 const part = (id: number, name: string, unit_price: number | null): Part => ({
   id,
   name,
+  category: null,
   shop: '',
+  buy_url: '',
   price: unit_price,
   pack_qty: 1,
   unit: '개',
@@ -169,6 +172,32 @@ describe('원가 계산 (PRD 3.6)', () => {
     expect(rec(125)).toBe(1800) // 1,800원 그대로
     expect(rec(130)).toBe(1900) // 1,872원 → 1,900원
     expect(rec(130, { ...plain, target_margin: 100 })).toBeNull()
+  })
+})
+
+describe('부자재비 카테고리별 (TBD-17)', () => {
+  it('카테고리 이름순 · 미분류는 맨 뒤 · 가격 미입력은 0원', () => {
+    const cat = makeCatalog(
+      filaments,
+      [{ ...part(1, '자석', 60), category: 2 }, { ...part(2, '박스', 400), category: 1 }, part(3, '스티커', null)],
+      setting,
+    )
+    const p = product({
+      parts: [
+        { part: 1, qty: 12 },
+        { part: 2, qty: 1 },
+        { part: 3, qty: 1 },
+      ],
+    })
+    const categories = [
+      { id: 2, name: '부품', part_count: 1 },
+      { id: 1, name: '포장재', part_count: 1 },
+    ]
+    expect(partsByCategory(p, cat, categories)).toEqual([
+      { name: '부품', amount: 720 },
+      { name: '포장재', amount: 400 },
+      { name: '미분류', amount: 0 },
+    ])
   })
 })
 

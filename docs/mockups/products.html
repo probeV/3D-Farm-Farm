@@ -231,6 +231,8 @@ dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 
 .cost-line { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
 .cost-line > span:first-child { color: var(--muted); }
 .cost-line small { color: var(--muted); }
+/* 부자재비 아래 카테고리별 (TBD-17, parts.html 의 부자재 카테고리) */
+.cost-sub { margin: -2px 0 2px 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .cost-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--border); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .cost-total strong { font-size: 18px; }
 .cost-gap { height: 10px; }
@@ -341,13 +343,13 @@ const db = {
   ],
   // 부자재
   parts: [
-    { id: 1, name: "네오디뮴 자석 6×3mm", price: 12000, pack_qty: 200, unit: "개" },
-    { id: 2, name: "M3 볼트 10mm", price: 5900, pack_qty: 100, unit: "개" },
-    { id: 3, name: "OPP 봉투 15×20", price: 8900, pack_qty: 500, unit: "장" },
-    { id: 4, name: "소형 박스", price: 22000, pack_qty: 50, unit: "개" },
-    { id: 5, name: "USB LED 모듈", price: 35000, pack_qty: 10, unit: "개" },
-    { id: 6, name: "에어캡 완충재", price: null, pack_qty: 1, unit: "롤" },
-    { id: 7, name: "제품 스티커", price: 15000, pack_qty: 1000, unit: "장" },
+    { id: 1, name: "네오디뮴 자석 6×3mm", cat: "부품", price: 12000, pack_qty: 200, unit: "개" },
+    { id: 2, name: "M3 볼트 10mm", cat: "부품", price: 5900, pack_qty: 100, unit: "개" },
+    { id: 3, name: "OPP 봉투 15×20", cat: "포장재", price: 8900, pack_qty: 500, unit: "장" },
+    { id: 4, name: "소형 박스", cat: "포장재", price: 22000, pack_qty: 50, unit: "개" },
+    { id: 5, name: "USB LED 모듈", cat: "부품", price: 35000, pack_qty: 10, unit: "개" },
+    { id: 6, name: "에어캡 완충재", cat: "포장재", price: null, pack_qty: 40, unit: "회" },
+    { id: 7, name: "제품 스티커", cat: null, price: 15000, pack_qty: 1000, unit: "장" },
   ],
   // 카테고리 · 세부 분류: 제품 관리 창에서 추가·수정 (인테리어는 아직 제품이 없는 예)
   categories: [
@@ -794,6 +796,7 @@ function openProduct(p, dl = dlg, preset = {}) {
       ${line("필라멘트비", c.fil, c.grams ? `${gTxt(c.grams)}g` : "")}
       ${line("전기료", c.elec, d.minutes ? hm(d.minutes) : "", tipElec)}
       ${line("부자재비", c.parts)}
+      ${partsByCat(d)}
       <div class="cost-total"><span class="label">원가${help(tipCost)}</span><strong>${won(c.cost)}</strong></div>
       <div class="cost-gap"></div>
       ${line("판매가", d.sale)}
@@ -814,6 +817,12 @@ function openProduct(p, dl = dlg, preset = {}) {
     if (cnt("fils")) cnt("fils").innerHTML = `필라멘트 <b>${d.fils.length}개</b> · <b>${gTxt(c.grams)}g</b>`;
     if (cnt("parts")) cnt("parts").innerHTML = `부자재 <b>${d.parts.length}개</b>`;
   };
+  // 부자재비를 카테고리별로 (2개 이상일 때만). 목록 원가 열은 합계 그대로
+  function partsByCat(x) {
+    const by = new Map();
+    x.parts.forEach((r) => { const pt = byId(db.parts, r[0]), a = partAmt(r) ?? 0; const k = pt.cat || "미분류"; by.set(k, (by.get(k) || 0) + a); });
+    return by.size > 1 ? `<div class="cost-sub">${[...by].map(([k, v]) => `${esc(k)} ${won(v)}`).join(" · ")}</div>` : "";
+  }
   const redrawLines = () => { $("#fils", form).innerHTML = filLines(); $("#parts", form).innerHTML = partLines(); panel(); };
 
   panel();

@@ -19,11 +19,19 @@ export type Sort = SortState<keyof typeof SORT_COLUMNS>
 
 export interface ListFilter {
   q: string
+  category: CategorySel // 카테고리 필터
+
   noPriceOnly: boolean // `가격 미입력` 카드를 눌러 가격이 없는 부자재만
   sort: Sort
 }
 
-export const NO_FILTER: ListFilter = { q: '', noPriceOnly: false, sort: { key: 'name', dir: 'asc' } }
+export const NO_FILTER: ListFilter = { q: '', category: '', noPriceOnly: false, sort: { key: 'name', dir: 'asc' } }
+
+// 카테고리 선택: '' = 전체, 'c:3' = 그 카테고리, 'none' = 미분류 (목록 필터 · 부자재 관리 창 카테고리별 보기)
+export type CategorySel = '' | 'none' | `c:${number}`
+
+export const inCategory = (part: Part, sel: CategorySel) =>
+  sel === '' || (sel === 'none' ? part.category == null : part.category === Number(sel.slice(2)))
 
 export interface Usage {
   productId: number
@@ -54,6 +62,7 @@ export function filterParts(parts: Part[], filter: ListFilter) {
     .filter(
       (p) =>
         (!filter.noPriceOnly || p.price == null) &&
+        inCategory(p, filter.category) &&
         (!q || [p.name, p.shop, p.note].join(' ').toLowerCase().includes(q)),
     )
     .sort(compareBy(SORT_COLUMNS, filter.sort, byName))

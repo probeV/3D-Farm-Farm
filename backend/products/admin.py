@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, CostSetting, Part, Product, ProductFilament, ProductPart, Subcategory
+from .models import Category, CostSetting, Part, PartCategory, Product, ProductFilament, ProductPart, Subcategory
 
 
 class SubcategoryInline(admin.TabularInline):
@@ -22,9 +22,15 @@ class SubcategoryAdmin(admin.ModelAdmin):
     list_select_related = ['category']
 
 
+@admin.register(PartCategory)
+class PartCategoryAdmin(admin.ModelAdmin):
+    search_fields = ['name']
+
+
 @admin.register(Part)
 class PartAdmin(admin.ModelAdmin):
-    list_display = ['name', 'shop', 'price', 'pack_qty', 'unit', 'unit_price']
+    list_display = ['name', 'category', 'shop', 'price', 'pack_qty', 'unit', 'unit_price']
+    list_filter = ['category']
     search_fields = ['name', 'shop']
 
     @admin.display(description='개당 단가')
