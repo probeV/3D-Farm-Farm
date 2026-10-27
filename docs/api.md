@@ -52,8 +52,11 @@
 | GET · PATCH · DELETE | `/api/v0/categories/{id}/` | 카테고리 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/subcategories/` | 세부 분류 목록 / 추가 |
 | GET · PATCH · DELETE | `/api/v0/subcategories/{id}/` | 세부 분류 하나 / 수정 / 삭제 |
+| GET · POST | `/api/v0/part-categories/` | 부자재 카테고리 목록 / 추가 |
+| GET · PATCH · DELETE | `/api/v0/part-categories/{id}/` | 부자재 카테고리 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/parts/` | 부자재 목록 / 추가 |
 | GET · PATCH · DELETE | `/api/v0/parts/{id}/` | 부자재 하나 / 수정 / 삭제 |
+| POST | `/api/v0/parts/{id}/replace/` | 제품의 부자재 바꾸기 (이 부자재 → 다른 부자재) |
 | GET · POST | `/api/v0/products/` | **제품 원가 화면의 제품 데이터 전부** / 제품 추가 |
 | GET · PATCH · DELETE | `/api/v0/products/{id}/` | 제품 하나 / 수정 / 삭제 |
 | GET · PATCH | `/api/v0/cost-setting/` | 원가 설정 (항상 1개) |
@@ -145,9 +148,8 @@
 | `price_per_g` | — | g당 가격 (소수 2자리) |
 | `counts` | — | 상태별 스풀 개수 `{sealed, open, empty}` |
 
-- 삭제: 스풀이 있으면 409 `스풀이 있어서 삭제할 수 없습니다.`
-- 제품에서 쓰는 색상은 지워진다. 그 제품 줄은 `color: null`(색상 선택 안 함)이 되어 필라멘트 가격으로 계산된다 (TBD-04).
-  지우기 전 확인 창의 "쓰는 제품" 목록은 화면이 제품 목록(`filaments[].color`)에서 찾는다
+- 삭제: 막는 것 없음 (204). 그 색상의 스풀도 함께 삭제되고, 제품에서 쓰던 줄은 `color: null`(색상 선택 안 함)이 되어 필라멘트 가격으로 계산된다 (PRD FIL-09).
+  지우기 전 확인 창의 스풀 개수는 `counts`, "쓰는 제품" 목록은 화면이 제품 목록(`filaments[].color`)에서 찾는다
 
 ### 재고 추가 `POST /api/v0/colors/{id}/spools/`
 ```json
@@ -248,14 +250,17 @@
 ## 부자재 `parts`
 ```json
 {
-  "id": 1, "name": "네오디뮴 자석 6×3mm", "shop": "", "price": 12000, "pack_qty": 200, "unit": "개",
+  "id": 1, "name": "네오디뮴 자석 6×3mm", "category": 1, "shop": "", "buy_url": "https://…",
+  "price": 12000, "pack_qty": 200, "unit": "개",
   "unit_price": 60.0, "note": "", "product_count": 2
 }
 ```
 | 칸 | 쓰기 | 설명 |
 |---|---|---|
 | `name` | ✅ 필수 | 품목. 중복 불가 → 400 `이미 있는 품목입니다.` |
+| `category` | 선택 | 부자재 카테고리 id. `null` = 미분류 |
 | `shop` · `note` | 선택 | 회사/구매처, 메모 |
+| `buy_url` | 선택 | 구매 링크 (최대 500자). 주소 형식이 아니면 400 `https:// 로 시작하는 주소로 입력하세요.` |
 | `price` | 선택 | 묶음 구매가. `null` = 미입력 (원가에서 0원 + 경고) |
 | `pack_qty` | 선택 | 묶음 수량, 기본 1. 0 보다 커야 함 |
 | `unit` | 선택 | 단위, 기본 `개` |
@@ -266,6 +271,24 @@
 - 목록 순서: 품목 이름순
 - 부자재 화면의 사용하는 제품 목록 · 제품당 평균 부자재비는 제품 목록(`/products/`)의 `parts` 줄로 화면에서 계산한다
 
+### 제품의 부자재 바꾸기 `POST /api/v0/parts/{id}/replace/`
+```json
+{ "to": 9, "products": [1, 3] }
+```
+- 제품에서 쓰는 이 부자재 줄을 `to` 로 바꾼다. `products` 를 빼면 이 부자재를 쓰는 제품 전부
+- 수량은 그대로. 그 제품에 이미 `to` 줄이 있으면 수량을 더해 한 줄로
+- 한 번에 처리 (하나라도 실패하면 아무것도 바꾸지 않음). 부자재 자체는 지우거나 바꾸지 않는다
+- 응답 200 `{"replaced": 2}` (바꾼 제품 수)
+- 400: `to` 가 자기 자신 `다른 부자재를 고르세요.` · 없는 id `없는 부자재입니다.` / `products` 에 이 부자재를 안 쓰는 제품 `이 부자재를 쓰는 제품을 고르세요.`
+
+## 부자재 카테고리 `part-categories`
+```json
+{ "id": 1, "name": "부품", "part_count": 4 }
+```
+- `name` 필수, 중복 → 400 `이미 있는 카테고리 이름입니다.`. `part_count` 는 이 카테고리의 부자재 수
+- 삭제: 막는 것 없음 (204). 그 부자재는 `category: null`(미분류)
+- 처음에는 `부품` · `포장재` · `기타` (마이그레이션이 만든다). 목록 순서: 이름순
+
 ## 제품 `products`
 ```json
 {
@@ -274,7 +297,7 @@
   "name": "분수 원판 세트", "status": "on_sale",
   "print_minutes": 200, "sale_price": 18900, "note": "",
   "filaments": [
-    { "id": 1, "filament": 1, "color": 101, "grams": 24 },
+    { "id": 1, "filament": 1, "color": 101, "grams": 24.37 },
     { "id": 2, "filament": 4, "color": null, "grams": 60 }
   ],
   "parts": [{ "id": 1, "part": 1, "qty": 12 }],
@@ -290,7 +313,7 @@
 | `print_minutes` | 선택 | 출력 시간(분, 정수). `null` = 미입력 |
 | `sale_price` | 선택 | 판매가. `null` = 미입력 |
 | `note` | 선택 | 메모 |
-| `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상 |
+| `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상, 소수 2자리까지 |
 | `parts` | 선택 | 사용 부자재 줄 `{part, qty}`. `qty` 0 이상 |
 
 - **줄 저장**: `filaments` · `parts` 를 보내면 그 목록으로 통째로 바꾼다 (기존 줄을 지우고 새로 만들어서 줄 `id` 가 바뀐다).

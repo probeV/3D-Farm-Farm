@@ -7,6 +7,7 @@ from . import views
 router = SimpleRouter()
 router.register('categories', views.CategoryViewSet)
 router.register('subcategories', views.SubcategoryViewSet)
+router.register('part-categories', views.PartCategoryViewSet)
 router.register('parts', views.PartViewSet)
 router.register('products', views.ProductViewSet)
 

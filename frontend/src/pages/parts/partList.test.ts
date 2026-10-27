@@ -7,7 +7,9 @@ import { partSchema, previewUnitPrice } from './schemas'
 const part = (p: Partial<Part>): Part => ({
   id: 1,
   name: '',
+  category: null,
   shop: '',
+  buy_url: '',
   price: 1000,
   pack_qty: 10,
   unit: '개',
@@ -79,20 +81,32 @@ describe('부자재 목록 (PART-01)', () => {
     expect(names(filterParts(parts, { ...NO_FILTER, noPriceOnly: true }))).toEqual(['에어캡'])
   })
 
-  it('정렬: 단가 높은 순은 가격 없는 것을 맨 뒤, 구매처순은 구매처 없는 것을 맨 뒤', () => {
-    expect(names(filterParts(parts, { ...NO_FILTER, sort: 'unitDesc' }))).toEqual([
+  it('카테고리 필터 · 미분류 (TBD-17)', () => {
+    const list = [part({ name: '자석', category: 1 }), part({ name: '박스', category: 2 }), part({ name: '스티커' })]
+    expect(names(filterParts(list, { ...NO_FILTER, category: 'c:1' }))).toEqual(['자석'])
+    expect(names(filterParts(list, { ...NO_FILTER, category: 'none' }))).toEqual(['스티커'])
+  })
+
+  it('열 제목 정렬: 가격 · 구매처가 없는 것은 방향과 상관없이 맨 뒤', () => {
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'unitPrice', dir: 'desc' } }))).toEqual([
       '박스',
       '자석',
       'OPP 봉투',
       '에어캡',
     ])
-    expect(names(filterParts(parts, { ...NO_FILTER, sort: 'usedDesc' }))).toEqual([
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'used', dir: 'desc' } }))).toEqual([
       '자석',
       '박스',
       'OPP 봉투',
       '에어캡',
     ])
-    expect(names(filterParts(parts, { ...NO_FILTER, sort: 'shop' }))).toEqual(['자석', '박스', 'OPP 봉투', '에어캡'])
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'shop', dir: 'asc' } }))).toEqual([
+      '자석',
+      '박스',
+      'OPP 봉투',
+      '에어캡',
+    ])
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'unitPrice', dir: 'asc' } })).pop()).toBe('에어캡')
   })
 })
 
@@ -128,18 +142,36 @@ describe('사용하는 제품 · 요약 (PART-03)', () => {
 })
 
 describe('부자재 폼 검증 (PART-02)', () => {
-  const values = { name: ' 자석 ', shop: '', price: '12,000', pack_qty: '200', unit: '', note: '' }
+  const values = {
+    name: ' 자석 ',
+    category: '',
+    shop: '',
+    buy_url: '',
+    price: '12,000',
+    pack_qty: '200',
+    unit: '',
+    note: '',
+  }
 
-  it('글자 → 서버로 보낼 값 (단위를 비우면 "개", 구매가를 비우면 미입력)', () => {
+  it('글자 → 서버로 보낼 값 (단위를 비우면 "개", 구매가를 비우면 미입력, 카테고리를 비우면 미분류)', () => {
     expect(partSchema.parse(values)).toEqual({
       name: '자석',
+      category: null,
       shop: '',
+      buy_url: '',
       price: 12000,
       pack_qty: 200,
       unit: '개',
       note: '',
     })
     expect(partSchema.parse({ ...values, price: '' }).price).toBeNull()
+    expect(partSchema.parse({ ...values, category: '3' }).category).toBe(3)
+  })
+
+  it('구매 링크: 비워도 되고, 넣으면 https:// 주소 (TBD-20)', () => {
+    expect(partSchema.parse({ ...values, buy_url: ' https://example.com/a ' }).buy_url).toBe('https://example.com/a')
+    const r = partSchema.safeParse({ ...values, buy_url: 'example.com' })
+    expect(r.success ? {} : fieldErrors(r.error)).toEqual({ buy_url: 'https:// 로 시작하는 주소로 입력하세요' })
   })
 
   it('품목 필수, 묶음 수량은 0.01 이상 · 소수 2자리까지', () => {

@@ -1,6 +1,6 @@
 """제품 원가 모델 — docs/ERD.md 기준.
 
-카테고리(Category) → 세부 분류(Subcategory) · 제품(Product)
+카테고리(Category) → 세부 분류(Subcategory) · 제품(Product), 부자재 카테고리(PartCategory) → 부자재(Part)
 제품 → 사용 필라멘트(ProductFilament, filaments 앱의 Filament · Color) · 사용 부자재(ProductPart → Part)
 원가 계산 설정값은 CostSetting 1개 행
 """
@@ -62,11 +62,35 @@ class Subcategory(models.Model):
         return f'{self.category} › {self.name}'
 
 
+class PartCategory(models.Model):
+    """부자재 카테고리 (부품, 포장재 …). 원가 내역에서 부자재비를 카테고리별로 나눠 보여 줄 때 쓴다"""
+
+    name = models.CharField('이름', max_length=50, unique=True)
+
+    class Meta:
+        verbose_name = '부자재 카테고리'
+        verbose_name_plural = '부자재 카테고리'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Part(models.Model):
     """부자재 (자석, 나사, 포장재 …). 묶음 구매가 ÷ 묶음 수량 = 개당 단가"""
 
     name = models.CharField('품목', max_length=100, unique=True)
+    # 카테고리를 지우면 그 부자재는 미분류 (원가는 그대로)
+    category = models.ForeignKey(
+        PartCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='parts',
+        verbose_name='카테고리',
+    )
     shop = models.CharField('회사/구매처', max_length=100, blank=True)
+    buy_url = models.URLField('구매 링크', max_length=500, blank=True)
     price = models.DecimalField('묶음 구매가', null=True, blank=True, **MONEY)
     pack_qty = models.DecimalField(
         '묶음 수량',
@@ -177,7 +201,7 @@ class ProductFilament(models.Model):
         verbose_name='색상',
     )
     grams = models.DecimalField(
-        '사용량(g)', max_digits=7, decimal_places=1, default=0, validators=[MinValueValidator(0)]
+        '사용량(g)', max_digits=8, decimal_places=2, default=0, validators=[MinValueValidator(0)]
     )
 
     class Meta:

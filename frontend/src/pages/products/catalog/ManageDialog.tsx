@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { deleteProduct, useRefreshProducts, type Category, type Product } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
+import ManageColumn from '../../../components/ManageColumn'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { pct, won } from '../../../format'
 import { findSubcategory, inSelection, selectionExists, selectionLabel, type CategorySel } from '../categories'
@@ -22,6 +24,8 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const data = useCostData().data
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const [picked, setPicked] = useState<CategorySel>('')
   const [sub, setSub] = useState<Sub | null>(null)
   const closeSub = () => setSub(null)
@@ -36,7 +40,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const prods = rows.filter((r) => inSelection(r.product, sel)).sort((a, b) => a.product.no - b.product.no)
 
   const remove = async (p: Product) => {
-    if (!confirm(`${p.name} 제품을 삭제할까요?`)) return
+    if (!(await confirm({ title: '제품 삭제', message: `${p.name} 제품을 삭제할까요?`, danger: true }))) return
     try {
       await deleteProduct(p.id)
       await refresh()
@@ -146,9 +150,14 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Dialog size="wide" title="제품 관리" onClose={onClose}>
+      <Dialog size="wide" fixed title="제품 관리" onClose={onClose}>
         <div className="manage">
-          <div>
+          <ManageColumn
+            title="카테고리"
+            count={categories.length}
+            addLabel="+ 카테고리 추가"
+            onAdd={() => setSub({ kind: 'category', category: null })}
+          >
             <div className="list">
               {categories.map((c) => [
                 item(`c:${c.id}`, c.name, {
@@ -159,27 +168,16 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
               ])}
               {hasUncategorized && item('none', '미분류')}
             </div>
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ kind: 'category', category: null })}
-            >
-              + 카테고리 추가
-            </button>
-          </div>
-          <div className="manage-right">
-            <h4>{selectionLabel(categories, sel)} 의 제품</h4>
+          </ManageColumn>
+          <ManageColumn
+            className="manage-right"
+            title={`${selectionLabel(categories, sel)} 의 제품`}
+            count={prods.length}
+            addLabel="+ 제품 추가"
+            onAdd={() => setSub({ kind: 'product', product: null })}
+          >
             {right()}
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ kind: 'product', product: null })}
-            >
-              + 제품 추가
-            </button>
-          </div>
+          </ManageColumn>
         </div>
       </Dialog>
 

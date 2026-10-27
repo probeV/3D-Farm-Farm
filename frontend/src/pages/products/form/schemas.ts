@@ -11,7 +11,7 @@ const lineAmount = (max: number, places: number) =>
   z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? '0' : v), decimal(0, max, places))
 
 // 서버: Product — no PositiveIntegerField(1 이상), name max_length=100, print_minutes PositiveIntegerField,
-//       ProductFilament.grams DecimalField(max_digits=7, decimal_places=1), ProductPart.qty (max_digits=10, decimal_places=2)
+//       ProductFilament.grams DecimalField(max_digits=8, decimal_places=2), ProductPart.qty (max_digits=10, decimal_places=2)
 export const productSchema = z
   .object({
     no: optionalInt(1, 2_147_483_647), // 비우면 서버가 다음 번호
@@ -24,7 +24,7 @@ export const productSchema = z
     sale_price: money,
     note: z.string(),
     filaments: z.array(
-      z.object({ filament: selectedId('필라멘트를 고르세요'), color: optionalId, grams: lineAmount(999_999.9, 1) }),
+      z.object({ filament: selectedId('필라멘트를 고르세요'), color: optionalId, grams: lineAmount(999_999.99, 2) }),
     ),
     parts: z.array(z.object({ part: selectedId('부자재를 고르세요'), qty: lineAmount(99_999_999.99, 2) })),
   })

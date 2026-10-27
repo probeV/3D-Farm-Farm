@@ -9,7 +9,8 @@ import { marginClass } from './cost'
 import ProductDialog from './form/ProductDialog'
 import { downloadText, productsCsv } from './list/csv'
 import ProductTable from './list/ProductTable'
-import { filterProducts, NO_FILTER, SORTS, summarize, type ListFilter, type Sort } from './list/productList'
+import { filterProducts, NO_FILTER, SORT_COLUMNS, summarize, type ListFilter, type Sort } from './list/productList'
+import { nextSort } from '../../sort'
 import { useCostData } from './useCostData'
 
 type DialogState = { kind: 'manage' } | { kind: 'product'; productId: number }
@@ -41,6 +42,7 @@ export default function ProductsPage() {
   const list = filterProducts(rows, { ...filter, category })
   const sum = summarize(rows)
   const filtered = filter.q !== '' || category !== '' || filter.needOnly
+  const sortBy = (key: Sort['key']) => set({ sort: nextSort(SORT_COLUMNS, filter.sort, key) })
 
   const exportCsv = () => {
     downloadText(`제품원가_${today()}.csv`, productsCsv(rows, categories))
@@ -60,6 +62,16 @@ export default function ProductsPage() {
           <span className={sum.discontinued ? 'bad' : ''}>
             판매중지<b>{sum.discontinued}</b>
           </span>
+          {/* 입력이 덜 된 제품 수. 누르면 그 제품만 (PRD-02 · PRD-03) */}
+          <button
+            type="button"
+            className={['need', sum.needInput ? '' : 'zero', filter.needOnly ? 'active' : ''].join(' ')}
+            disabled={!sum.needInput && !filter.needOnly}
+            title={filter.needOnly ? '입력 필요 제품만 보는 중 · 다시 누르면 해제' : '누르면 입력이 덜 된 제품만 보기'}
+            onClick={() => set({ needOnly: !filter.needOnly })}
+          >
+            입력 필요<b>{sum.needInput}</b>
+          </button>
         </div>
         <div className="spacer" />
         <button className="btn" onClick={() => setDialog({ kind: 'manage' })}>
@@ -67,7 +79,7 @@ export default function ProductsPage() {
         </button>
       </div>
 
-      <div className="sum-cards">
+      <div className="sum-cards two">
         <div className="sum-card">
           <span>등록 제품</span>
           <strong>
@@ -82,21 +94,6 @@ export default function ProductsPage() {
           </span>
           <strong className={marginClass(sum.avgMargin)}>{pct(sum.avgMargin)}</strong>
         </div>
-        <button
-          className={['sum-card', sum.needInput ? 'warn' : '', filter.needOnly ? 'active' : ''].join(' ')}
-          onClick={() => set({ needOnly: !filter.needOnly })}
-        >
-          <span>
-            입력 필요
-            <Help
-              tip={filter.needOnly ? '입력 필요 제품만 보는 중 · 다시 누르면 해제' : '누르면 입력이 덜 된 제품만 보기'}
-            />
-          </span>
-          <strong>
-            {sum.needInput}
-            <small>개</small>
-          </strong>
-        </button>
       </div>
 
       <div className="section-head list-toolbar">
@@ -123,13 +120,6 @@ export default function ProductsPage() {
           ])}
           {rows.some((r) => r.product.category == null) && <option value="none">미분류</option>}
         </select>
-        <select value={filter.sort} onChange={(e) => set({ sort: e.target.value as Sort })}>
-          {Object.entries(SORTS).map(([v, label]) => (
-            <option key={v} value={v}>
-              정렬: {label}
-            </option>
-          ))}
-        </select>
         {filtered && (
           <button className="btn small" onClick={() => set({ q: '', category: '', needOnly: false })}>
             필터 지우기
@@ -146,6 +136,8 @@ export default function ProductsPage() {
             rows={list}
             categories={categories}
             catalog={catalog}
+            sort={filter.sort}
+            onSort={sortBy}
             onOpen={(p: Product) => setDialog({ kind: 'product', productId: p.id })}
           />
         </div>

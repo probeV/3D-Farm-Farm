@@ -10,6 +10,7 @@ import {
 } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { useForm } from '../../../useForm'
 import MaterialDialog from './MaterialDialog'
@@ -20,19 +21,24 @@ const NEW_MATERIAL = 'new'
 interface Props {
   brand: Brand // 관리 창에서 고른 회사 (수정할 때도 회사는 바꾸지 않음)
   filament: Filament | null // null 이면 추가
+  copyOf?: Filament // 복제: 값(재질 · 시리즈 · 가격 · 무게)만 복사, 색상은 복사하지 않음. 저장해야 추가됨
   onClose: () => void
 }
 
 // 필라멘트 추가 / 수정 (PRD FIL-03). 회사 · 재질 · 시리즈 조합 중복은 서버가 400 (series 칸), 색상이 있으면 삭제 시 409
-export default function FilamentDialog({ brand, filament, onClose }: Props) {
+export default function FilamentDialog({ brand, filament, copyOf, onClose }: Props) {
   const materials = useMaterials().data ?? []
   const refresh = useRefreshFilaments()
   const toast = useToast()
+
+  const confirm = useConfirm()
+  const from = filament ?? copyOf
   const { values, errors, busy, change, submit } = useForm(filamentSchema, {
-    material: String(filament?.material ?? materials[0]?.id ?? ''),
-    series: filament?.series ?? '',
-    price: filament?.price != null ? String(filament.price) : '',
-    spool_g: String(filament?.spool_g ?? 1000),
+    material: String(from?.material ?? materials[0]?.id ?? ''),
+    // 복제는 시리즈 뒤에 (복사): 회사 · 재질 · 시리즈 조합이 겹치지 않게
+    series: copyOf ? `${copyOf.series ? `${copyOf.series} ` : ''}(복사)` : (filament?.series ?? ''),
+    price: from?.price != null ? String(from.price) : '',
+    spool_g: String(from?.spool_g ?? 1000),
   })
   const [addingMaterial, setAddingMaterial] = useState(false)
 
@@ -48,8 +54,18 @@ export default function FilamentDialog({ brand, filament, onClose }: Props) {
       onClose()
     })
 
+  // 색상이 있으면 지울 수 없어 확인 창 없이 이유만. 제품에서 쓰면 서버가 409 (PRD FIL-09)
   const remove = async () => {
-    if (!filament || !confirm(`${filament.display_name} 필라멘트를 삭제할까요?`)) return
+    if (filament?.colors.length) return toast(`색상 ${filament.colors.length}개가 있어서 삭제할 수 없어요`)
+    if (
+      !filament ||
+      !(await confirm({
+        title: '필라멘트 삭제',
+        message: `${filament.display_name} 필라멘트를 삭제할까요?`,
+        danger: true,
+      }))
+    )
+      return
     try {
       await deleteFilament(filament.id)
       await refresh()
@@ -63,7 +79,12 @@ export default function FilamentDialog({ brand, filament, onClose }: Props) {
   return (
     <>
       <Dialog
-        title={filament ? '필라멘트 수정' : `${brand.name} 필라멘트 추가`}
+        title={
+          <>
+            {filament ? '필라멘트 수정' : `${brand.name} 필라멘트 추가`}
+            {copyOf && <span className="copy-from">{copyOf.display_name}에서 복제</span>}
+          </>
+        }
         onClose={onClose}
         submitLabel="저장"
         onSubmit={save}
