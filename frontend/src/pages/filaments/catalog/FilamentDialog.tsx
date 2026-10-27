@@ -10,6 +10,7 @@ import {
 } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { useForm } from '../../../useForm'
 import MaterialDialog from './MaterialDialog'
@@ -28,6 +29,8 @@ export default function FilamentDialog({ brand, filament, onClose }: Props) {
   const materials = useMaterials().data ?? []
   const refresh = useRefreshFilaments()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const { values, errors, busy, change, submit } = useForm(filamentSchema, {
     material: String(filament?.material ?? materials[0]?.id ?? ''),
     series: filament?.series ?? '',
@@ -49,7 +52,15 @@ export default function FilamentDialog({ brand, filament, onClose }: Props) {
     })
 
   const remove = async () => {
-    if (!filament || !confirm(`${filament.display_name} 필라멘트를 삭제할까요?`)) return
+    if (
+      !filament ||
+      !(await confirm({
+        title: '필라멘트 삭제',
+        message: `${filament.display_name} 필라멘트를 삭제할까요?`,
+        danger: true,
+      }))
+    )
+      return
     try {
       await deleteFilament(filament.id)
       await refresh()

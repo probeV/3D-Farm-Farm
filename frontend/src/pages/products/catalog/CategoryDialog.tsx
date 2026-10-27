@@ -10,6 +10,7 @@ import {
 } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { useForm } from '../../../useForm'
 import { categorySchema } from './schemas'
@@ -27,6 +28,8 @@ let lastKey = 0
 export default function CategoryDialog({ category, onClose, onSaved }: Props) {
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const original = category?.subcategories ?? []
   const { values, errors, busy, change, submit } = useForm(categorySchema, {
     name: category?.name ?? '',
@@ -72,7 +75,11 @@ export default function CategoryDialog({ category, onClose, onSaved }: Props) {
     })
 
   const remove = async () => {
-    if (!category || !confirm(`${category.name} 카테고리를 삭제할까요?`)) return
+    if (
+      !category ||
+      !(await confirm({ title: '카테고리 삭제', message: `${category.name} 카테고리를 삭제할까요?`, danger: true }))
+    )
+      return
     try {
       await deleteCategory(category.id) // 제품이 있으면 409
       await refresh()

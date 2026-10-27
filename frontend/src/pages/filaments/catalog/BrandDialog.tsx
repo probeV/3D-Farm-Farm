@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createBrand, deleteBrand, updateBrand, useRefreshFilaments, type Brand } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { useForm } from '../../../useForm'
 import BrandLogo from '../BrandLogo'
@@ -18,6 +19,8 @@ interface Props {
 export default function BrandDialog({ brand, onClose, onSaved, onDeleted }: Props) {
   const refresh = useRefreshFilaments()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const { values, errors, busy, change, submit } = useForm(brandSchema, {
     name: brand?.name ?? '',
     logo: null as File | null, // 새로 고른 파일
@@ -67,7 +70,8 @@ export default function BrandDialog({ brand, onClose, onSaved, onDeleted }: Prop
     })
 
   const remove = async () => {
-    if (!brand || !confirm(`${brand.name} 회사를 삭제할까요?`)) return
+    if (!brand || !(await confirm({ title: '회사 삭제', message: `${brand.name} 회사를 삭제할까요?`, danger: true })))
+      return
     try {
       await deleteBrand(brand.id)
       await refresh()

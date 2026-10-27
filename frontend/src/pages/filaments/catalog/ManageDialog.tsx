@@ -42,7 +42,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Dialog size="wide" title="필라멘트 관리" headExtra={tabs} onClose={onClose}>
+      <Dialog size="wide" fixed title="필라멘트 관리" headExtra={tabs} onClose={onClose}>
         {tab === 'brands' ? (
           <div className="manage">
             <div>

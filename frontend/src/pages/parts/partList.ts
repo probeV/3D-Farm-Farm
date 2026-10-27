@@ -1,15 +1,21 @@
 // 부자재 목록의 검색 · 정렬 · 요약 · 사용하는 제품 (PART-01 · PART-03, docs/screens.md 3장)
 // 사용하는 제품 · 평균 부자재비는 서버가 주지 않는다. 제품 목록(/products/)의 부자재 줄로 계산 (docs/api.md "부자재")
 import type { Part, Product, ProductStatus } from '../../api/products'
+import { compareBy, type SortColumns, type SortState } from '../../sort'
 
-export const SORTS = {
-  name: '이름순',
-  unitDesc: '개당 단가 높은 순',
-  usedDesc: '사용 제품 많은 순',
-  shop: '구매처순',
-} as const
+const byName = (a: Part, b: Part) => a.name.localeCompare(b.name, 'ko')
 
-export type Sort = keyof typeof SORTS
+// 열 제목 정렬 (PART-01). 가격 · 구매처가 없으면 방향과 상관없이 맨 뒤
+export const SORT_COLUMNS = {
+  name: { value: (p) => p.name },
+  shop: { value: (p) => p.shop || null },
+  price: { value: (p) => p.price, first: 'desc' },
+  packQty: { value: (p) => p.pack_qty, first: 'desc' },
+  unitPrice: { value: (p) => p.unit_price, first: 'desc' },
+  used: { value: (p) => p.product_count, first: 'desc' },
+} satisfies SortColumns<Part, string>
+
+export type Sort = SortState<keyof typeof SORT_COLUMNS>
 
 export interface ListFilter {
   q: string
@@ -17,7 +23,7 @@ export interface ListFilter {
   sort: Sort
 }
 
-export const NO_FILTER: ListFilter = { q: '', noPriceOnly: false, sort: 'name' }
+export const NO_FILTER: ListFilter = { q: '', noPriceOnly: false, sort: { key: 'name', dir: 'asc' } }
 
 export interface Usage {
   productId: number
@@ -41,19 +47,6 @@ export function usagesByPart(products: Product[]) {
   return out
 }
 
-const byName = (a: Part, b: Part) => a.name.localeCompare(b.name, 'ko')
-
-// 가격이 없으면 단가 정렬에서, 구매처가 없으면 구매처순에서 맨 뒤 (방향과 상관없이)
-const sorters: Record<Sort, (a: Part, b: Part) => number> = {
-  name: byName,
-  unitDesc: (a, b) =>
-    a.unit_price == null || b.unit_price == null
-      ? Number(a.unit_price == null) - Number(b.unit_price == null) || byName(a, b)
-      : b.unit_price - a.unit_price || byName(a, b),
-  usedDesc: (a, b) => b.product_count - a.product_count || byName(a, b),
-  shop: (a, b) => Number(!a.shop) - Number(!b.shop) || a.shop.localeCompare(b.shop, 'ko') || byName(a, b),
-}
-
 // 검색: 품목 · 구매처 · 비고
 export function filterParts(parts: Part[], filter: ListFilter) {
   const q = filter.q.trim().toLowerCase()
@@ -63,7 +56,7 @@ export function filterParts(parts: Part[], filter: ListFilter) {
         (!filter.noPriceOnly || p.price == null) &&
         (!q || [p.name, p.shop, p.note].join(' ').toLowerCase().includes(q)),
     )
-    .sort(sorters[filter.sort])
+    .sort(compareBy(SORT_COLUMNS, filter.sort, byName))
 }
 
 // 제품 1개의 부자재비. 가격이 없는 부자재는 0원 (제품 원가 계산과 같음)

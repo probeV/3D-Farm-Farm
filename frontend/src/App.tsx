@@ -3,6 +3,7 @@ import FilamentsPage from './pages/filaments/FilamentsPage'
 import PartsPage from './pages/parts/PartsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProductsPage from './pages/products/ProductsPage'
+import { applyTheme, loadTheme, saveTheme, THEMES, type ThemePref } from './theme'
 
 type Page = 'products' | 'filaments' | 'parts' | 'settings'
 
@@ -63,6 +64,22 @@ function Icon({ children }: { children: ReactNode }) {
   )
 }
 
+const THEME_ICON: Record<ThemePref, ReactNode> = {
+  system: (
+    <>
+      <rect x="3" y="4" width="18" height="12" rx="2" />
+      <path d="M8 20h8M12 16v4" />
+    </>
+  ),
+  light: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </>
+  ),
+  dark: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />,
+}
+
 // 사이드바 접힘 상태는 브라우저에 기억 (저장할 수 없는 환경이면 기억만 안 함)
 const SIDE_KEY = 'pff-side-collapsed'
 
@@ -77,7 +94,17 @@ function loadCollapsed() {
 export default function App() {
   const [page, setPage] = useState<Page>('filaments')
   const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const [theme, setTheme] = useState(loadTheme)
   const current = NAV.find((n) => n.page === page)!
+  const currentTheme = THEMES.find((t) => t.pref === theme)!
+
+  const chooseTheme = (pref: ThemePref) => {
+    setTheme(pref)
+    saveTheme(pref)
+    applyTheme(pref)
+  }
+  // 접힌 사이드바에서는 아이콘 하나: 누를 때마다 다음 테마
+  const nextTheme = () => chooseTheme(THEMES[(THEMES.indexOf(currentTheme) + 1) % THEMES.length].pref)
 
   const toggleSide = () => {
     const next = !collapsed
@@ -108,7 +135,31 @@ export default function App() {
           </button>
         ))}
         <div className="side-bottom">
-          <button className="nav-item" title="사이드바 접기/펼치기" onClick={toggleSide}>
+          <div className="theme-seg" role="radiogroup" aria-label="테마">
+            {THEMES.map((t) => (
+              <button
+                key={t.pref}
+                type="button"
+                role="radio"
+                aria-checked={t.pref === theme}
+                className={t.pref === theme ? 'on' : ''}
+                title={`테마: ${t.label}`}
+                onClick={() => chooseTheme(t.pref)}
+              >
+                <Icon>{THEME_ICON[t.pref]}</Icon>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <button
+            className="nav-item theme-one"
+            title={`테마: ${currentTheme.label} (누르면 다음)`}
+            onClick={nextTheme}
+          >
+            <Icon>{THEME_ICON[theme]}</Icon>
+            <span className="label">{currentTheme.label}</span>
+          </button>
+          <button className="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onClick={toggleSide}>
             <Icon>
               <rect x="3" y="4" width="18" height="16" rx="2" />
               <path d="M9 4v16" />

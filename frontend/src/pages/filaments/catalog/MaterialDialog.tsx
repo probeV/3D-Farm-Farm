@@ -7,6 +7,7 @@ import {
 } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { useForm } from '../../../useForm'
 import { materialSchema } from './schemas'
@@ -21,6 +22,8 @@ interface Props {
 export default function MaterialDialog({ material, onClose, onSaved }: Props) {
   const refresh = useRefreshFilaments()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const { values, errors, busy, change, submit } = useForm(materialSchema, { name: material?.name ?? '' })
 
   const save = () =>
@@ -33,7 +36,11 @@ export default function MaterialDialog({ material, onClose, onSaved }: Props) {
     })
 
   const remove = async () => {
-    if (!material || !confirm(`${material.name} 재질을 삭제할까요?`)) return
+    if (
+      !material ||
+      !(await confirm({ title: '재질 삭제', message: `${material.name} 재질을 삭제할까요?`, danger: true }))
+    )
+      return
     try {
       await deleteMaterial(material.id)
       await refresh()

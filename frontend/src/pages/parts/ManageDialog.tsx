@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { deletePart, useRefreshProducts, type Part } from '../../api/products'
 import Dialog from '../../components/Dialog'
+import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { unitWon } from '../../format'
 import PartDialog from './PartDialog'
@@ -16,6 +17,8 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const data = usePartsData().data
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const [picked, setPicked] = useState<ShopSel>('')
   const [sub, setSub] = useState<Sub | null>(null)
   const closeSub = () => setSub(null)
@@ -32,7 +35,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const remove = async (p: Part) => {
     // 제품에서 쓰면 서버도 막는다 (409)
     if (p.product_count) return toast(`제품 ${p.product_count}개에서 쓰고 있어서 삭제할 수 없어요`)
-    if (!confirm(`${p.name} 을(를) 삭제할까요?`)) return
+    if (!(await confirm({ title: '부자재 삭제', message: `${p.name} 을(를) 삭제할까요?`, danger: true }))) return
     try {
       await deletePart(p.id)
       await refresh()
@@ -57,7 +60,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Dialog size="wide" title="부자재 관리" onClose={onClose}>
+      <Dialog size="wide" fixed title="부자재 관리" onClose={onClose}>
         <div className="manage parts-manage">
           <div className="list">
             {item('', '전체')}

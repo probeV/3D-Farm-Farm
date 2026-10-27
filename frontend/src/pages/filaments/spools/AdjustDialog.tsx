@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSpools, type Color, type Spool, type SpoolStatus } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Pager, { PAGE_SIZE } from '../../../components/Pager'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { dateText } from '../../../format'
 import { money } from '../../../validation'
@@ -17,6 +18,7 @@ export default function AdjustDialog({ color, onClose }: { color: Color; onClose
   const spools = useSpools(color.id)
   const actions = useSpoolActions()
   const toast = useToast()
+  const confirm = useConfirm()
   const [view, setView] = useState<View>('simple')
   const [page, setPage] = useState(1)
 
@@ -26,14 +28,23 @@ export default function AdjustDialog({ color, onClose }: { color: Color; onClose
   const rows = list.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
 
   // 거꾸로 이동(사용 완료 → 사용 중 등)은 확인 후 실행 (PRD INV-07)
-  const changeStatus = (s: Spool, to: SpoolStatus) => {
+  const changeStatus = async (s: Spool, to: SpoolStatus) => {
     const backwards = STATUSES.indexOf(to) < STATUSES.indexOf(s.status)
-    const msg = `${color.name} ${s.code}\n${STATUS_LABEL[s.status]} → ${STATUS_LABEL[to]}(으)로 되돌릴까요?`
-    if (backwards && !confirm(msg)) return
+    const message = (
+      <>
+        <b>
+          {color.name} {s.code}
+        </b>
+        <br />
+        {STATUS_LABEL[s.status]} → {STATUS_LABEL[to]}(으)로 되돌릴까요?
+      </>
+    )
+    if (backwards && !(await confirm({ title: '스풀 되돌리기', message, okLabel: '되돌리기' }))) return
     actions.changeStatus(color, s, to).catch(actions.fail)
   }
-  const remove = (s: Spool) => {
-    if (!confirm(`${color.name} ${s.code} 스풀 기록을 삭제할까요?`)) return
+  const remove = async (s: Spool) => {
+    const message = `${color.name} ${s.code} 스풀 기록을 삭제할까요?`
+    if (!(await confirm({ title: '스풀 삭제', message, danger: true }))) return
     actions.remove(s).catch(actions.fail)
   }
   const setPrice = (s: Spool, price: number | null) => actions.setPrice(s, price).catch(actions.fail)
@@ -51,6 +62,7 @@ export default function AdjustDialog({ color, onClose }: { color: Color; onClose
   return (
     <Dialog
       size="wide"
+      fixed
       title={
         <>
           <Swatch hex={color.hex} /> {color.name} · 스풀 조정{' '}

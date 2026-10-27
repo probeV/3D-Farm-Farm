@@ -1,6 +1,7 @@
 // 제품 목록의 검색 · 필터 · 정렬 (PRD-01b · PRD-03, docs/screens.md 2.3). 요약 · CSV 는 검색 · 필터와 상관없이 전체
 import type { Color } from '../../../api/filaments'
 import type { Product } from '../../../api/products'
+import { compareBy, type SortColumns, type SortState } from '../../../sort'
 import { inSelection, type CategorySel } from '../categories'
 import { completeMargin, type Cost } from '../cost'
 
@@ -10,15 +11,21 @@ export interface ProductRow {
   colors: Color[]
 }
 
-export const SORTS = {
-  no: 'No. 순',
-  name: '이름순',
-  marginAsc: '순마진율 낮은 순',
-  marginDesc: '순마진율 높은 순',
-  costDesc: '원가 높은 순',
-} as const
+const byNo = (a: ProductRow, b: ProductRow) => a.product.no - b.product.no
 
-export type Sort = keyof typeof SORTS
+// 열 제목 정렬 (PRD-01b). 입력이 덜 된 제품의 순이익 · 순마진율은 정확하지 않아 방향과 상관없이 맨 뒤
+export const SORT_COLUMNS = {
+  no: { value: (r) => r.product.no },
+  name: { value: (r) => r.product.name },
+  grams: { value: (r) => r.cost.grams || null, first: 'desc' },
+  minutes: { value: (r) => r.product.print_minutes, first: 'desc' },
+  cost: { value: (r) => r.cost.cost, first: 'desc' },
+  price: { value: (r) => r.product.sale_price, first: 'desc' },
+  net: { value: (r) => (r.cost.warnings.length ? null : r.cost.net), first: 'desc' },
+  margin: { value: (r) => completeMargin(r.cost) },
+} satisfies SortColumns<ProductRow, string>
+
+export type Sort = SortState<keyof typeof SORT_COLUMNS>
 
 export interface ListFilter {
   q: string
@@ -27,25 +34,7 @@ export interface ListFilter {
   sort: Sort
 }
 
-export const NO_FILTER: ListFilter = { q: '', category: '', needOnly: false, sort: 'no' }
-
-const byNo = (a: ProductRow, b: ProductRow) => a.product.no - b.product.no
-
-// 입력이 덜 된 제품은 순마진율이 정확하지 않아 맨 뒤로 (방향과 상관없이)
-const byMargin = (dir: 1 | -1) => (a: ProductRow, b: ProductRow) => {
-  const ma = completeMargin(a.cost)
-  const mb = completeMargin(b.cost)
-  if (ma == null || mb == null) return Number(ma == null) - Number(mb == null) || byNo(a, b)
-  return dir * (ma - mb) || byNo(a, b)
-}
-
-const sorters: Record<Sort, (a: ProductRow, b: ProductRow) => number> = {
-  no: byNo,
-  name: (a, b) => a.product.name.localeCompare(b.product.name, 'ko') || byNo(a, b),
-  marginAsc: byMargin(1),
-  marginDesc: byMargin(-1),
-  costDesc: (a, b) => b.cost.cost - a.cost.cost || byNo(a, b),
-}
+export const NO_FILTER: ListFilter = { q: '', category: '', needOnly: false, sort: { key: 'no', dir: 'asc' } }
 
 // 검색: 제품명 · No. · 색상 이름
 export function filterProducts(rows: ProductRow[], filter: ListFilter) {
@@ -57,7 +46,7 @@ export function filterProducts(rows: ProductRow[], filter: ListFilter) {
         (!filter.needOnly || cost.warnings.length > 0) &&
         (!q || [product.no, product.name, ...colors.map((c) => c.name)].join(' ').toLowerCase().includes(q)),
     )
-    .sort(sorters[filter.sort])
+    .sort(compareBy(SORT_COLUMNS, filter.sort, byNo))
 }
 
 // 맨 위 요약 (PRD-02). 평균 순마진율은 판매중이고 입력이 끝난 제품만
