@@ -20,6 +20,8 @@
   --bar-empty: #d5dae2;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 4px 16px rgba(16, 24, 40, 0.06);
   --radius: 10px;
+  /* 관리 창(제품 · 필라멘트 · 부자재 관리, 스풀 조정) 높이. 이 값 하나로 모든 관리 창에 적용 (TBD-01) */
+  --dlg-fixed-h: 640px;
   color-scheme: light;
 }
 :root[data-theme='dark'] {
@@ -157,6 +159,92 @@ textarea {
   padding-left: 0;
   padding-right: 0;
 }
+/* 테마 선택 (TBD-10): 펼치면 3칸, 접으면 지금 테마 아이콘 하나 (누를 때마다 다음 테마) */
+.theme-seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin: 0 4px 4px;
+  background: var(--surface-2);
+  border-radius: 9px;
+}
+.theme-seg button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 0;
+  border: 0;
+  background: none;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.theme-seg button:hover {
+  color: var(--text);
+}
+.theme-seg button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.theme-seg svg {
+  width: 14px;
+  height: 14px;
+}
+.nav-item.theme-one,
+.layout.collapsed .theme-seg {
+  display: none;
+}
+.layout.collapsed .nav-item.theme-one {
+  display: flex;
+}
+
+/* 열 제목 정렬 (TBD-05, components/SortTh.tsx) */
+th.sortable {
+  padding: 0;
+}
+th.sortable button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: inherit;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+th.sortable.num button {
+  justify-content: flex-end;
+}
+th.sortable button:hover {
+  color: var(--text);
+}
+th.sortable .arrow {
+  width: 10px;
+  opacity: 0;
+}
+th.sortable button:hover .arrow {
+  opacity: 0.4;
+}
+th.sorted {
+  color: var(--accent);
+}
+th.sorted .arrow,
+th.sorted button:hover .arrow {
+  opacity: 1;
+}
+
 .mock-tag {
   font-size: 11px;
   color: var(--muted);
@@ -215,6 +303,22 @@ h3 {
 }
 .btn.danger {
   color: var(--bad);
+}
+/* 확인 대화상자의 삭제 버튼: 1차는 빨간 테두리, 2차(정말 삭제) · 한 번 확인은 빨간 바탕 */
+.btn.danger-line {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.btn.danger-line:hover {
+  background: var(--bad-soft);
+}
+.btn.danger-fill {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+.btn.danger-fill:hover {
+  filter: brightness(1.08);
 }
 .btn.small {
   padding: 3px 9px;
@@ -982,6 +1086,19 @@ dialog.narrow {
 dialog.wide {
   width: min(760px, calc(100vw - 32px));
 }
+/* 창 머리 · 아래는 그대로 두고 본문만 스크롤 */
+dialog > form {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+/* 관리 창: 항목이 늘어도 높이 고정 (Dialog fixed) */
+dialog.fixed {
+  height: min(var(--dlg-fixed-h), calc(100vh - 32px));
+}
+dialog.fixed > form {
+  height: 100%;
+}
 .dlg-head {
   padding: 14px 20px;
   border-bottom: 1px solid var(--border);
@@ -1000,7 +1117,73 @@ dialog.wide {
 .dlg-body {
   padding: 16px 20px;
   overflow-y: auto;
-  max-height: calc(100vh - 150px);
+  flex: 1;
+  min-height: 0;
+}
+/* 본문이 스크롤되면 위 · 아래 경계에 옅은 그림자로 "더 있음" 표시 */
+.dlg-body.scroll-top {
+  box-shadow: inset 0 8px 8px -8px rgba(0, 0, 0, 0.18);
+}
+.dlg-body.scroll-bottom {
+  box-shadow: inset 0 -8px 8px -8px rgba(0, 0, 0, 0.18);
+}
+.dlg-body.scroll-top.scroll-bottom {
+  box-shadow:
+    inset 0 8px 8px -8px rgba(0, 0, 0, 0.18),
+    inset 0 -8px 8px -8px rgba(0, 0, 0, 0.18);
+}
+.dlg-head,
+.dlg-foot {
+  flex: none;
+}
+
+/* 확인 대화상자 (components/Confirm.tsx) */
+.confirm .dlg-head {
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+.confirm .dlg-body {
+  padding-top: 4px;
+}
+.confirm .dlg-foot {
+  border-top: 0;
+  padding-top: 4px;
+}
+.confirm .lead {
+  margin: 0;
+}
+dialog.confirm.has-effects {
+  width: min(460px, calc(100vw - 32px));
+}
+/* 함께 지워지거나 바뀌는 것: 하나씩 따로 묶음. 제목(무엇이 몇 개) + 아래 내용 */
+.confirm .effects {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.confirm .effect {
+  padding: 9px 12px;
+  border-left: 3px solid var(--bad);
+  background: var(--bad-soft);
+  border-radius: 0 8px 8px 0;
+}
+.confirm .effects.info .effect {
+  border-left-color: var(--muted);
+  background: var(--surface-2);
+}
+.confirm .effect .t {
+  font-weight: 700;
+}
+.confirm .effect .d {
+  margin-top: 2px;
+  font-size: 13px;
+}
+.confirm .again {
+  margin-top: 10px;
+  color: var(--bad);
+  font-size: 13px;
+  font-weight: 600;
 }
 .dlg-foot {
   display: flex;
@@ -1351,8 +1534,12 @@ input[type='color'] {
     padding-right: 0;
   }
   .mock-tag,
-  [data-act='toggle-side'] {
+  [data-act='toggle-side'],
+  .theme-seg {
     display: none;
+  }
+  .layout .nav-item.theme-one {
+    display: flex;
   }
   .brand-card {
     width: 220px;

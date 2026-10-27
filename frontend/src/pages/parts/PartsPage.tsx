@@ -3,7 +3,9 @@ import Help from '../../components/Help'
 import { unitWon, won } from '../../format'
 import ManageDialog from './ManageDialog'
 import PartDialog from './PartDialog'
-import { filterParts, NO_FILTER, SORTS, summarize, type ListFilter, type Sort } from './partList'
+import SortTh from '../../components/SortTh'
+import { nextSort } from '../../sort'
+import { filterParts, NO_FILTER, SORT_COLUMNS, summarize, type ListFilter, type Sort } from './partList'
 import { usePartsData } from './usePartsData'
 
 type DialogState = { kind: 'manage' } | { kind: 'part'; partId: number }
@@ -34,6 +36,10 @@ export default function PartsPage() {
   const noPriceOnly = filter.noPriceOnly && sum.noPrice > 0
   const list = filterParts(parts, { ...filter, noPriceOnly })
   const filtered = filter.q !== '' || noPriceOnly
+  const th = {
+    sort: filter.sort,
+    onSort: (key: Sort['key']) => set({ sort: nextSort(SORT_COLUMNS, filter.sort, key) }),
+  }
 
   return (
     <>
@@ -98,13 +104,6 @@ export default function PartsPage() {
           value={filter.q}
           onChange={(e) => set({ q: e.target.value })}
         />
-        <select value={filter.sort} onChange={(e) => set({ sort: e.target.value as Sort })}>
-          {Object.entries(SORTS).map(([v, label]) => (
-            <option key={v} value={v}>
-              정렬: {label}
-            </option>
-          ))}
-        </select>
         {filtered && (
           <button className="btn small" onClick={() => set({ q: '', noPriceOnly: false })}>
             필터 지우기
@@ -117,12 +116,24 @@ export default function PartsPage() {
           <table className="parts-table">
             <thead>
               <tr>
-                <th>품목</th>
-                <th>회사/구매처</th>
-                <th className="num">구매가</th>
-                <th className="num">묶음 수량</th>
-                <th className="num">개당 단가</th>
-                <th className="num">사용 제품</th>
+                <SortTh sortKey="name" {...th}>
+                  품목
+                </SortTh>
+                <SortTh sortKey="shop" {...th}>
+                  회사/구매처
+                </SortTh>
+                <SortTh sortKey="price" num {...th}>
+                  구매가
+                </SortTh>
+                <SortTh sortKey="packQty" num {...th}>
+                  묶음 수량
+                </SortTh>
+                <SortTh sortKey="unitPrice" num {...th}>
+                  개당 단가
+                </SortTh>
+                <SortTh sortKey="used" num {...th}>
+                  사용 제품
+                </SortTh>
                 <th>비고</th>
               </tr>
             </thead>

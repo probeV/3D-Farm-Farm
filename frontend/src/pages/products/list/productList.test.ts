@@ -82,13 +82,17 @@ describe('제품 목록 검색 · 필터 · 정렬 (PRD-01b · PRD-03)', () => {
   })
 
   it('순마진율 정렬: 입력이 덜 된 제품은 방향과 상관없이 맨 뒤', () => {
-    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: 'marginAsc' }))).toEqual([1, 10, 2, 3])
-    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: 'marginDesc' }))).toEqual([2, 10, 1, 3])
+    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: { key: 'margin', dir: 'asc' } }))).toEqual([1, 10, 2, 3])
+    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: { key: 'margin', dir: 'desc' } }))).toEqual([2, 10, 1, 3])
   })
 
   it('이름순 · 원가 높은 순 (같으면 No. 순)', () => {
-    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: 'name' }))).toEqual([3, 1, 2, 10])
-    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: 'costDesc' }))).toEqual([10, 1, 2, 3])
+    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: { key: 'name', dir: 'asc' } }))).toEqual([3, 1, 2, 10])
+    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: { key: 'cost', dir: 'desc' } }))).toEqual([10, 1, 2, 3])
+  })
+
+  it('No. 내림차순', () => {
+    expect(nos(filterProducts(rows, { ...NO_FILTER, sort: { key: 'no', dir: 'desc' } }))).toEqual([10, 3, 2, 1])
   })
 })
 

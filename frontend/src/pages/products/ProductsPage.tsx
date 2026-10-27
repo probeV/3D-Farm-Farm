@@ -9,7 +9,8 @@ import { marginClass } from './cost'
 import ProductDialog from './form/ProductDialog'
 import { downloadText, productsCsv } from './list/csv'
 import ProductTable from './list/ProductTable'
-import { filterProducts, NO_FILTER, SORTS, summarize, type ListFilter, type Sort } from './list/productList'
+import { filterProducts, NO_FILTER, SORT_COLUMNS, summarize, type ListFilter, type Sort } from './list/productList'
+import { nextSort } from '../../sort'
 import { useCostData } from './useCostData'
 
 type DialogState = { kind: 'manage' } | { kind: 'product'; productId: number }
@@ -41,6 +42,7 @@ export default function ProductsPage() {
   const list = filterProducts(rows, { ...filter, category })
   const sum = summarize(rows)
   const filtered = filter.q !== '' || category !== '' || filter.needOnly
+  const sortBy = (key: Sort['key']) => set({ sort: nextSort(SORT_COLUMNS, filter.sort, key) })
 
   const exportCsv = () => {
     downloadText(`제품원가_${today()}.csv`, productsCsv(rows, categories))
@@ -123,13 +125,6 @@ export default function ProductsPage() {
           ])}
           {rows.some((r) => r.product.category == null) && <option value="none">미분류</option>}
         </select>
-        <select value={filter.sort} onChange={(e) => set({ sort: e.target.value as Sort })}>
-          {Object.entries(SORTS).map(([v, label]) => (
-            <option key={v} value={v}>
-              정렬: {label}
-            </option>
-          ))}
-        </select>
         {filtered && (
           <button className="btn small" onClick={() => set({ q: '', category: '', needOnly: false })}>
             필터 지우기
@@ -146,6 +141,8 @@ export default function ProductsPage() {
             rows={list}
             categories={categories}
             catalog={catalog}
+            sort={filter.sort}
+            onSort={sortBy}
             onOpen={(p: Product) => setDialog({ kind: 'product', productId: p.id })}
           />
         </div>

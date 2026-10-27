@@ -8,6 +8,7 @@ import {
 } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { won } from '../../../format'
 import { useForm } from '../../../useForm'
@@ -23,6 +24,8 @@ interface Props {
 export default function ColorDialog({ filament, color, onClose }: Props) {
   const refresh = useRefreshFilaments()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const { values, errors, busy, change, submit } = useForm(colorSchema, {
     name: color?.name ?? '',
     hex: color?.hex ?? '#CCCCCC',
@@ -45,7 +48,15 @@ export default function ColorDialog({ filament, color, onClose }: Props) {
 
   // 스풀이 있으면 서버가 409 → 알림 (PRD FIL-09)
   const remove = async () => {
-    if (!color || !confirm(`${filament.display_name} · ${color.name} 색상을 삭제할까요?`)) return
+    if (
+      !color ||
+      !(await confirm({
+        title: '색상 삭제',
+        message: `${filament.display_name} · ${color.name} 색상을 삭제할까요?`,
+        danger: true,
+      }))
+    )
+      return
     try {
       await deleteColor(color.id)
       await refresh()

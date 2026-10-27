@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createProduct, deleteProduct, updateProduct, useRefreshProducts } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { useForm } from '../../../useForm'
 import CategoryDialog from '../catalog/CategoryDialog'
@@ -29,6 +30,8 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
   const { catalog, categories, filaments, parts, rows } = data
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const products = rows.map((r) => r.product)
   const form = useForm(productSchema, initialValues({ product, copyOf, preset }, products, filaments))
   const { values, errors, busy, change, update, submit } = form
@@ -54,7 +57,11 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
     })
 
   const remove = async () => {
-    if (!product || !confirm(`${product.name} 제품을 삭제할까요?`)) return
+    if (
+      !product ||
+      !(await confirm({ title: '제품 삭제', message: `${product.name} 제품을 삭제할까요?`, danger: true }))
+    )
+      return
     try {
       await deleteProduct(product.id)
       await refresh()

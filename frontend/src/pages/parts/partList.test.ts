@@ -79,20 +79,26 @@ describe('부자재 목록 (PART-01)', () => {
     expect(names(filterParts(parts, { ...NO_FILTER, noPriceOnly: true }))).toEqual(['에어캡'])
   })
 
-  it('정렬: 단가 높은 순은 가격 없는 것을 맨 뒤, 구매처순은 구매처 없는 것을 맨 뒤', () => {
-    expect(names(filterParts(parts, { ...NO_FILTER, sort: 'unitDesc' }))).toEqual([
+  it('열 제목 정렬: 가격 · 구매처가 없는 것은 방향과 상관없이 맨 뒤', () => {
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'unitPrice', dir: 'desc' } }))).toEqual([
       '박스',
       '자석',
       'OPP 봉투',
       '에어캡',
     ])
-    expect(names(filterParts(parts, { ...NO_FILTER, sort: 'usedDesc' }))).toEqual([
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'used', dir: 'desc' } }))).toEqual([
       '자석',
       '박스',
       'OPP 봉투',
       '에어캡',
     ])
-    expect(names(filterParts(parts, { ...NO_FILTER, sort: 'shop' }))).toEqual(['자석', '박스', 'OPP 봉투', '에어캡'])
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'shop', dir: 'asc' } }))).toEqual([
+      '자석',
+      '박스',
+      'OPP 봉투',
+      '에어캡',
+    ])
+    expect(names(filterParts(parts, { ...NO_FILTER, sort: { key: 'unitPrice', dir: 'asc' } })).pop()).toBe('에어캡')
   })
 })
 

@@ -1,6 +1,7 @@
 import { createPart, deletePart, updatePart, useRefreshProducts, type Part } from '../../api/products'
 import Dialog from '../../components/Dialog'
 import Field from '../../components/Field'
+import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { unitWon, won } from '../../format'
 import { useForm } from '../../useForm'
@@ -23,6 +24,8 @@ interface Props {
 export default function PartDialog({ part, copyOf, shop, usages, onClose }: Props) {
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const src = part ?? copyOf
   const { values, errors, busy, change, submit } = useForm(partSchema, {
     name: part ? part.name : copyOf ? `${copyOf.name} (복사)` : '',
@@ -50,7 +53,8 @@ export default function PartDialog({ part, copyOf, shop, usages, onClose }: Prop
     })
 
   const remove = async () => {
-    if (!part || !confirm(`${part.name} 을(를) 삭제할까요?`)) return
+    if (!part || !(await confirm({ title: '부자재 삭제', message: `${part.name} 을(를) 삭제할까요?`, danger: true })))
+      return
     try {
       await deletePart(part.id) // 제품에서 쓰면 409
       await refresh()

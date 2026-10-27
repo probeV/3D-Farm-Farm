@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { deleteProduct, useRefreshProducts, type Category, type Product } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { pct, won } from '../../../format'
 import { findSubcategory, inSelection, selectionExists, selectionLabel, type CategorySel } from '../categories'
@@ -22,6 +23,8 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const data = useCostData().data
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const [picked, setPicked] = useState<CategorySel>('')
   const [sub, setSub] = useState<Sub | null>(null)
   const closeSub = () => setSub(null)
@@ -36,7 +39,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const prods = rows.filter((r) => inSelection(r.product, sel)).sort((a, b) => a.product.no - b.product.no)
 
   const remove = async (p: Product) => {
-    if (!confirm(`${p.name} 제품을 삭제할까요?`)) return
+    if (!(await confirm({ title: '제품 삭제', message: `${p.name} 제품을 삭제할까요?`, danger: true }))) return
     try {
       await deleteProduct(p.id)
       await refresh()
@@ -146,7 +149,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Dialog size="wide" title="제품 관리" onClose={onClose}>
+      <Dialog size="wide" fixed title="제품 관리" onClose={onClose}>
         <div className="manage">
           <div>
             <div className="list">
