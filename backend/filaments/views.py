@@ -107,7 +107,7 @@ class FilamentViewSet(BaseViewSet):
 class ColorViewSet(BaseViewSet):
     queryset = colors_with_counts()
     serializer_class = ColorSerializer
-    protected_message = '스풀이 있어서 삭제할 수 없습니다.'
+    # 삭제: 스풀은 함께 삭제, 제품 줄은 색상 선택 안 함으로 (막는 것 없음, PRD FIL-09)
 
     # POST /colors/ — 새 색상은 개수가 붙어 있지 않으므로 queryset(개수 포함)으로 다시 조회해서 응답.
     # 수정(PATCH)은 기본 동작 그대로: 조회한 객체에 붙은 개수가 남아 있음

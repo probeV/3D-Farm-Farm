@@ -1,6 +1,18 @@
 import { useState } from 'react'
-import { useBrands, useFilaments, useMaterials, type Brand, type Filament, type Material } from '../../../api/filaments'
+import {
+  deleteFilament,
+  useBrands,
+  useFilaments,
+  useMaterials,
+  useRefreshFilaments,
+  type Brand,
+  type Filament,
+  type Material,
+} from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
+import ManageColumn from '../../../components/ManageColumn'
+import { useConfirm } from '../../../components/useConfirm'
+import { useToast } from '../../../components/useToast'
 import { won } from '../../../format'
 import BrandDialog from './BrandDialog'
 import BrandLogo from '../BrandLogo'
@@ -9,18 +21,21 @@ import MaterialDialog from './MaterialDialog'
 
 type Tab = 'brands' | 'materials'
 
-// 관리 창 위에 겹쳐 여는 창 (null = 추가)
+// 관리 창 위에 겹쳐 여는 창 (null = 추가, copyOf = 복제)
 type Sub =
   | { kind: 'brand'; brand: Brand | null }
-  | { kind: 'filament'; filament: Filament | null }
+  | { kind: 'filament'; filament: Filament | null; copyOf?: Filament }
   | { kind: 'material'; material: Material | null }
 
 // 필라멘트 관리 (PRD FIL-03, docs/screens.md 1.5)
-// 회사·필라멘트 탭: 왼쪽 회사 목록 / 오른쪽 고른 회사의 필라멘트. 재질 탭: 재질 목록
+// 회사·필라멘트 탭: 왼쪽 회사 목록 / 오른쪽 고른 회사의 필라멘트. 재질 탭: 재질 목록. 목록마다 따로 스크롤
 export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const brands = useBrands().data ?? []
   const materials = useMaterials().data ?? []
   const filaments = useFilaments().data ?? []
+  const refresh = useRefreshFilaments()
+  const toast = useToast()
+  const confirm = useConfirm()
   const [tab, setTab] = useState<Tab>('brands')
   const [brandId, setBrandId] = useState<number | null>(null)
   const [sub, setSub] = useState<Sub | null>(null)
@@ -29,6 +44,20 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   // 고른 회사가 없거나 지워졌으면 첫 회사
   const brand = brands.find((b) => b.id === brandId) ?? brands[0]
   const brandFilaments = filaments.filter((f) => f.brand === brand?.id)
+
+  // 색상이 있으면 지울 수 없어 확인 창 없이 이유만. 제품에서 쓰면 서버가 409 (PRD FIL-09)
+  const remove = async (f: Filament) => {
+    if (f.colors.length) return toast(`색상 ${f.colors.length}개가 있어서 삭제할 수 없어요`)
+    if (!(await confirm({ title: '필라멘트 삭제', message: `${f.display_name} 필라멘트를 삭제할까요?`, danger: true })))
+      return
+    try {
+      await deleteFilament(f.id)
+      await refresh()
+      toast(`${f.display_name} 삭제했어요`)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   const tabs = (
     <div className="view-tabs">
@@ -45,7 +74,12 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
       <Dialog size="wide" fixed title="필라멘트 관리" headExtra={tabs} onClose={onClose}>
         {tab === 'brands' ? (
           <div className="manage">
-            <div>
+            <ManageColumn
+              title="회사"
+              count={brands.length}
+              addLabel="+ 회사 추가"
+              onAdd={() => setSub({ kind: 'brand', brand: null })}
+            >
               <div className="list">
                 {brands.map((b) => (
                   <div
@@ -71,54 +105,61 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                   </div>
                 ))}
               </div>
-              <button
-                type="button"
-                className="btn small"
-                style={{ marginTop: 10 }}
-                onClick={() => setSub({ kind: 'brand', brand: null })}
+            </ManageColumn>
+            {brand ? (
+              <ManageColumn
+                className="manage-right"
+                title={`${brand.name} 의 필라멘트`}
+                count={brandFilaments.length}
+                addLabel="+ 필라멘트 추가"
+                onAdd={() => setSub({ kind: 'filament', filament: null })}
               >
-                + 회사 추가
-              </button>
-            </div>
-            <div className="manage-right">
-              {brand ? (
-                <>
-                  <h4>{brand.name} 의 필라멘트</h4>
-                  {brandFilaments.map((f) => (
-                    <div key={f.id} className="row-item">
-                      <div>
-                        <strong>{f.series ? `${f.material_name} ${f.series}` : f.material_name}</strong>
-                        <div className="hint">색상 {f.colors.length}개</div>
-                      </div>
-                      <span className="muted">
-                        {f.price == null ? '가격 미입력' : `${won(f.price)} / ${f.spool_g}g`}
-                      </span>
-                      <button
-                        type="button"
-                        className="btn small"
-                        onClick={() => setSub({ kind: 'filament', filament: f })}
-                      >
-                        수정
-                      </button>
+                {brandFilaments.map((f) => (
+                  <div key={f.id} className="row-item fil-row">
+                    <div>
+                      <strong>{f.series ? `${f.material_name} ${f.series}` : f.material_name}</strong>
+                      <div className="hint">색상 {f.colors.length}개</div>
                     </div>
-                  ))}
-                  {!brandFilaments.length && <p className="hint">등록된 필라멘트가 없어요.</p>}
-                  <button
-                    type="button"
-                    className="btn small"
-                    style={{ marginTop: 10 }}
-                    onClick={() => setSub({ kind: 'filament', filament: null })}
-                  >
-                    + 필라멘트 추가
-                  </button>
-                </>
-              ) : (
+                    <span className="muted">{f.price == null ? '가격 미입력' : `${won(f.price)} / ${f.spool_g}g`}</span>
+                    <button
+                      type="button"
+                      className="btn small"
+                      onClick={() => setSub({ kind: 'filament', filament: null, copyOf: f })}
+                    >
+                      복제
+                    </button>
+                    <button
+                      type="button"
+                      className="btn small"
+                      onClick={() => setSub({ kind: 'filament', filament: f })}
+                    >
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      title={f.colors.length ? `색상 ${f.colors.length}개가 있어서 삭제할 수 없어요` : '필라멘트 삭제'}
+                      onClick={() => remove(f)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {!brandFilaments.length && <p className="hint">등록된 필라멘트가 없어요.</p>}
+              </ManageColumn>
+            ) : (
+              <div className="manage-right">
                 <p className="hint">회사를 먼저 추가하세요.</p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ) : (
-          <div style={{ minHeight: 340 }}>
+          <ManageColumn
+            title="재질"
+            count={materials.length}
+            addLabel="+ 재질 추가"
+            onAdd={() => setSub({ kind: 'material', material: null })}
+          >
             {materials.map((m) => (
               <div key={m.id} className="row-item">
                 <strong>{m.name}</strong>
@@ -129,15 +170,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
               </div>
             ))}
             {!materials.length && <p className="hint">등록된 재질이 없어요.</p>}
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ kind: 'material', material: null })}
-            >
-              + 재질 추가
-            </button>
-          </div>
+          </ManageColumn>
         )}
       </Dialog>
 
@@ -150,7 +183,9 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           onDeleted={() => setBrandId(null)}
         />
       )}
-      {sub?.kind === 'filament' && brand && <FilamentDialog brand={brand} filament={sub.filament} onClose={closeSub} />}
+      {sub?.kind === 'filament' && brand && (
+        <FilamentDialog brand={brand} filament={sub.filament} copyOf={sub.copyOf} onClose={closeSub} />
+      )}
       {sub?.kind === 'material' && <MaterialDialog material={sub.material} onClose={closeSub} />}
     </>
   )

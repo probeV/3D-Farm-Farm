@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 export interface ConfirmEffect {
   title: ReactNode
   details?: ReactNode[]
+  tone?: 'warn' // 지워지지는 않고 바뀌는 것 (주황). 기본은 삭제 창이면 빨강
 }
 
 export interface ConfirmOptions {

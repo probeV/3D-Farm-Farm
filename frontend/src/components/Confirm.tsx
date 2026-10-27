@@ -78,7 +78,7 @@ function ConfirmDialog({ options: o, onAnswer }: { options: ConfirmOptions; onAn
           {!!o.effects?.length && (
             <div className={o.danger ? 'effects' : 'effects info'}>
               {o.effects.map((x, i) => (
-                <div key={i} className="effect">
+                <div key={i} className={x.tone ? `effect ${x.tone}` : 'effect'}>
                   <div className="t">{x.title}</div>
                   {x.details?.map((d, j) => (
                     <div key={j} className="d">

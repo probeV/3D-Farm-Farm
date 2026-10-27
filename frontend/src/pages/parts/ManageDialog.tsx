@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { deletePart, useRefreshProducts, type Part } from '../../api/products'
 import Dialog from '../../components/Dialog'
+import ManageColumn from '../../components/ManageColumn'
 import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { unitWon } from '../../format'
@@ -62,13 +63,20 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
     <>
       <Dialog size="wide" fixed title="부자재 관리" onClose={onClose}>
         <div className="manage parts-manage">
-          <div className="list">
-            {item('', '전체')}
-            {shops.map((s) => item(`s:${s}`, s))}
-            {hasNoShop && item('none', '구매처 없음')}
-          </div>
-          <div className="manage-right">
-            <h4>{selName ? `${selName} 의 부자재` : '전체 부자재'}</h4>
+          <ManageColumn title="구매처" count={shops.length}>
+            <div className="list">
+              {item('', '전체')}
+              {shops.map((s) => item(`s:${s}`, s))}
+              {hasNoShop && item('none', '구매처 없음')}
+            </div>
+          </ManageColumn>
+          <ManageColumn
+            className="manage-right"
+            title={selName ? `${selName} 의 부자재` : '전체 부자재'}
+            count={list.length}
+            addLabel="+ 부자재 추가"
+            onAdd={() => setSub({ part: null })}
+          >
             {list.length ? (
               list.map((p) => (
                 <div key={p.id} className="row-item">
@@ -111,15 +119,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
             ) : (
               <p className="hint">등록된 부자재가 없어요.</p>
             )}
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ part: null })}
-            >
-              + 부자재 추가
-            </button>
-          </div>
+          </ManageColumn>
         </div>
       </Dialog>
 

@@ -206,11 +206,11 @@ class ColorApiTests(ApiTestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['spool_price'], 15000)
 
-    def test_delete_with_spools_is_conflict(self):
+    def test_delete_with_spools_deletes_spools(self):
         Spool.objects.create(color=self.color)
-        res = self.client.delete(f'{API}/colors/{self.color.pk}/')
-        self.assertEqual(res.status_code, 409)
-        self.assertEqual(res.data['detail'], '스풀이 있어서 삭제할 수 없습니다.')
+        Spool.objects.create(color=self.color, status=Spool.Status.EMPTY)
+        self.assertEqual(self.client.delete(f'{API}/colors/{self.color.pk}/').status_code, 204)
+        self.assertFalse(Spool.objects.filter(color_id=self.color.pk).exists())
 
 
 class PurchaseApiTests(ApiTestCase):
