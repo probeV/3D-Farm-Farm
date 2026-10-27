@@ -2,7 +2,7 @@ import type { Color } from '../../../api/filaments'
 import type { Category, Product } from '../../../api/products'
 import SortTh from '../../../components/SortTh'
 import Swatch from '../../../components/Swatch'
-import { minutesText, pct, won } from '../../../format'
+import { gramsText, minutesText, pct, won } from '../../../format'
 import { findSubcategory } from '../categories'
 import { marginClass, type Catalog } from '../cost'
 import StatusBadge from '../StatusBadge'
@@ -31,7 +31,7 @@ function Filaments({ product, catalog }: { product: Product; catalog: Catalog })
   const title = product.filaments
     .map((r) => {
       const color = r.color == null ? undefined : catalog.colors.get(r.color)
-      return `${catalog.filaments.get(r.filament)?.display_name ?? ''}${color ? ` · ${color.name}` : ''} ${r.grams}g`
+      return `${catalog.filaments.get(r.filament)?.display_name ?? ''}${color ? ` · ${color.name}` : ''} ${gramsText(r.grams)}g`
     })
     .join('\n')
   return (
@@ -109,7 +109,7 @@ export default function ProductTable({ rows, categories, catalog, sort, onSort, 
               <Swatches colors={colors} />
             </td>
             <Filaments product={p} catalog={catalog} />
-            <td className="num">{c.grams ? `${c.grams.toLocaleString('ko-KR')}g` : '-'}</td>
+            <td className="num">{c.grams ? `${gramsText(c.grams)}g` : '-'}</td>
             <td className="num">{minutesText(p.print_minutes)}</td>
             <td className="num">{won(c.cost)}</td>
             <td className="num">{won(p.sale_price)}</td>

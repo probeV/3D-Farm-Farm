@@ -2,6 +2,7 @@
 // 서버는 원가를 계산하지 않는다 (docs/api.md "화면에서 계산하는 값")
 import type { Color, Filament } from '../../api/filaments'
 import type { CostSetting, Part } from '../../api/products'
+import { minutesText, won } from '../../format'
 
 // 계산에 필요한 목록을 id 로 찾을 수 있게 모아 둔 것
 export interface Catalog {
@@ -128,6 +129,22 @@ export function calcCost(p: CostInput, catalog: Catalog): Cost {
     margin: net == null ? null : net / sale,
     recommended,
     warnings: [...warnings],
+  }
+}
+
+// 원가 내역 (?) 에 보여 줄 계산식: 위 calcCost 와 같은 식을 그 제품 값으로 (TBD-19).
+// 필라멘트비 · 부자재비는 재료 표에 줄마다 금액이 있어 따로 두지 않는다
+export function costFormulas(p: CostInput, c: Cost, S: CostSetting) {
+  const sale = won(p.sale_price)
+  const feePct = `${(c.feeRate * 100).toFixed(2)}%`
+  const shipping = S.shipping_cost > 0
+  return {
+    electricity: `${p.print_minutes ? minutesText(p.print_minutes) : '0분'} × ${S.power_kw}kW × ${S.elec_rate}원/kWh = ${won(c.electricity)}`,
+    cost: `필라멘트비 + 전기료 + 부자재비\n= ${won(c.filament)} + ${won(c.electricity)} + ${won(c.parts)}`,
+    fee: `판매가 × (주문관리 ${S.fee_order}% + 판매 ${S.fee_sales}%)\n= ${sale} × ${feePct}`,
+    net: `판매가 − 원가 − 수수료${shipping ? ' − 배송비' : ''}\n= ${sale} − ${won(c.cost)} − ${won(c.fee)}${shipping ? ` − ${won(S.shipping_cost)}` : ''}`,
+    margin: `순이익 ÷ 판매가\n= ${won(c.net)} ÷ ${sale}`,
+    recommended: `(원가 + 배송비) ÷ (1 − 수수료율 − 목표 마진율), 100원 단위 올림\n= (${won(c.cost)} + ${won(S.shipping_cost)}) ÷ (1 − ${feePct} − ${S.target_margin}%)`,
   }
 }
 

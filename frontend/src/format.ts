@@ -7,6 +7,9 @@ export const won = (n: number | null | undefined) => (n == null ? '-' : Math.rou
 export const unitWon = (n: number | null | undefined) =>
   n == null ? '-' : (n < 10 ? Math.round(n * 10) / 10 : Math.round(n)).toLocaleString('ko-KR') + '원'
 
+// 사용량 g: 소수 둘째 자리까지 (24.37 → "24.37", 180.57000001 → "180.57", 1200 → "1,200")
+export const gramsText = (n: number) => (Math.round(n * 100) / 100).toLocaleString('ko-KR')
+
 // 소수 첫째 자리까지: 2.25 → "2.3", 12 → "12"
 export const kgText = (n: number) => (Math.round(n * 10) / 10).toLocaleString('ko-KR')
 

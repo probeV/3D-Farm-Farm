@@ -1,7 +1,7 @@
 import type { Filament } from '../../../api/filaments'
 import type { Part } from '../../../api/products'
 import Swatch from '../../../components/Swatch'
-import { won } from '../../../format'
+import { gramsText, won } from '../../../format'
 import { filamentAmount, filamentUnitText, partAmount, partUnitText, type Catalog } from '../cost'
 import { newFilamentLine, newKey, previewOf, type FilamentLine, type PartLine, type Values } from './draft'
 
@@ -11,6 +11,7 @@ interface Props {
   catalog: Catalog
   filaments: Filament[]
   parts: Part[]
+  onPickFrom: () => void // `+ 다른 제품에서`: 고르는 창은 제품 창이 연다 (form 안에 form 이 들어가지 않도록)
   filamentTotal: number
   partTotal: number
   onFilaments: (rows: FilamentLine[]) => void
@@ -23,8 +24,10 @@ const lineError = (errors: Record<string, string>, kind: string, i: number) =>
 
 // 사용 필라멘트 · 부자재 표 (docs/screens.md 2.5): 한 항목 = 한 줄, 끝에 그 줄 금액 (단가는 금액에 마우스를 올리면)
 export default function MaterialLines(props: Props) {
-  const { values, errors, catalog, filaments, parts, filamentTotal, partTotal, onFilaments, onParts } = props
+  const { values, errors, catalog, filaments, parts, filamentTotal, partTotal, onFilaments, onParts, onPickFrom } =
+    props
   const preview = previewOf(values)
+  const gramsSum = preview.filaments.reduce((sum, r) => sum + r.grams, 0)
 
   const setFilament = (i: number, patch: Partial<FilamentLine>) =>
     onFilaments(values.filaments.map((r, j) => (j === i ? { ...r, ...patch } : r)))
@@ -111,9 +114,14 @@ export default function MaterialLines(props: Props) {
                 </div>
               )
             })}
+            {/* 합계 줄: 왼쪽에 줄 수 · 사용량, 오른쪽에 금액 (TBD-21) */}
             <div className="mat-total">
-              <span>합계</span>
-              <b>{won(filamentTotal)}</b>
+              <span className="cnt">
+                필라멘트 <b>{values.filaments.length}개</b> · <b>{gramsText(gramsSum)}g</b>
+              </span>
+              <span>
+                합계 <b>{won(filamentTotal)}</b>
+              </span>
             </div>
           </div>
         ) : (
@@ -130,15 +138,26 @@ export default function MaterialLines(props: Props) {
           <h4>
             사용 부자재<small>1개 기준</small>
           </h4>
-          <button
-            type="button"
-            className="btn small"
-            disabled={!parts.length}
-            title={parts.length ? undefined : '등록된 부자재가 없어요'}
-            onClick={() => onParts([...values.parts, { key: newKey(), part: String(parts[0].id), qty: '1' }])}
-          >
-            + 추가
-          </button>
+          <div className="head-btns">
+            <button
+              type="button"
+              className="btn small"
+              disabled={!parts.length}
+              title="다른 제품의 부자재 항목을 넣어요 (수량은 직접)"
+              onClick={onPickFrom}
+            >
+              + 다른 제품에서
+            </button>
+            <button
+              type="button"
+              className="btn small"
+              disabled={!parts.length}
+              title={parts.length ? undefined : '등록된 부자재가 없어요'}
+              onClick={() => onParts([...values.parts, { key: newKey(), part: String(parts[0].id), qty: '1' }])}
+            >
+              + 추가
+            </button>
+          </div>
         </div>
         {values.parts.length ? (
           <div className="mat parts">
@@ -154,7 +173,7 @@ export default function MaterialLines(props: Props) {
               const error = lineError(errors, 'parts', i)
               return (
                 <div key={r.key}>
-                  <div className={amount == null ? 'mat-row missing' : 'mat-row'}>
+                  <div className={amount == null || !Number(r.qty) ? 'mat-row missing' : 'mat-row'}>
                     <select value={r.part} onChange={(e) => setPart(i, { part: e.target.value })}>
                       {parts.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -188,8 +207,12 @@ export default function MaterialLines(props: Props) {
               )
             })}
             <div className="mat-total">
-              <span>합계</span>
-              <b>{won(partTotal)}</b>
+              <span className="cnt">
+                부자재 <b>{values.parts.length}개</b>
+              </span>
+              <span>
+                합계 <b>{won(partTotal)}</b>
+              </span>
             </div>
           </div>
         ) : (

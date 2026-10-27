@@ -90,7 +90,7 @@ erDiagram
         bigint product_id FK
         bigint filament_id FK
         bigint color_id FK "NULL=색상 선택 안 함"
-        decimal grams "사용량(g)"
+        decimal grams "사용량(g) 소수 2자리"
     }
     PRODUCT_PART {
         bigint id PK

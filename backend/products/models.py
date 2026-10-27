@@ -177,7 +177,7 @@ class ProductFilament(models.Model):
         verbose_name='색상',
     )
     grams = models.DecimalField(
-        '사용량(g)', max_digits=7, decimal_places=1, default=0, validators=[MinValueValidator(0)]
+        '사용량(g)', max_digits=8, decimal_places=2, default=0, validators=[MinValueValidator(0)]
     )
 
     class Meta:

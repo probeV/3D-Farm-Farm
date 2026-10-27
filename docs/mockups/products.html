@@ -86,10 +86,12 @@ button.sum-card { cursor: pointer; transition: border-color .1s; }
 button.sum-card:hover { border-color: var(--accent); }
 button.sum-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 /* 설명 문구는 (?) 에 마우스를 올리면 위로 (아래 숫자를 가리지 않게) */
-.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; }
+.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; top: -1px; }
 .help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: 0; }
 .help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 240px; padding: 6px 10px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; }
 .help:hover::after, .help:focus::after { opacity: 1; }
+/* 숨어 있는 말풍선도 스크롤 영역을 넓히므로, 보일 때만 그린다 */
+.help:not(:hover):not(:focus)::after { display: none; }
 .sum-card.warn strong { color: var(--warn); }
 
 /* 도구 모음 */
@@ -130,7 +132,10 @@ dialog.narrow { width: min(380px, calc(100vw - 32px)); }
 dialog.wide { width: min(760px, calc(100vw - 32px)); }
 dialog.xwide { width: min(1000px, calc(100vw - 32px)); }
 .dlg-head { padding: 14px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; }
-.dlg-body { padding: 16px 20px; overflow-y: auto; max-height: calc(100vh - 150px); }
+.dlg-body { padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+/* 머리 · 아래는 그대로 두고 본문만 스크롤 (common.html TBD-01) */
+dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
+.hero, .dlg-head, .dlg-foot { flex: none; }
 .dlg-foot { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
 .dlg-foot .spacer { flex: 1; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
@@ -229,11 +234,46 @@ dialog.xwide { width: min(1000px, calc(100vw - 32px)); }
 .cost-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--border); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .cost-total strong { font-size: 18px; }
 .cost-gap { height: 10px; }
-.margin-row { display: flex; justify-content: flex-end; font-size: 13px; }
 .rec { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--surface); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .rec b { font-size: 15px; font-variant-numeric: tabular-nums; }
 .warn-list { margin: 8px 0 0; padding: 10px 12px 10px 30px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 12.5px; }
 .warn-list li + li { margin-top: 2px; }
+
+/* ---------- v1.1.0 */
+/* TBD-11: 상태별 개수 줄 끝에 주황 `입력 필요 N` (누르면 그 제품만) */
+.stats .need { border: 0; background: none; padding: 2px 8px; margin-left: -4px; border-radius: 99px; color: var(--warn); font: inherit; font-weight: 600; cursor: pointer; }
+.stats .need b { color: var(--warn); }
+.stats .need:hover { background: var(--warn-soft); }
+.stats .need.active { background: var(--warn); color: #fff; }
+.stats .need.active b { color: #fff; }
+.stats .need.zero { color: var(--muted); cursor: default; }
+.stats .need.zero b { color: var(--muted); }
+.sum-cards.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* TBD-19: 원가 내역 줄 이름 옆 (?) — 그 제품 값으로 계산식. 여러 줄이라 줄바꿈 유지, 패널 안쪽으로 펼침 */
+.cost-panel .help { position: static; }
+.cost-line, .cost-total, .rec { position: relative; }
+.cost-panel .help::after { left: -4px; right: -4px; bottom: calc(100% + 4px); transform: none; width: auto; max-width: none; white-space: pre-line; font-variant-numeric: tabular-nums; text-align: left; }
+.cost-line .label, .cost-total .label { display: inline-flex; align-items: center; }
+
+/* TBD-21: 재료 표 아래 합계 줄 — 구분선 · 옅은 배경 · 굵은 금액, 왼쪽에 개수 */
+.lines-head .head-right { display: flex; align-items: center; gap: 8px; }
+.mat-total.strong { justify-content: space-between; align-items: baseline; margin: 4px 0 0; padding: 8px 40px 8px 10px; border-top: 1px solid var(--border); background: var(--surface-2); border-radius: 0 0 8px 8px; color: var(--text); font-size: 14px; }
+.mat-total.strong b { font-size: 15px; font-weight: 800; }
+.mat-total.strong .cnt { color: var(--muted); font-size: 13px; }
+.mat-total.strong .cnt b { color: var(--text); font-size: 13px; font-weight: 700; }
+
+/* TBD-22: 다른 제품에서 부자재 가져오기 */
+.pick-prod { display: grid; grid-template-columns: 220px 1fr; gap: 14px; min-height: 280px; }
+.pick-prod .plist { display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
+.pick-prod .plist button { display: flex; justify-content: space-between; gap: 8px; border: 1px solid transparent; background: none; text-align: left; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.pick-prod .plist button:hover { background: var(--surface-2); }
+.pick-prod .plist button.active { border-color: var(--accent); background: var(--accent-soft); }
+.pick-prod .plist small { color: var(--muted); }
+.pick-prod .preview { border-left: 1px solid var(--border); padding-left: 14px; }
+.pick-prod .preview h4 { margin: 0 0 8px; font-size: 14px; }
+.pick-prod .prow { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.pick-prod .prow .skip { font-size: 12px; }
 
 /* 알림 */
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 600; z-index: 100; }
@@ -273,6 +313,7 @@ dialog.xwide { width: min(1000px, calc(100vw - 32px)); }
 </div>
 <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <dialog id="dlg2"><form method="dialog" id="dlg2-form"></form></dialog>
+<dialog id="dlg3"><form method="dialog" id="dlg3-form"></form></dialog>
 <div id="toast" class="toast" hidden></div>
 
 <script>
@@ -319,7 +360,7 @@ const db = {
   // fils: [필라멘트 id, g, 색상 id(null = 선택 안 함)], parts: [부자재 id, 수량]
   products: [
     { id: 1, code: "001", category: 1, sub: 1, name: "분수 원판 세트", status: "on_sale", minutes: 200, sale: 18900, note: "자석은 원판 뒷면에 2개씩",
-      fils: [[1, 24, 101], [1, 24, 102], [1, 24, 103], [1, 24, 104], [1, 24, 105], [4, 60, 7]], parts: [[1, 12], [3, 1], [7, 1]] },
+      fils: [[1, 24.37, 101], [1, 24.2, 102], [1, 24, 103], [1, 24, 104], [1, 24, 105], [4, 60, 7]], parts: [[1, 12], [3, 1], [7, 1]] },
     { id: 2, code: "002", category: 1, sub: 1, name: "정다면체 전개도 모형", status: "on_sale", minutes: 250, sale: 24000, note: "",
       fils: [[6, 105, 10], [6, 105, 11]], parts: [[1, 20], [4, 1], [7, 1]] },
     { id: 3, code: "003", category: 2, sub: 3, name: "소마 큐브", status: "on_sale", minutes: 165, sale: 12900, note: "",
@@ -380,6 +421,8 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const won = (n) => (n == null ? "-" : Math.round(n).toLocaleString("ko-KR") + "원");
 const pct = (r) => (r == null ? "-" : (Math.round(r * 1000) / 10).toLocaleString("ko-KR") + "%");
 const marginCls = (r) => (r == null ? "muted" : r < 0 ? "m-bad" : r < 0.2 ? "m-warn" : "m-good");
+// 사용량 g: 소수 2자리까지 (TBD-24)
+const gTxt = (g) => Number(g).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
 const hm = (min) => (!min ? "-" : min < 60 ? `${min}분` : `${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ""}`);
 const help = (tip) => `<span class="help" tabindex="0" data-tip="${esc(tip)}">?</span>`;
 const statusBadge = (s) => `<span class="badge ${STATUS[s][1]}">${STATUS[s][0]}</span>`;
@@ -452,15 +495,14 @@ function render() {
       <div class="stats">
         <span>판매중<b>${byStatus("on_sale")}</b></span><span>개발중<b>${byStatus("developing")}</b></span>
         <span class="${byStatus("discontinued") ? "bad" : ""}">판매중지<b>${byStatus("discontinued")}</b></span>
+        <button type="button" class="need ${need ? "" : "zero"} ${state.needOnly ? "active" : ""}" data-act="need-only" title="${state.needOnly ? "입력 필요 제품만 보는 중 · 다시 누르면 해제" : "누르면 입력이 덜 된 제품만 보기"}">입력 필요<b>${need}</b></button>
       </div>
       <div class="spacer"></div>
       <button type="button" class="btn" data-act="manage">제품 관리</button>
     </div>
-    <div class="sum-cards">
+    <div class="sum-cards two">
       <div class="sum-card"><span>등록 제품</span><strong>${all.length}<small>개</small></strong></div>
       <div class="sum-card"><span>평균 순마진율${help(`판매중이고 입력이 끝난 제품 ${onSale.length}개 기준 · 수수료 반영`)}</span><strong class="${marginCls(avg)}">${pct(avg)}</strong></div>
-      <button type="button" class="sum-card ${need ? "warn" : ""} ${state.needOnly ? "active" : ""}" data-act="need-only">
-        <span>입력 필요${help(state.needOnly ? "입력 필요 제품만 보는 중 · 다시 누르면 해제" : "누르면 입력이 덜 된 제품만 보기")}</span><strong>${need}<small>개</small></strong></button>
     </div>
     <div class="section-head list-toolbar"><h3>제품 목록</h3><span class="hint">${rows.length}개</span><div class="spacer"></div>
       <input type="search" id="q" placeholder="제품명·번호·색상 검색" value="${esc(state.q)}">
@@ -488,8 +530,8 @@ function row({ p, c }) {
     <td>${p.category == null ? '<span class="muted">미분류</span>' : esc(catName(p.category))}${p.sub ? `<span class="sub-name"> › ${esc(subName(p.sub))}</span>` : ""}</td>
     <td><span class="pname">${esc(p.name)}</span>${p.status === "on_sale" ? "" : statusBadge(p.status)}</td>
     <td>${swatches(p)}</td>
-    <td class="fils" title="${esc(p.fils.map(([id, g, cid]) => `${byId(db.filaments, id).name}${colorOf(byId(db.filaments, id), cid) ? ` · ${colorOf(byId(db.filaments, id), cid).name}` : ""} ${g}g`).join("\n"))}">${esc(first)}${filIds.length > 1 ? `<small>+${filIds.length - 1}</small>` : ""}</td>
-    <td class="num">${c.grams ? c.grams.toLocaleString("ko-KR") + "g" : "-"}</td>
+    <td class="fils" title="${esc(p.fils.map(([id, g, cid]) => `${byId(db.filaments, id).name}${colorOf(byId(db.filaments, id), cid) ? ` · ${colorOf(byId(db.filaments, id), cid).name}` : ""} ${gTxt(g)}g`).join("\n"))}">${esc(first)}${filIds.length > 1 ? `<small>+${filIds.length - 1}</small>` : ""}</td>
+    <td class="num">${c.grams ? gTxt(c.grams) + "g" : "-"}</td>
     <td class="num">${hm(p.minutes)}</td>
     <td class="num">${won(c.cost)}</td>
     <td class="num">${won(p.sale)}</td>
@@ -679,18 +721,18 @@ function openProduct(p, dl = dlg, preset = {}) {
       return `<div class="mat-row ${filAmt(r) == null ? "missing" : ""}" data-kind="fils" data-i="${i}">
         <select data-k="id">${opt(db.filaments, r[0], (x) => x.name)}</select>
         <div class="color-pick">${col ? swatch(col.hex) : '<span class="swatch none"></span>'}<select data-k="c"><option value="">색상 선택 안 함</option>${opt(f.colors, col?.id, (x) => x.name)}</select></div>
-        <div class="with-suffix"><input type="number" data-k="v" min="0" step="1" value="${r[1] || ""}" placeholder="0"><em>g</em></div>
+        <div class="with-suffix"><input type="number" data-k="v" min="0" step="0.01" value="${r[1] || ""}" placeholder="0" title="소수 2자리까지 (예: 24.37)"><em>g</em></div>
         <span class="amt" data-amt="fils:${i}" title="${esc(filUnit(r))}"></span>
         <button type="button" class="icon-btn" data-remove title="빼기">✕</button></div>`; }).join("")}
-    <div class="mat-total"><span>합계</span><b data-total="fils"></b></div></div>` : '<div class="none">사용하는 필라멘트가 없어요</div>';
+    <div class="mat-total strong"><span class="cnt" data-count="fils"></span><span>합계 <b data-total="fils"></b></span></div></div>` : '<div class="none">사용하는 필라멘트가 없어요</div>';
   const partLines = () => d.parts.length ? `<div class="mat parts"><div class="mat-head"><span>부자재</span><span>수량</span><span class="r">금액</span><span></span></div>
     ${d.parts.map((r, i) => { const x = byId(db.parts, r[0]);
-      return `<div class="mat-row ${x.price == null ? "missing" : ""}" data-kind="parts" data-i="${i}">
+      return `<div class="mat-row ${x.price == null || !r[1] ? "missing" : ""}" data-kind="parts" data-i="${i}">
         <select data-k="id">${opt(db.parts, r[0], (y) => y.name)}</select>
         <div class="with-suffix"><input type="number" data-k="v" min="0" step="1" value="${r[1] || ""}" placeholder="0"><em>${esc(x.unit)}</em></div>
         <span class="amt" data-amt="parts:${i}" title="${esc(partUnit(r))}"></span>
         <button type="button" class="icon-btn" data-remove title="빼기">✕</button></div>`; }).join("")}
-    <div class="mat-total"><span>합계</span><b data-total="parts"></b></div></div>` : '<div class="none">사용하는 부자재가 없어요</div>';
+    <div class="mat-total strong"><span class="cnt" data-count="parts"></span><span>합계 <b data-total="parts"></b></span></div></div>` : '<div class="none">사용하는 부자재가 없어요</div>';
 
   show(dl, `<div class="hero">
       <div class="hero-top"><label class="code-wrap">No.<input class="ghost" name="code" value="${esc(d.code)}"></label>
@@ -703,9 +745,9 @@ function openProduct(p, dl = dlg, preset = {}) {
     </div>
     <div class="dlg-body"><div class="product-form">
       <div>
-        <div class="lines"><div class="lines-head"><h4>사용 필라멘트<small>1개 기준</small></h4><button type="button" class="btn small" data-add="fils">+ 추가</button></div>
+        <div class="lines"><div class="lines-head"><h4>사용 필라멘트<small>1개 기준</small></h4><div class="head-right"><button type="button" class="btn small" data-add="fils">+ 추가</button></div></div>
           <div id="fils">${filLines()}</div></div>
-        <div class="lines"><div class="lines-head"><h4>사용 부자재<small>1개 기준</small></h4><button type="button" class="btn small" data-add="parts">+ 추가</button></div>
+        <div class="lines"><div class="lines-head"><h4>사용 부자재<small>1개 기준</small></h4><div class="head-right"><button type="button" class="btn small" data-from-product>+ 다른 제품에서</button><button type="button" class="btn small" data-add="parts">+ 추가</button></div></div>
           <div id="parts">${partLines()}</div></div>
         <label class="field full" style="margin-top:18px"><span>메모</span><textarea name="note" rows="2">${esc(d.note)}</textarea></label>
       </div>
@@ -738,20 +780,28 @@ function openProduct(p, dl = dlg, preset = {}) {
   };
   const panel = () => {
     const c = calc(d), S = settings;
-    const line = (label, val, sub = "") => `<div class="cost-line"><span>${label}${sub ? ` <small>${sub}</small>` : ""}</span><span>${won(val)}</span></div>`;
+    const line = (label, val, sub = "", tip = "") => `<div class="cost-line"><span class="label">${label}${tip ? help(tip) : ""}${sub ? `&nbsp;<small>${sub}</small>` : ""}</span><span>${won(val)}</span></div>`;
+    // 계산식 (PRD 3.6 원가 계산 규칙과 같게) — 그 제품 값으로. 필라멘트비 · 부자재비는 왼쪽 재료 표에 줄마다 금액이 있어 생략
+    const feePct = (c.feeRate * 100).toFixed(2);
+    const tipElec = `${hm(d.minutes) === "-" ? "0분" : hm(d.minutes)} × ${S.power_kw}kW × ${S.elec_rate}원/kWh = ${won(c.elec)}`;
+    const tipCost = `필라멘트비 + 전기료 + 부자재비\n= ${won(c.fil)} + ${won(c.elec)} + ${won(c.parts)}`;
+    const tipFee = `판매가 × (주문관리 ${S.fee_order}% + 판매 ${S.fee_sales}%)\n= ${won(d.sale)} × ${feePct}%`;
+    const tipNet = `판매가 − 원가 − 수수료${S.shipping_cost ? " − 배송비" : ""}\n= ${won(d.sale)} − ${won(c.cost)} − ${won(c.fee)}${S.shipping_cost ? ` − ${won(S.shipping_cost)}` : ""}`;
+    const tipMargin = `순이익 ÷ 판매가\n= ${won(c.net)} ÷ ${won(d.sale)}`;
+    const tipRec = `(원가 + 배송비) ÷ (1 − 수수료율 − 목표 마진율), 100원 단위 올림\n= (${won(c.cost)} + ${won(S.shipping_cost)}) ÷ (1 − ${feePct}% − ${S.target_margin}%)`;
     $("#cost-lines", form).innerHTML = `
       <h4>원가 내역 <small>제품 1개 · 저장 전 미리보기</small></h4>
-      ${line("필라멘트비", c.fil, c.grams ? `${c.grams.toLocaleString("ko-KR")}g` : "")}
-      ${line("전기료", c.elec, d.minutes ? hm(d.minutes) : "")}
+      ${line("필라멘트비", c.fil, c.grams ? `${gTxt(c.grams)}g` : "")}
+      ${line("전기료", c.elec, d.minutes ? hm(d.minutes) : "", tipElec)}
       ${line("부자재비", c.parts)}
-      <div class="cost-total"><span>원가</span><strong>${won(c.cost)}</strong></div>
+      <div class="cost-total"><span class="label">원가${help(tipCost)}</span><strong>${won(c.cost)}</strong></div>
       <div class="cost-gap"></div>
       ${line("판매가", d.sale)}
-      <div class="cost-line"><span>수수료 <small>${(c.feeRate * 100).toFixed(2)}%</small></span><span>${d.sale ? "−" + won(c.fee) : "-"}</span></div>
+      <div class="cost-line"><span class="label">수수료${d.sale ? help(tipFee) : ""}&nbsp;<small>${feePct}%</small></span><span>${d.sale ? "−" + won(c.fee) : "-"}</span></div>
       ${S.shipping_cost ? `<div class="cost-line"><span>배송비 <small>판매자 부담</small></span><span>−${won(S.shipping_cost)}</span></div>` : ""}
-      <div class="cost-total"><span>순이익</span><strong class="${d.sale ? marginCls(c.margin) : ""}">${won(c.net)}</strong></div>
-      <div class="margin-row"><span class="muted">순마진율&nbsp;</span><b class="${marginCls(c.margin)}">${pct(c.margin)}</b></div>
-      <div class="rec"><div><div class="muted" style="font-size:12px">권장 판매가 · 목표 마진 ${S.target_margin}%</div><b>${won(c.rec)}</b></div>
+      <div class="cost-total"><span class="label">순이익${d.sale ? help(tipNet) : ""}</span><strong class="${d.sale ? marginCls(c.margin) : ""}">${won(c.net)}</strong></div>
+      <div class="cost-line"><span class="label">순마진율${d.sale ? help(tipMargin) : ""}</span><b class="${marginCls(c.margin)}">${pct(c.margin)}</b></div>
+      <div class="rec"><div><div class="muted" style="font-size:12px">권장 판매가${c.rec ? help(tipRec) : ""} · 목표 마진 ${S.target_margin}%</div><b>${won(c.rec)}</b></div>
         ${c.rec && c.rec !== d.sale ? '<button type="button" class="btn small" data-use-rec>판매가로</button>' : ""}</div>
       ${c.warn.length ? `<ul class="warn-list">${c.warn.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}`;
     form.querySelectorAll("[data-amt]").forEach((el) => {
@@ -759,6 +809,10 @@ function openProduct(p, dl = dlg, preset = {}) {
       el.textContent = a == null ? "가격 없음" : won(a);
     });
     form.querySelectorAll("[data-total]").forEach((el) => (el.textContent = won(el.dataset.total === "fils" ? c.fil : c.parts)));
+    // 합계 줄 왼쪽: 필라멘트 줄 수 · 사용량 합계 / 부자재 종류 수
+    const cnt = (k) => form.querySelector(`[data-count="${k}"]`);
+    if (cnt("fils")) cnt("fils").innerHTML = `필라멘트 <b>${d.fils.length}개</b> · <b>${gTxt(c.grams)}g</b>`;
+    if (cnt("parts")) cnt("parts").innerHTML = `부자재 <b>${d.parts.length}개</b>`;
   };
   const redrawLines = () => { $("#fils", form).innerHTML = filLines(); $("#parts", form).innerHTML = partLines(); panel(); };
 
@@ -786,6 +840,8 @@ function openProduct(p, dl = dlg, preset = {}) {
       [...form.querySelectorAll(`[data-kind="${add.dataset.add}"]`)].at(-1)?.querySelector("input")?.focus();
       return;
     }
+    // 넣은 뒤 첫 새 줄의 수량 칸으로
+    if (t.closest("[data-from-product]")) { read(); return openPartsFrom(d, p || src, (from) => { redrawLines(); form.querySelectorAll('[data-kind="parts"]')[from]?.querySelector("input")?.focus(); }); }
     const rm = t.closest("[data-remove]");
     if (rm) { read(); const r = rm.closest("[data-kind]"); d[r.dataset.kind].splice(Number(r.dataset.i), 1); return redrawLines(); }
     if (t.closest("[data-use-rec]")) { form.elements.sale.value = calc(d).rec; read(); return panel(); }
@@ -801,6 +857,37 @@ function openProduct(p, dl = dlg, preset = {}) {
     if (p) Object.assign(p, d); else db.products.push({ ...d, id: Math.max(...db.products.map((x) => x.id)) + 1 });
     dl.el.close(); refresh(); toast("저장했어요");
   };
+}
+
+// ---------------------------------------------------------------- 다른 제품에서 부자재 가져오기 (TBD-22)
+// 고른 제품의 부자재 항목만 넣는다 (수량은 비워 두고 직접 입력). 이미 있는 부자재는 건너뜀. 세트 · 연결은 하지 않음
+const dlg3 = { el: $("#dlg3"), form: $("#dlg3-form") };
+function openPartsFrom(d, self, done) {
+  const dl = dlg.el.open && dlg2.el.open ? dlg3 : dlg.el.open ? dlg2 : dlg;
+  const cands = db.products.filter((x) => x !== self && x.parts.length).sort((a, b) => a.code.localeCompare(b.code));
+  let pick = cands[0];
+  const draw = () => {
+    const has = (id) => d.parts.some(([pid]) => pid === id);
+    const fresh = pick ? pick.parts.filter(([id]) => !has(id)) : [];
+    const rows = pick ? pick.parts.map(([id]) => { const x = byId(db.parts, id);
+      return `<div class="prow ${has(id) ? "muted" : ""}"><span>${esc(x.name)}</span><span>${has(id) ? '<span class="skip">이미 있음 · 건너뜀</span>' : `${esc(x.unit)} 단위`}</span></div>`; }).join("") : "";
+    show(dl, `<div class="dlg-head">다른 제품에서 부자재 가져오기</div><div class="dlg-body"><div class="pick-prod">
+        <div class="plist">${cands.map((x) => `<button type="button" class="${x === pick ? "active" : ""}" data-pick="${x.id}"><span>${esc(x.name)}</span><small>${x.parts.length}종</small></button>`).join("") || '<p class="hint">부자재를 쓰는 다른 제품이 없어요.</p>'}</div>
+        <div class="preview">${pick ? `<h4>${esc(pick.name)} 의 부자재</h4>${rows}<p class="hint" style="margin-top:10px">항목만 넣어요. 수량은 넣은 뒤 직접 입력하세요.</p>` : ""}</div>
+      </div></div>
+      <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>취소</button>
+        <button type="button" class="btn primary" data-take ${fresh.length ? "" : "disabled"}>${!pick ? "넣기" : fresh.length ? `부자재 ${fresh.length}종 넣기` : "모두 이미 있어요"}</button></div>`, "wide");
+    dl.form.onclick = (e) => {
+      if (e.target.closest("[data-close]")) return dl.el.close();
+      const b = e.target.closest("[data-pick]"); if (b) { pick = byId(db.products, b.dataset.pick); return draw(); }
+      if (e.target.closest("[data-take]")) {
+        const from = d.parts.length;
+        fresh.forEach(([id]) => d.parts.push([id, 0]));
+        dl.el.close(); done(from); toast(`부자재 ${fresh.length}종을 넣었어요 · 수량을 입력하세요`);
+      }
+    };
+  };
+  draw();
 }
 
 // ---------------------------------------------------------------- 시작
