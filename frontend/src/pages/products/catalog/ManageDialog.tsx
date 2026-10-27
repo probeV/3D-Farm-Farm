@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { deleteProduct, useRefreshProducts, type Category, type Product } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
+import ManageColumn from '../../../components/ManageColumn'
 import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { pct, won } from '../../../format'
@@ -151,7 +152,12 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
     <>
       <Dialog size="wide" fixed title="제품 관리" onClose={onClose}>
         <div className="manage">
-          <div>
+          <ManageColumn
+            title="카테고리"
+            count={categories.length}
+            addLabel="+ 카테고리 추가"
+            onAdd={() => setSub({ kind: 'category', category: null })}
+          >
             <div className="list">
               {categories.map((c) => [
                 item(`c:${c.id}`, c.name, {
@@ -162,27 +168,16 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
               ])}
               {hasUncategorized && item('none', '미분류')}
             </div>
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ kind: 'category', category: null })}
-            >
-              + 카테고리 추가
-            </button>
-          </div>
-          <div className="manage-right">
-            <h4>{selectionLabel(categories, sel)} 의 제품</h4>
+          </ManageColumn>
+          <ManageColumn
+            className="manage-right"
+            title={`${selectionLabel(categories, sel)} 의 제품`}
+            count={prods.length}
+            addLabel="+ 제품 추가"
+            onAdd={() => setSub({ kind: 'product', product: null })}
+          >
             {right()}
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ kind: 'product', product: null })}
-            >
-              + 제품 추가
-            </button>
-          </div>
+          </ManageColumn>
         </div>
       </Dialog>
 

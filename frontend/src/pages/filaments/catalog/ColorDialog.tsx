@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import {
   createColor,
   deleteColor,
@@ -6,9 +7,10 @@ import {
   type Color,
   type Filament,
 } from '../../../api/filaments'
+import { useProducts, useRefreshProducts } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
-import { useConfirm } from '../../../components/useConfirm'
+import { useConfirm, type ConfirmEffect } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { won } from '../../../format'
 import { useForm } from '../../../useForm'
@@ -21,8 +23,11 @@ interface Props {
 }
 
 // 색상 추가 / 수정 (PRD FIL-04 · FIL-05 · FIL-06, docs/screens.md 1.6)
+// 창 머리는 그 색상의 옅은 그라데이션 띠 (입력 중인 색상 코드를 따라 바뀜)
 export default function ColorDialog({ filament, color, onClose }: Props) {
   const refresh = useRefreshFilaments()
+  const refreshProducts = useRefreshProducts()
+  const products = useProducts().data ?? [] // 삭제 확인 창에 이 색상을 쓰는 제품을 보여 주려고
   const toast = useToast()
 
   const confirm = useConfirm()
@@ -46,30 +51,60 @@ export default function ColorDialog({ filament, color, onClose }: Props) {
       onClose()
     })
 
-  // 스풀이 있으면 서버가 409 → 알림 (PRD FIL-09)
+  // 스풀은 함께 삭제, 제품 줄은 '색상 선택 안 함' 으로 (PRD FIL-09). 함께 바뀌는 것이 있으면 2차 확인, 되돌리기는 없음
   const remove = async () => {
-    if (
-      !color ||
-      !(await confirm({
-        title: '색상 삭제',
-        message: `${filament.display_name} · ${color.name} 색상을 삭제할까요?`,
-        danger: true,
-      }))
-    )
-      return
+    if (!color) return
+    const n = color.counts
+    const spools = n.sealed + n.open + n.empty
+    const using = products.filter((p) => p.filaments.some((r) => r.color === color.id)).map((p) => p.name)
+    const effects: ConfirmEffect[] = []
+    if (spools)
+      effects.push({
+        title: `스풀 ${spools}개도 함께 삭제`,
+        details: [`재고 ${n.sealed} · 사용 중 ${n.open} · 사용 완료 ${n.empty}`, '삭제한 스풀은 되돌릴 수 없어요.'],
+      })
+    if (using.length)
+      effects.push({
+        title: `제품 ${using.length}개의 색상이 비워짐`,
+        details: [
+          using.join(' · '),
+          `'색상 선택 안 함'으로 바뀌고 필라멘트 가격으로 계산돼요.${color.price != null ? ' 색상 가격이 따로 있어서 원가가 바뀌어요.' : ''}`,
+        ],
+        tone: 'warn',
+      })
+    const ok = await confirm({
+      title: '색상 삭제',
+      message: `${filament.display_name} · ${color.name} 색상을 삭제할까요?`,
+      effects,
+      danger: true,
+      twice: effects.length > 0,
+    })
+    if (!ok) return
     try {
       await deleteColor(color.id)
-      await refresh()
-      toast('삭제했어요')
+      await Promise.all([refresh(), using.length && refreshProducts()])
+      toast(spools ? `${color.name} 색상과 스풀 ${spools}개를 삭제했어요` : `${color.name} 색상을 삭제했어요`)
       onClose()
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e))
     }
   }
 
+  const shown = hexOk ?? color?.hex ?? '#CCCCCC'
+  const header = (
+    <div className="color-hero" style={{ '--c': shown } as CSSProperties}>
+      <span className="chip" />
+      <div>
+        <div className="t">{color ? `색상 수정 · ${color.name}` : '색상 추가'}</div>
+        <div className="s">{filament.display_name}</div>
+      </div>
+      <code>{shown}</code>
+    </div>
+  )
+
   return (
     <Dialog
-      title={color ? '색상 수정' : '색상 추가'}
+      header={header}
       onClose={onClose}
       submitLabel="저장"
       onSubmit={save}

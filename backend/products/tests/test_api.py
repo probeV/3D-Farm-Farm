@@ -287,10 +287,15 @@ class FilamentInProductApiTests(ApiTestCase):
         row.refresh_from_db()
         self.assertIsNone(row.color)
 
-    def test_color_with_spools_still_protected(self):
+    def test_color_with_spools_and_products(self):
+        row = ProductFilament.objects.create(
+            product=Product.objects.create(name='소마 큐브'), filament=self.filament, color=self.red, grams=20
+        )
         Spool.objects.create(color=self.red)
-        res = self.client.delete(f'{API}/colors/{self.red.pk}/')
-        self.assertEqual(res.status_code, 409)
+        self.assertEqual(self.client.delete(f'{API}/colors/{self.red.pk}/').status_code, 204)
+        row.refresh_from_db()
+        self.assertIsNone(row.color)
+        self.assertFalse(Spool.objects.exists())
 
 
 class CostSettingApiTests(APITestCase):
