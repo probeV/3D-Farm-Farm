@@ -27,6 +27,8 @@ docs/       PRD · ERD · 화면 명세 · 목업 · 코드 구조 · API
 처음 한 번 아래 "로컬 실행" 준비(가상환경 · `backend/.env` · Node.js)를 마친 뒤에는 저장소 루트의 **`start.bat`** 을 더블클릭하면 돼요.
 - DB 변경 사항 적용(`migrate`) · 프론트 패키지 설치(`npm install`)를 한 뒤, 백엔드 · 프론트 서버를 각각 새 창으로 켜고 브라우저(`http://localhost:5173`)를 열어요.
 - 끌 때는 두 서버 창을 닫거나 각 창에서 `Ctrl+C`.
+- 같은 와이파이(공유기 안)의 폰 · 태블릿에서는 `http://PC내부IP:5173` (예: `http://172.30.1.77:5173`, `ipconfig` 의 IPv4 주소).
+  아이폰 · 아이패드는 `http://PC이름.local:5173` 도 돼요. 공유기 없이 공인 IP 를 바로 받는 PC 라면 `frontend/vite.config.ts` 의 `host: true` 를 끄세요 (인터넷에 그대로 열림).
 
 ## 로컬 실행 (백엔드)
 ```bash
