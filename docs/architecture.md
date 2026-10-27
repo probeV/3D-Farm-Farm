@@ -98,7 +98,8 @@ frontend/src/
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
   useForm.ts    폼 공통 흐름 훅: 입력 → 스키마 검사 → 저장 → 서버 오류 표시
   App.tsx       레이아웃(사이드바) + 화면 전환
-  main.tsx      시작점: TanStack Query, 테마(시스템 설정 따름)
+  main.tsx      시작점: TanStack Query, 테마 적용
+  theme.ts      테마: 시스템 / 라이트 / 다크 고르기, 고른 값은 브라우저에 기억
 ```
 ### 화면 폴더 안 (`pages/<화면>/`)
 파일이 많아지면 **기능별 폴더**로 나눈다 (계층별 `components/` 폴더 하나로 모으지 않는다). 기능 폴더 이름은 PRD · 화면 명세의 묶음을 따른다.

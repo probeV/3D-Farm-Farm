@@ -167,7 +167,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `ProductFilament.filament` → `Filament` | PROTECT | 제품에서 쓰면 필라멘트 삭제 불가 |
 | `ProductPart.part` → `Part` | PROTECT | 제품에서 쓰면 부자재 삭제 불가 |
 | `Part.category` → `PartCategory` | SET_NULL | 카테고리를 지우면 그 부자재는 미분류 (원가는 그대로). 부자재가 있으면 화면에서 2차 확인 |
-| `ProductFilament.color` → `Color` | SET_NULL | 색상을 지우면 그 줄은 색상 선택 안 함 (필라멘트 가격으로 계산). 지우기 전에 쓰는 제품을 알려 주고 확인 ([TBD-04](plans/v1.1.0.md)) |
+| `ProductFilament.color` → `Color` | SET_NULL | 색상을 지우면 그 줄은 색상 선택 안 함 (필라멘트 가격으로 계산). 지우기 전에 쓰는 제품을 알려 주고 확인 (PRD FIL-09) |
 | `Product.category` → `Category` | PROTECT | 제품이 있으면 카테고리 삭제 불가 |
 | `Product.subcategory` → `Subcategory` | PROTECT | 제품이 있으면 세부 분류 삭제 불가 |
 | `Subcategory.category` → `Category` | CASCADE | 카테고리 삭제 시 (제품이 없을 때만 가능) 세부 분류도 함께 삭제 |
