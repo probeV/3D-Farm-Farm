@@ -1,5 +1,6 @@
 import {
   createRecurring,
+  deleteRecurring,
   updateRecurring,
   useRefreshExpenses,
   type ExpenseCategory,
@@ -7,6 +8,7 @@ import {
 } from '../../api/expenses'
 import Dialog from '../../components/Dialog'
 import Field from '../../components/Field'
+import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { today } from '../../format'
 import { useForm } from '../../useForm'
@@ -22,6 +24,7 @@ interface Props {
 export default function RecurringFormDialog({ recurring: r, onClose }: Props) {
   const refresh = useRefreshExpenses()
   const toast = useToast()
+  const confirm = useConfirm()
   const { values, errors, busy, change, submit } = useForm(recurringSchema, {
     name: r?.name ?? '',
     category: (r?.category ?? 'sub') as ExpenseCategory | '',
@@ -40,8 +43,43 @@ export default function RecurringFormDialog({ recurring: r, onClose }: Props) {
       onClose()
     })
 
+  // 그만 낼 때는 삭제. 이미 넣은 지출은 남는다 (그것만 지워지는 삭제라 확인 한 번)
+  const remove = async () => {
+    if (!r) return
+    const ok = await confirm({
+      title: '반복 지출 삭제',
+      message: (
+        <>
+          {r.name} 을(를) 삭제할까요?
+          <br />
+          <span className="hint">
+            다음 달부터 알림이 뜨지 않아요.
+            {r.expense_count > 0 && ` 이미 넣은 지출 ${r.expense_count}건은 목록에 그대로 남아요.`}
+          </span>
+        </>
+      ),
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deleteRecurring(r.id)
+      await refresh()
+      toast('삭제했어요')
+      onClose()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   return (
     <Dialog
+      footerLeft={
+        r && (
+          <button type="button" className="btn danger" onClick={remove}>
+            삭제
+          </button>
+        )
+      }
       title={r ? '반복 지출 수정' : '반복 지출 추가'}
       onClose={onClose}
       submitLabel="저장"

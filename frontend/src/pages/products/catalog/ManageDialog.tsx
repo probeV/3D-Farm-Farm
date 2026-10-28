@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { deleteProduct, useRefreshProducts, type Category, type Product } from '../../../api/products'
+import type { Category, Product } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
 import ManageColumn from '../../../components/ManageColumn'
-import { useConfirm } from '../../../components/useConfirm'
-import { useToast } from '../../../components/useToast'
 import { pct, won } from '../../../format'
 import { findSubcategory, inSelection, selectionExists, selectionLabel, type CategorySel } from '../categories'
 import { completeMargin, marginClass } from '../cost'
@@ -12,7 +10,7 @@ import type { ProductRow } from '../list/productList'
 import StatusBadge from '../StatusBadge'
 import { useCostData } from '../useCostData'
 import CategoryDialog from './CategoryDialog'
-import EditButton from '../../../components/EditButton'
+import EditButton, { CopyButton } from '../../../components/EditButton'
 
 // 관리 창 위에 겹쳐 여는 창
 type Sub =
@@ -20,13 +18,11 @@ type Sub =
   | { kind: 'product'; product: Product | null; copyOf?: Product }
 
 // 제품 관리 (PRD-04 · PRD-04a · PRD-11, docs/screens.md 2.4)
-// 왼쪽: 카테고리 › 세부 분류 (+ 미분류) / 오른쪽: 고른 것의 제품. 제품 추가 · 복제 · 삭제는 여기서
+// 왼쪽: 카테고리 › 세부 분류 (+ 미분류) / 오른쪽: 고른 것의 제품 (처음엔 전체). 고른 것을 다시 누르면 전체로
+// 제품 추가 · 복제는 여기서, 삭제는 제품 수정 창에서
 export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const data = useCostData().data
-  const refresh = useRefreshProducts()
-  const toast = useToast()
 
-  const confirm = useConfirm()
   const [picked, setPicked] = useState<CategorySel>('')
   const [sub, setSub] = useState<Sub | null>(null)
   const closeSub = () => setSub(null)
@@ -34,26 +30,14 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
 
   const { rows, categories } = data
   const hasUncategorized = rows.some((r) => r.product.category == null)
-  // 고른 것이 없거나 지워졌으면 첫 카테고리 (없으면 미분류)
-  const fallback: CategorySel = categories.length ? `c:${categories[0].id}` : 'none'
-  const sel = picked !== '' && selectionExists(categories, picked, hasUncategorized) ? picked : fallback
+  // 고른 것이 지워졌으면 전체로
+  const sel: CategorySel = selectionExists(categories, picked, hasUncategorized) ? picked : ''
   const count = (s: CategorySel) => rows.filter((r) => inSelection(r.product, s)).length
   const prods = rows.filter((r) => inSelection(r.product, sel)).sort((a, b) => a.product.no - b.product.no)
 
-  const remove = async (p: Product) => {
-    if (!(await confirm({ title: '제품 삭제', message: `${p.name} 제품을 삭제할까요?`, danger: true }))) return
-    try {
-      await deleteProduct(p.id)
-      await refresh()
-      toast(`${p.name} 삭제했어요`)
-    } catch (e) {
-      toast(e instanceof Error ? e.message : String(e))
-    }
-  }
-
   // `+ 제품 추가`: 지금 고른 카테고리 · 세부 분류를 미리 고른 채로
   const preset = () => {
-    if (sel === 'none') return { category: null, subcategory: null }
+    if (sel === '' || sel === 'none') return { category: null, subcategory: null }
     const id = Number(sel.slice(2))
     if (sel.startsWith('c:')) return { category: id, subcategory: null }
     return { category: findSubcategory(categories, id)?.category ?? null, subcategory: id }
@@ -75,33 +59,32 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <div className="row-btns">
-          <button
-            type="button"
-            className="btn small"
-            onClick={() => setSub({ kind: 'product', product: null, copyOf: p })}
-          >
-            복제
-          </button>
+          <CopyButton onClick={() => setSub({ kind: 'product', product: null, copyOf: p })} />
           <EditButton onClick={() => setSub({ kind: 'product', product: p })} />
-          <button type="button" className="icon-btn" title="제품 삭제" onClick={() => remove(p)}>
-            ✕
-          </button>
         </div>
       </div>
     )
   }
 
-  // 카테고리를 고르면 세부 분류별로 묶어서 (세부 분류 없는 제품은 끝에)
+  // 전체면 카테고리별로, 카테고리를 고르면 세부 분류별로 묶어서 (분류 없는 제품은 끝에)
   const right = () => {
-    const subs = sel.startsWith('c:')
-      ? (categories.find((c) => c.id === Number(sel.slice(2)))?.subcategories ?? [])
-      : []
     if (!prods.length) return <p className="hint">등록된 제품이 없어요.</p>
-    if (!subs.length) return prods.map(productRow)
-    const groups: [string, ProductRow[]][] = [
-      ...subs.map((s): [string, ProductRow[]] => [s.name, prods.filter((r) => r.product.subcategory === s.id)]),
-      ['세부 분류 없음', prods.filter((r) => r.product.subcategory == null)],
-    ]
+    let groups: [string, ProductRow[]][]
+    if (sel === '') {
+      groups = [
+        ...categories.map((c): [string, ProductRow[]] => [c.name, prods.filter((r) => r.product.category === c.id)]),
+        ['미분류', prods.filter((r) => r.product.category == null)],
+      ]
+    } else {
+      const subs = sel.startsWith('c:')
+        ? (categories.find((c) => c.id === Number(sel.slice(2)))?.subcategories ?? [])
+        : []
+      if (!subs.length) return prods.map(productRow)
+      groups = [
+        ...subs.map((s): [string, ProductRow[]] => [s.name, prods.filter((r) => r.product.subcategory === s.id)]),
+        ['세부 분류 없음', prods.filter((r) => r.product.subcategory == null)],
+      ]
+    }
     return groups
       .filter(([, list]) => list.length)
       .map(([name, list]) => (
@@ -120,8 +103,10 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
         opts.sub ? 'sub' : '',
         s === sel ? 'active' : '',
         s === 'none' ? 'uncategorized' : '',
+        opts.category ? 'cat-item' : '',
       ].join(' ')}
-      onClick={() => setPicked(s)}
+      // 고른 것을 다시 누르면 선택을 풀고 전체로
+      onClick={() => setPicked(s === sel ? '' : s)}
     >
       <div className="grow">
         <strong>{label}</strong>
@@ -131,7 +116,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           </small>
         )}
       </div>
-      {opts.sub && <small>{count(s)}</small>}
+      {opts.sub && <small className="sub-count">{count(s)}</small>}
       {opts.category && (
         <EditButton
           onClick={(e) => {
@@ -153,20 +138,27 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
             addLabel="+ 카테고리 추가"
             onAdd={() => setSub({ kind: 'category', category: null })}
           >
-            <div className="list">
-              {categories.map((c) => [
-                item(`c:${c.id}`, c.name, {
-                  category: c,
-                  extra: c.subcategories.length ? ` · 세부 ${c.subcategories.length}` : '',
-                }),
-                ...c.subcategories.map((s) => item(`s:${s.id}`, s.name, { sub: true })),
-              ])}
-              {hasUncategorized && item('none', '미분류')}
+            {/* 카테고리마다 한 묶음: 카테고리 줄 아래에 세부 분류를 세로선으로 들여 쓴다. 묶음 사이는 구분선 */}
+            <div className="list cat-list">
+              {categories.map((c) => (
+                <div key={c.id} className="cat-group">
+                  {item(`c:${c.id}`, c.name, {
+                    category: c,
+                    extra: c.subcategories.length ? ` · 세부 ${c.subcategories.length}` : '',
+                  })}
+                  {c.subcategories.length > 0 && (
+                    <div className="sub-list">
+                      {c.subcategories.map((s) => item(`s:${s.id}`, s.name, { sub: true }))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {hasUncategorized && <div className="cat-group">{item('none', '미분류')}</div>}
             </div>
           </ManageColumn>
           <ManageColumn
             className="manage-right"
-            title={`${selectionLabel(categories, sel)} 의 제품`}
+            title={sel === '' ? '전체 제품' : `${selectionLabel(categories, sel)} 의 제품`}
             count={prods.length}
             addLabel="+ 제품 추가"
             onAdd={() => setSub({ kind: 'product', product: null })}

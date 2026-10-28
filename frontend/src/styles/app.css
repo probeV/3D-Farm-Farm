@@ -714,10 +714,19 @@ button.fil-head:hover {
     inset 4px 0 0 var(--accent),
     inset 0 0 0 1px var(--accent);
 }
-button.fil-head:hover .fil-title::after {
-  content: ' ✎';
-  font-size: 13px;
+/* 마우스를 올리면 이름 옆에 연필 (관리 창 수정 아이콘과 같은 모양) */
+.fil-edit {
+  display: none;
+  margin-left: 5px;
   color: var(--accent);
+  vertical-align: -2px;
+}
+.fil-edit svg {
+  width: 14px;
+  height: 14px;
+}
+button.fil-head:hover .fil-edit {
+  display: inline-block;
 }
 .fil-brand {
   font-size: 12px;
@@ -1572,11 +1581,7 @@ dialog.fixed .manage {
 .row-item:last-of-type {
   border-bottom: 0;
 }
-/* 필라멘트 관리의 필라멘트 줄: 이름 · 가격 · 복제 · 수정 · ✕ (TBD-07) */
-.row-item.fil-row {
-  grid-template-columns: 1fr auto auto auto auto;
-  gap: 8px;
-}
+/* 필라멘트 관리의 필라멘트 줄: 이름 · 가격 · 복제 · 수정 (다른 관리 창과 같은 줄 모양) */
 .row-item strong {
   font-size: 14px;
 }
@@ -1729,12 +1734,12 @@ input[type='color'] {
   background: var(--surface-2);
   color: var(--bad);
 }
-/* 관리 창 줄의 수정 연필 (EditButton) — 삭제 ✕ 와 같은 자리 크기, 마우스를 올리면 파랑 */
+/* 관리 창 줄의 수정 · 복제 아이콘 (EditButton · CopyButton) — 삭제 ✕ 와 같은 자리 크기, 마우스를 올리면 파랑 */
 .icon-btn.edit {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
 }
 .icon-btn.edit svg {

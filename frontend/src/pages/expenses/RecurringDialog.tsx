@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { deleteRecurring, useRefreshExpenses, type RecurringExpense } from '../../api/expenses'
+import type { RecurringExpense } from '../../api/expenses'
 import Dialog from '../../components/Dialog'
 import Help from '../../components/Help'
 import ManageColumn from '../../components/ManageColumn'
-import { useConfirm } from '../../components/useConfirm'
-import { useToast } from '../../components/useToast'
 import { won } from '../../format'
 import { categoryInfo } from './categories'
 import RecurringFormDialog from './RecurringFormDialog'
@@ -19,38 +17,10 @@ interface Props {
   onClose: () => void
 }
 
-// 반복 지출 관리 (EXP-04, docs/screens.md 5.4). 해지 달은 두지 않고, 그만 낼 때는 삭제
+// 반복 지출 관리 (EXP-04, docs/screens.md 5.4). 해지 달은 두지 않고, 그만 낼 때는 삭제 (수정 창 왼쪽 아래)
 export default function RecurringDialog({ recurring, onClose }: Props) {
-  const refresh = useRefreshExpenses()
-  const toast = useToast()
-  const confirm = useConfirm()
   // 겹쳐 여는 추가 · 수정 창. null = 추가
   const [editing, setEditing] = useState<RecurringExpense | null | undefined>(undefined)
-
-  const remove = async (r: RecurringExpense) => {
-    const ok = await confirm({
-      title: '반복 지출 삭제',
-      message: (
-        <>
-          {r.name} 을(를) 삭제할까요?
-          <br />
-          <span className="hint">
-            다음 달부터 알림이 뜨지 않아요.
-            {r.expense_count > 0 && ` 이미 넣은 지출 ${r.expense_count}건은 목록에 그대로 남아요.`}
-          </span>
-        </>
-      ),
-      danger: true,
-    })
-    if (!ok) return
-    try {
-      await deleteRecurring(r.id)
-      await refresh()
-      toast('삭제했어요')
-    } catch (e) {
-      toast(e instanceof Error ? e.message : String(e))
-    }
-  }
 
   return (
     <>
@@ -81,14 +51,6 @@ export default function RecurringDialog({ recurring, onClose }: Props) {
                 <div className="price">{won(r.amount)}</div>
                 <div className="row-btns">
                   <EditButton onClick={() => setEditing(r)} />
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    title="반복 지출 삭제 (이미 넣은 지출은 그대로)"
-                    onClick={() => remove(r)}
-                  >
-                    ✕
-                  </button>
                 </div>
               </div>
             ))

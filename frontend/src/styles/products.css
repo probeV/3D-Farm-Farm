@@ -308,17 +308,55 @@ dialog.xwide {
   color: var(--muted);
   font-weight: 600;
 }
-/* 세부 분류: 카테고리 아래 들여쓰기 */
+/* 카테고리 목록 (v1.2.0): 카테고리마다 한 묶음, 묶음 사이 구분선. 카테고리는 굵게, 세부 분류는 세로선으로 들여 쓰고 가늘게 */
+.cat-list {
+  gap: 0;
+}
+.cat-group {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.cat-group:first-child {
+  padding-top: 0;
+}
+.cat-group:last-child {
+  border-bottom: 0;
+}
+.list-item.cat-item strong {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+.sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 4px 0 2px 18px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
 .list-item.sub {
-  margin-left: 16px;
   padding: 5px 10px;
   font-size: 13px;
 }
 .list-item.sub strong {
-  font-weight: 600;
+  font-weight: 500;
 }
-.list-item.sub > small {
-  display: inline;
+.list-item.sub.active {
+  border-color: transparent;
+}
+.list-item.sub.active strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+/* 세부 분류 제품 수: 작은 알약 */
+.list-item.sub > .sub-count {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .group-label {
   margin: 10px 0 0;
@@ -339,14 +377,11 @@ dialog.xwide {
   width: 32px;
   height: 32px;
 }
+/* 관리 창 줄 오른쪽 아이콘 묶음 (복제 · 수정). 모든 관리 창이 같은 크기 · 간격 (v1.2.0) */
 .row-btns {
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-.row-btns .icon-btn {
-  width: 32px;
-  height: 32px;
+  gap: 2px;
 }
 .row-item .badge {
   margin-left: 4px;

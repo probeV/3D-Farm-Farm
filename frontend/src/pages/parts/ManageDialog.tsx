@@ -1,30 +1,25 @@
 import { useState } from 'react'
-import { deletePart, useRefreshProducts, type Part, type PartCategory } from '../../api/products'
+import type { Part, PartCategory } from '../../api/products'
 import Dialog from '../../components/Dialog'
 import ManageColumn from '../../components/ManageColumn'
-import { useConfirm } from '../../components/useConfirm'
-import { useToast } from '../../components/useToast'
 import { unitWon } from '../../format'
 import BuyLink from './BuyLink'
 import PartCategoryDialog from './PartCategoryDialog'
 import PartDialog from './PartDialog'
 import { inCategory, inShop, shopsOf, type CategorySel, type ShopSel } from './partList'
 import { usePartsData } from './usePartsData'
-import EditButton from '../../components/EditButton'
+import EditButton, { CopyButton } from '../../components/EditButton'
 
 // 관리 창 위에 겹쳐 여는 창
 type Sub = { kind: 'part'; part: Part | null; copyOf?: Part } | { kind: 'category'; category: PartCategory | null }
 type View = 'shop' | 'category'
 
 // 부자재 관리 (PART-02 · PART-02a, docs/screens.md 3.4)
-// 제목 줄 오른쪽에서 구매처별 / 카테고리별. 왼쪽: 전체 + 구매처(+ 구매처 없음) 또는 카테고리(+ 미분류, 추가 · 수정)
-// 오른쪽: 고른 것의 부자재. 부자재 추가 · 복제 · 삭제는 여기서
+// 제목 줄 오른쪽에서 구매처별 / 카테고리별. 왼쪽: 구매처(+ 구매처 없음) 또는 카테고리(+ 미분류, 추가 · 수정)
+// 오른쪽: 고른 것의 부자재 (처음엔 전체). 고른 것을 다시 누르면 전체로 (제품 관리 창과 같음). 부자재 추가 · 복제는 여기서
 export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const data = usePartsData().data
-  const refresh = useRefreshProducts()
-  const toast = useToast()
 
-  const confirm = useConfirm()
   const [view, setView] = useState<View>('shop')
   const [picked, setPicked] = useState<ShopSel>('')
   const [pickedCategory, setPickedCategory] = useState<CategorySel>('')
@@ -63,24 +58,11 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           ? '미분류'
           : (categoryName(Number(catSel.slice(2))) ?? '')
 
-  const remove = async (p: Part) => {
-    // 제품에서 쓰면 서버도 막는다 (409)
-    if (p.product_count) return toast(`제품 ${p.product_count}개에서 쓰고 있어서 삭제할 수 없어요`)
-    if (!(await confirm({ title: '부자재 삭제', message: `${p.name} 을(를) 삭제할까요?`, danger: true }))) return
-    try {
-      await deletePart(p.id)
-      await refresh()
-      toast(`${p.name} 삭제했어요`)
-    } catch (e) {
-      toast(e instanceof Error ? e.message : String(e))
-    }
-  }
-
   const categoryItem = (s: CategorySel, label: string, category?: PartCategory) => (
     <div
       key={s}
       className={['list-item', s === catSel ? 'active' : '', s === 'none' ? 'no-shop' : ''].join(' ')}
-      onClick={() => setPickedCategory(s)}
+      onClick={() => setPickedCategory(s === catSel ? '' : s)}
     >
       <div className="grow">
         <strong>{label}</strong>
@@ -111,7 +93,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
     <div
       key={s}
       className={['list-item', s === sel ? 'active' : '', s === 'none' ? 'no-shop' : ''].join(' ')}
-      onClick={() => setPicked(s)}
+      onClick={() => setPicked(s === sel ? '' : s)}
     >
       <div className="grow">
         <strong>{label}</strong>
@@ -127,7 +109,6 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           {view === 'shop' ? (
             <ManageColumn title="구매처" count={shops.length}>
               <div className="list">
-                {item('', '전체')}
                 {shops.map((s) => item(`s:${s}`, s))}
                 {hasNoShop && item('none', '구매처 없음')}
               </div>
@@ -140,7 +121,6 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
               onAdd={() => setSub({ kind: 'category', category: null })}
             >
               <div className="list">
-                {categoryItem('', '전체')}
                 {categories.map((c) => categoryItem(`c:${c.id}`, c.name, c))}
                 {hasUncategorized && categoryItem('none', '미분류')}
               </div>
@@ -175,24 +155,8 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
                   <div className="row-btns">
-                    <button
-                      type="button"
-                      className="btn small"
-                      onClick={() => setSub({ kind: 'part', part: null, copyOf: p })}
-                    >
-                      복제
-                    </button>
+                    <CopyButton onClick={() => setSub({ kind: 'part', part: null, copyOf: p })} />
                     <EditButton onClick={() => setSub({ kind: 'part', part: p })} />
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      title={
-                        p.product_count ? `제품 ${p.product_count}개에서 쓰고 있어서 삭제할 수 없어요` : '부자재 삭제'
-                      }
-                      onClick={() => remove(p)}
-                    >
-                      ✕
-                    </button>
                   </div>
                 </div>
               ))
