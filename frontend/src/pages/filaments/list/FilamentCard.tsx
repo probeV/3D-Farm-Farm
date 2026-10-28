@@ -3,6 +3,7 @@ import type { Brand, Color, Filament } from '../../../api/filaments'
 import { kgText, won } from '../../../format'
 import BrandLogo from '../BrandLogo'
 import { STATUS_LABEL, colorState, heldOf, totalOf } from '../stock'
+import { PencilIcon } from '../../../components/icons'
 
 interface Props {
   filament: Filament
@@ -39,7 +40,13 @@ export default function FilamentCard({
         >
           <BrandLogo brand={brand ?? { name: f.brand_name, logo: null }} />
           <div className="fil-brand">{f.brand_name}</div>
-          <div className="fil-title">{f.series ? `${f.material_name} ${f.series}` : f.material_name}</div>
+          <div className="fil-title">
+            {f.series ? `${f.material_name} ${f.series}` : f.material_name}
+            {/* 마우스를 올리면 연필 (관리 창의 수정 아이콘과 같은 모양) */}
+            <span className="fil-edit" aria-hidden>
+              <PencilIcon />
+            </span>
+          </div>
           <div className={f.price == null ? 'fil-meta none' : 'fil-meta'}>
             {f.price == null ? '가격 미입력' : `${won(f.price)} / ${kgText(f.spool_g / 1000)}kg`}
           </div>

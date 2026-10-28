@@ -1,23 +1,13 @@
 import { useState } from 'react'
-import {
-  deleteFilament,
-  useBrands,
-  useFilaments,
-  useMaterials,
-  useRefreshFilaments,
-  type Brand,
-  type Filament,
-  type Material,
-} from '../../../api/filaments'
+import { useBrands, useFilaments, useMaterials, type Brand, type Filament, type Material } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import ManageColumn from '../../../components/ManageColumn'
-import { useConfirm } from '../../../components/useConfirm'
-import { useToast } from '../../../components/useToast'
 import { won } from '../../../format'
 import BrandDialog from './BrandDialog'
 import BrandLogo from '../BrandLogo'
 import FilamentDialog from './FilamentDialog'
 import MaterialDialog from './MaterialDialog'
+import EditButton, { CopyButton } from '../../../components/EditButton'
 
 type Tab = 'brands' | 'materials'
 
@@ -33,9 +23,6 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const brands = useBrands().data ?? []
   const materials = useMaterials().data ?? []
   const filaments = useFilaments().data ?? []
-  const refresh = useRefreshFilaments()
-  const toast = useToast()
-  const confirm = useConfirm()
   const [tab, setTab] = useState<Tab>('brands')
   const [brandId, setBrandId] = useState<number | null>(null)
   const [sub, setSub] = useState<Sub | null>(null)
@@ -46,18 +33,6 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const brandFilaments = filaments.filter((f) => f.brand === brand?.id)
 
   // 색상이 있으면 지울 수 없어 확인 창 없이 이유만. 제품에서 쓰면 서버가 409 (PRD FIL-09)
-  const remove = async (f: Filament) => {
-    if (f.colors.length) return toast(`색상 ${f.colors.length}개가 있어서 삭제할 수 없어요`)
-    if (!(await confirm({ title: '필라멘트 삭제', message: `${f.display_name} 필라멘트를 삭제할까요?`, danger: true })))
-      return
-    try {
-      await deleteFilament(f.id)
-      await refresh()
-      toast(`${f.display_name} 삭제했어요`)
-    } catch (e) {
-      toast(e instanceof Error ? e.message : String(e))
-    }
-  }
 
   const tabs = (
     <div className="view-tabs">
@@ -92,16 +67,12 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                       <strong>{b.name}</strong>
                       <small>필라멘트 {b.filament_count}개</small>
                     </div>
-                    <button
-                      type="button"
-                      className="btn small"
+                    <EditButton
                       onClick={(e) => {
                         e.stopPropagation() // 회사 선택까지 같이 되지 않도록
                         setSub({ kind: 'brand', brand: b })
                       }}
-                    >
-                      수정
-                    </button>
+                    />
                   </div>
                 ))}
               </div>
@@ -121,28 +92,10 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                       <div className="hint">색상 {f.colors.length}개</div>
                     </div>
                     <span className="muted">{f.price == null ? '가격 미입력' : `${won(f.price)} / ${f.spool_g}g`}</span>
-                    <button
-                      type="button"
-                      className="btn small"
-                      onClick={() => setSub({ kind: 'filament', filament: null, copyOf: f })}
-                    >
-                      복제
-                    </button>
-                    <button
-                      type="button"
-                      className="btn small"
-                      onClick={() => setSub({ kind: 'filament', filament: f })}
-                    >
-                      수정
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      title={f.colors.length ? `색상 ${f.colors.length}개가 있어서 삭제할 수 없어요` : '필라멘트 삭제'}
-                      onClick={() => remove(f)}
-                    >
-                      ✕
-                    </button>
+                    <div className="row-btns">
+                      <CopyButton onClick={() => setSub({ kind: 'filament', filament: null, copyOf: f })} />
+                      <EditButton onClick={() => setSub({ kind: 'filament', filament: f })} />
+                    </div>
                   </div>
                 ))}
                 {!brandFilaments.length && <p className="hint">등록된 필라멘트가 없어요.</p>}
@@ -164,9 +117,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
               <div key={m.id} className="row-item">
                 <strong>{m.name}</strong>
                 <span className="muted">필라멘트 {m.filament_count}개</span>
-                <button type="button" className="btn small" onClick={() => setSub({ kind: 'material', material: m })}>
-                  수정
-                </button>
+                <EditButton onClick={() => setSub({ kind: 'material', material: m })} />
               </div>
             ))}
             {!materials.length && <p className="hint">등록된 재질이 없어요.</p>}

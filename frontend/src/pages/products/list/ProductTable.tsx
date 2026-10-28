@@ -90,7 +90,12 @@ export default function ProductTable({ rows, categories, catalog, sort, onSort, 
       <tbody>
         {rows.map(({ product: p, cost: c, colors }) => (
           <tr key={p.id} className={p.status === 'discontinued' ? 'discontinued' : ''} onClick={() => onOpen(p)}>
-            <td className="muted">{p.no}</td>
+            {/* 큰 번호는 줄이고 마우스를 올리면 전체 (TBD-12) */}
+            <td className="muted">
+              <span className="no-cell" title={`No. ${p.no}`}>
+                {p.no}
+              </span>
+            </td>
             <td>
               {p.category == null ? (
                 <span className="muted">미분류</span>

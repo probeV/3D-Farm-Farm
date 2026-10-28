@@ -16,6 +16,9 @@ export const kgText = (n: number) => (Math.round(n * 10) / 10).toLocaleString('k
 // 날짜만: "2026-10-20T13:33:30+09:00" → "2026-10-20" (서버가 서울 시간으로 줌), 없으면 "-"
 export const dateText = (v: string | null) => (v ? v.slice(0, 10) : '-')
 
+// 날짜 점 모양: "2026-10-21" → "2026.10.21" (지출 목록)
+export const dotDate = (v: string) => v.replace(/-/g, '.')
+
 // 오늘 날짜 "2026-10-21" (이 PC 시간 기준)
 export function today() {
   const d = new Date()
