@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import FilamentsPage from './pages/filaments/FilamentsPage'
+import ExpensesPage from './pages/expenses/ExpensesPage'
 import PartsPage from './pages/parts/PartsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ProductsPage from './pages/products/ProductsPage'
 import { applyTheme, loadTheme, saveTheme, THEMES, type ThemePref } from './theme'
 
-type Page = 'products' | 'filaments' | 'parts' | 'settings'
+type Page = 'products' | 'filaments' | 'parts' | 'expenses' | 'settings'
 
 const NAV: { page: Page; label: string; icon: ReactNode }[] = [
   {
@@ -34,6 +35,16 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
     page: 'parts',
     label: '부자재',
     icon: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z" />,
+  },
+  {
+    page: 'expenses',
+    label: '지출',
+    icon: (
+      <>
+        <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+        <path d="M9 8h6M9 12h6M9 16h3" />
+      </>
+    ),
   },
   {
     page: 'settings',
@@ -176,6 +187,8 @@ export default function App() {
           <ProductsPage />
         ) : page === 'parts' ? (
           <PartsPage />
+        ) : page === 'expenses' ? (
+          <ExpensesPage />
         ) : (
           <SettingsPage />
         )}

@@ -24,6 +24,13 @@ export const money = z.preprocess(
     .nullable(),
 )
 
+// 꼭 넣는 금액(원): 1 이상의 정수, 비우면 오류 (지출 금액)
+// 서버: MONEY + MinValueValidator(1) — expenses/models.py
+export const amount = z.preprocess(
+  toNumber,
+  number.int('원 단위 정수로 입력하세요').min(1, '1원 이상으로 입력하세요').max(9_999_999_999, '금액이 너무 커요'),
+)
+
 // 정수 범위 (예: 수량 1~100). 비우면 오류
 export const intRange = (min: number, max: number) =>
   z.preprocess(

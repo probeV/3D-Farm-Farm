@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'filaments',
     'products',
+    'expenses',
 ]
 
 MIDDLEWARE = [
