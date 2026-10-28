@@ -180,7 +180,7 @@ dialog.fixed > form { height: 100%; max-height: none; }
 .foot-note { font-size: 12.5px; color: var(--muted); }
 
 /* 반복 지출 관리 */
-.rec-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.rec-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .rec-row:last-child { border-bottom: 0; }
 .rec-row strong { font-size: 14px; }
 .rec-row .amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
@@ -210,6 +210,10 @@ dialog.fixed > form { height: 100%; max-height: none; }
   .sum-cards, .form-grid, .by-cat-grid { grid-template-columns: 1fr; }
   .due { flex-wrap: wrap; }
 }
+/* v1.2.0: 관리 창 줄의 수정은 연필 아이콘 (마우스를 올리면 파랑) */
+.icon-btn.edit { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; }
+.icon-btn.edit svg { width: 16px; height: 16px; }
+.icon-btn.edit:hover { color: var(--accent); background: var(--surface-2); }
 </style>
 </head>
 <body>
@@ -531,8 +535,7 @@ function openRecurring() {
     return `<div class="rec-row"><div><strong>${esc(r.name)}</strong> ${catBadge(r.category)}
         <div class="hint">매달 ${r.day}일 · ${ym(r.start)}부터 · 넣은 지출 ${n}건</div></div>
       <span class="amt">${won(r.amount)}</span>
-      <button type="button" class="btn small" data-edit="${r.id}">수정</button>
-      <button type="button" class="icon-btn" data-del="${r.id}" title="반복 지출 삭제 (이미 넣은 지출은 그대로)">✕</button></div>`;
+      <button type="button" class="icon-btn edit" data-edit="${r.id}" title="수정" aria-label="수정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div>`;
   };
   const active = db.recurring;
   show(dlg, `<div class="dlg-head">반복 지출 관리</div><div class="dlg-body rec-list">
@@ -543,12 +546,6 @@ function openRecurring() {
     if (e.target.closest("[data-close]")) return dlg.el.close();
     if (e.target.closest("[data-add]")) return openRecurringForm(null);
     const ed = e.target.closest("[data-edit]"); if (ed) return openRecurringForm(byId(db.recurring, ed.dataset.edit));
-    const del = e.target.closest("[data-del]");
-    if (del) {
-      const r = byId(db.recurring, del.dataset.del), n = db.expenses.filter((x) => x.recurring === r.id).length;
-      confirmBox({ title: "반복 지출 삭제", lead: `<b>${esc(r.name)}</b> 을(를) 삭제할까요?<br><span class="hint">다음 달부터 알림이 뜨지 않아요.${n ? ` 이미 넣은 지출 ${n}건은 목록에 그대로 남아요.` : ""}</span>`,
-        onOk: () => { db.recurring = db.recurring.filter((y) => y !== r); db.expenses.forEach((x) => { if (x.recurring === r.id) delete x.recurring; }); refresh(); toast("삭제했어요"); } });
-    }
   };
 }
 
@@ -562,8 +559,15 @@ function openRecurringForm(r) {
       <label class="field"><span>시작 달 *</span><input type="month" name="start" required value="${init.start}"></label>
       <label class="field"><span>메모</span><input name="note" value="${esc(init.note)}"></label>
     </div>${r ? '<p class="hint" style="margin:12px 0 0">금액을 바꾸면 다음에 넣는 달부터 바뀐 금액으로 들어가요. 이미 넣은 지출은 그대로예요.</p>' : ""}</div>
-    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div>`);
-  dlg2.form.onclick = (e) => { if (e.target.closest("[data-close]")) dlg2.el.close(); };
+    <div class="dlg-foot">${r ? '<button type="button" class="btn danger" data-del>삭제</button>' : ""}<div class="spacer"></div><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div>`);
+  // 그만 낼 때는 삭제 (수정 창 왼쪽 아래). 이미 넣은 지출은 남는다
+  dlg2.form.onclick = (e) => {
+    if (e.target.closest("[data-close]")) return dlg2.el.close();
+    if (!e.target.closest("[data-del]")) return;
+    const n = db.expenses.filter((x) => x.recurring === r.id).length;
+    confirmBox({ title: "반복 지출 삭제", lead: `<b>${esc(r.name)}</b> 을(를) 삭제할까요?<br><span class="hint">다음 달부터 알림이 뜨지 않아요.${n ? ` 이미 넣은 지출 ${n}건은 목록에 그대로 남아요.` : ""}</span>`,
+      onOk: () => { db.recurring = db.recurring.filter((y) => y !== r); db.expenses.forEach((x) => { if (x.recurring === r.id) delete x.recurring; }); dlg2.el.close(); refresh(); toast("삭제했어요"); } });
+  };
   dlg2.form.onsubmit = (e) => {
     e.preventDefault(); const fd = new FormData(dlg2.form);
     const d = { name: fd.get("name").trim(), category: fd.get("category"), amount: Math.round(Number(fd.get("amount"))), day: Number(fd.get("day")),

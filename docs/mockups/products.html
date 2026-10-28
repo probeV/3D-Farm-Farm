@@ -156,15 +156,25 @@ dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 
 .list-item small { display: block; color: var(--muted); font-size: 12px; }
 .list-item.uncategorized strong { color: var(--muted); font-weight: 600; }
 /* 세부 분류: 카테고리 아래 들여쓰기 */
-.list-item.sub { margin-left: 16px; padding: 5px 10px; font-size: 13px; }
-.list-item.sub strong { font-weight: 600; }
-.list-item.sub > small { display: inline; }
+/* v1.2.0: 카테고리마다 한 묶음 (묶음 사이 구분선). 카테고리는 굵게, 세부 분류는 세로선으로 들여 쓰고 가늘게 */
+.cat-list { gap: 0; }
+.cat-group { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.cat-group:first-child { padding-top: 0; }
+.cat-group:last-child { border-bottom: 0; }
+.list-item.cat-item strong { font-size: 14.5px; font-weight: 800; }
+.sub-list { display: flex; flex-direction: column; gap: 1px; margin: 4px 0 2px 18px; padding-left: 8px; border-left: 2px solid var(--border); }
+.list-item.sub { padding: 5px 10px; font-size: 13px; }
+.list-item.sub strong { font-weight: 500; }
+.list-item.sub.active { border-color: transparent; }
+.list-item.sub.active strong { color: var(--accent); font-weight: 700; }
+.list-item.sub > .sub-count { display: inline-block; min-width: 22px; padding: 0 7px; border-radius: 99px; background: var(--surface-2); text-align: center; font-variant-numeric: tabular-nums; }
 .group-label { margin: 10px 0 0; padding-bottom: 4px; font-size: 12px; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--border); }
 .sub-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 32px; gap: 8px; align-items: center; margin-bottom: 6px; }
 .manage-right { border-left: 1px solid var(--border); padding-left: 16px; }
 .manage-right h4 { margin: 2px 0 10px; font-size: 14px; }
 .row-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.row-btns { display: flex; align-items: center; gap: 4px; }
+/* v1.2.0: 관리 창 줄 오른쪽 아이콘 묶음 (복제 · 수정) — 모든 관리 창이 같은 크기 · 간격. 삭제는 수정 창 왼쪽 아래에서 */
+.row-btns { display: flex; align-items: center; gap: 2px; }
 .row-item:last-of-type { border-bottom: 0; }
 .row-item strong { font-size: 14px; }
 .row-item .badge { margin-left: 4px; }
@@ -291,6 +301,26 @@ dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 
   .hero-top { flex-wrap: wrap; }
   .manage { grid-template-columns: 1fr; } .manage-right { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
 }
+/* v1.2.0: 관리 창 줄의 수정 · 복제는 아이콘 (마우스를 올리면 파랑) */
+.icon-btn.edit { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; }
+.icon-btn.edit svg { width: 16px; height: 16px; }
+.icon-btn.edit:hover { color: var(--accent); background: var(--surface-2); }
+/* v1.2.0: 재료 표 맨 아래 + 줄 — 점선 칸, 누르면 그 자리에 새 줄 */
+.mat-add { display: block; width: 100%; margin-bottom: 6px; padding: 7px 10px; border: 1px dashed var(--border); border-radius: 8px; background: none; color: var(--accent); font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.mat-add:hover { border-color: var(--accent); background: var(--accent-soft); }
+/* 관리 창 목록 칸: 제목 줄(제목 · 개수 · 추가 버튼) + 따로 스크롤, 높이 고정 (TBD-01 · 06, parts.html 과 같음) */
+dialog.fixed { height: min(640px, calc(100vh - 32px)); }
+dialog.fixed > form { height: 100%; max-height: none; }
+.col { display: flex; flex-direction: column; min-height: 0; }
+.col-head { display: flex; align-items: center; gap: 8px; min-height: 30px; margin-bottom: 8px; }
+.col-head h4 { margin: 0; font-size: 14px; }
+.col-head .count { font-size: 12px; color: var(--muted); }
+.col-head .spacer { flex: 1; }
+.col-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 0 6px 4px; }
+.btn.add { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.btn.add:hover { background: var(--accent); color: #fff; }
+dialog.fixed .dlg-body.cols { display: flex; overflow: hidden; }
+dialog.fixed .cols > .manage { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
 </style>
 </head>
 <body>
@@ -595,41 +625,45 @@ function show(dl, html, cls = "") {
 const refresh = () => { render(); if (dlg.el.open && $("#dlg .manage")) openManage(); };
 
 // ---------------------------------------------------------------- 제품 관리 (카테고리 › 세부 분류 → 제품)
-let manageSel = "c:1";
+// 처음엔 전체(""). 고른 것을 다시 누르면 전체로
+let manageSel = "";
 function openManage() {
   const hasNone = db.products.some((p) => p.category == null);
-  const valid = (sel) => sel === "none" ? hasNone : sel.startsWith("c:") ? byId(db.categories, sel.slice(2)) : byId(db.subcategories, sel.slice(2));
-  if (!valid(manageSel)) manageSel = db.categories.length ? `c:${categories()[0].id}` : "none";
+  const valid = (sel) => sel === "" || (sel === "none" ? hasNone : sel.startsWith("c:") ? byId(db.categories, sel.slice(2)) : byId(db.subcategories, sel.slice(2)));
+  if (!valid(manageSel)) manageSel = "";
   const count = (sel) => db.products.filter((p) => inSel(p, sel)).length;
   const prodRow = (p) => {
     const c = calc(p);
     return `<div class="row-item"><div><strong>${esc(p.name)}</strong>${p.status === "on_sale" ? "" : statusBadge(p.status)}<div class="hint">No. ${esc(p.code)}</div></div>
       <div class="price">${won(p.sale)}<div class="${c.warn.length ? "muted" : marginCls(c.margin)}">${c.warn.length ? "입력 필요" : pct(c.margin)}</div></div>
-      <div class="row-btns"><button type="button" class="btn small" data-copy-prod="${p.id}">복제</button><button type="button" class="btn small" data-edit-prod="${p.id}">수정</button>
-        <button type="button" class="icon-btn" data-del-prod="${p.id}" title="제품 삭제">✕</button></div></div>`;
+      <div class="row-btns"><button type="button" class="icon-btn edit" data-copy-prod="${p.id}" title="복제" aria-label="복제"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button><button type="button" class="icon-btn edit" data-edit-prod="${p.id}" title="수정" aria-label="수정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div></div>`;
   };
   const prods = db.products.filter((p) => inSel(p, manageSel)).sort((a, b) => a.code.localeCompare(b.code));
-  // 카테고리를 고르면 세부 분류별로 묶어서 보여줌
+  // 전체면 카테고리별로, 카테고리를 고르면 세부 분류별로 묶어서 보여줌
   let right;
   const subs = manageSel.startsWith("c:") ? subsOf(Number(manageSel.slice(2))) : [];
-  if (subs.length && prods.length) {
+  if (manageSel === "" && prods.length) {
+    const groups = [...categories().map((c) => [c.name, prods.filter((p) => p.category === c.id)]), ["미분류", prods.filter((p) => p.category == null)]].filter(([, ps]) => ps.length);
+    right = groups.map(([name, ps]) => `<div class="group-label">${esc(name)}</div>${ps.map(prodRow).join("")}`).join("");
+  } else if (subs.length && prods.length) {
     const groups = [...subs.map((s) => [s.name, prods.filter((p) => p.sub === s.id)]), ["세부 분류 없음", prods.filter((p) => p.sub == null)]].filter(([, ps]) => ps.length);
     right = groups.map(([name, ps]) => `<div class="group-label">${esc(name)}</div>${ps.map(prodRow).join("")}`).join("");
   } else {
     right = prods.map(prodRow).join("") || '<p class="hint">등록된 제품이 없어요.</p>';
   }
-  const item = (sel, label, sub, extra = "") => `<div class="list-item ${sub ? "sub" : ""} ${sel === manageSel ? "active" : ""} ${sel === "none" ? "uncategorized" : ""}" data-sel="${sel}">
-      <div class="grow"><strong>${esc(label)}</strong>${sub ? "" : `<small>제품 ${count(sel)}개${extra}</small>`}</div>${sub ? `<small>${count(sel)}</small>` : ""}
-      ${sel.startsWith("c:") ? `<button type="button" class="btn small" data-edit-cat="${sel.slice(2)}">수정</button>` : ""}</div>`;
-  show(dlg, `<div class="dlg-head">제품 관리</div><div class="dlg-body"><div class="manage">
-      <div><div class="list">${categories().map((c) => item(`c:${c.id}`, c.name, false, subsOf(c.id).length ? ` · 세부 ${subsOf(c.id).length}` : "")
-          + subsOf(c.id).map((s) => item(`s:${s.id}`, s.name, true)).join("")).join("")}
-        ${hasNone ? item("none", "미분류", false) : ""}</div>
-        <button type="button" class="btn small" style="margin-top:10px" data-add-cat>+ 카테고리 추가</button></div>
-      <div class="manage-right"><h4>${esc(selLabel(manageSel))} 의 제품</h4>${right}
-        <button type="button" class="btn small" style="margin-top:10px" data-add-prod>+ 제품 추가</button></div>
+  const item = (sel, label, sub, extra = "") => `<div class="list-item ${sub ? "sub" : ""} ${sel.startsWith("c:") ? "cat-item" : ""} ${sel === manageSel ? "active" : ""} ${sel === "none" ? "uncategorized" : ""}" data-sel="${sel}">
+      <div class="grow"><strong>${esc(label)}</strong>${sub ? "" : `<small>제품 ${count(sel)}개${extra}</small>`}</div>${sub ? `<small class="sub-count">${count(sel)}</small>` : ""}
+      ${sel.startsWith("c:") ? `<button type="button" class="icon-btn edit" data-edit-cat="${sel.slice(2)}" title="수정" aria-label="수정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>` : ""}</div>`;
+  // 목록 칸마다 제목 줄(제목 · 개수 · 파란 추가 버튼)은 그대로 두고 목록만 따로 스크롤 (TBD-06, parts.html 과 같은 모양)
+  show(dlg, `<div class="dlg-head">제품 관리</div><div class="dlg-body cols"><div class="manage">
+      <div class="col"><div class="col-head"><h4>카테고리</h4><span class="count">${categories().length}</span><div class="spacer"></div><button type="button" class="btn small add" data-add-cat>+ 카테고리 추가</button></div>
+        <div class="col-scroll"><div class="list cat-list">${categories().map((c) => `<div class="cat-group">${item(`c:${c.id}`, c.name, false, subsOf(c.id).length ? ` · 세부 ${subsOf(c.id).length}` : "")}
+          ${subsOf(c.id).length ? `<div class="sub-list">${subsOf(c.id).map((s) => item(`s:${s.id}`, s.name, true)).join("")}</div>` : ""}</div>`).join("")}
+        ${hasNone ? `<div class="cat-group">${item("none", "미분류", false)}</div>` : ""}</div></div></div>
+      <div class="col manage-right"><div class="col-head"><h4>${manageSel === "" ? "전체 제품" : `${esc(selLabel(manageSel))} 의 제품`}</h4><span class="count">${prods.length}</span><div class="spacer"></div><button type="button" class="btn small add" data-add-prod>+ 제품 추가</button></div>
+        <div class="col-scroll">${right}</div></div>
     </div></div>
-    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button></div>`, "wide");
+    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button></div>`, "wide fixed");
   dlg.form.onclick = (e) => {
     const t = e.target;
     if (t.closest("[data-close]")) return dlg.el.close();
@@ -649,7 +683,7 @@ function openManage() {
       return openProduct(null, dlg2, preset);
     }
     const it = t.closest("[data-sel]");
-    if (it) { manageSel = it.dataset.sel; openManage(); }
+    if (it) { manageSel = it.dataset.sel === manageSel ? "" : it.dataset.sel; openManage(); }
   };
 }
 
@@ -720,7 +754,8 @@ function openProduct(p, dl = dlg, preset = {}) {
   const filUnit = ([id, , cid]) => { const f = byId(db.filaments, id), col = colorOf(f, cid), pr = spoolPrice(f, col);
     return pr == null ? "필라멘트 가격 미입력 — 0원으로 계산" : `${col?.price != null ? "색상 가격 " : ""}${won(pr)} / ${f.spool_g}g · g당 ${(pr / f.spool_g).toFixed(1)}원`; };
   const partUnit = ([id]) => { const x = byId(db.parts, id); return x.price == null ? "부자재 가격 미입력 — 0원으로 계산" : `${x.unit}당 ${won(x.price / x.pack_qty)}`; };
-  const filLines = () => d.fils.length ? `<div class="mat"><div class="mat-head"><span>필라멘트</span><span>색상</span><span>사용량</span><span class="r">금액</span><span></span></div>
+  // v1.2.0: 표 맨 아래 + 줄 (머리의 + 추가 대신). 비어 있으면 이 줄만
+  const filLines = () => `<div class="mat">${d.fils.length ? '<div class="mat-head"><span>필라멘트</span><span>색상</span><span>사용량</span><span class="r">금액</span><span></span></div>' : ""}
     ${d.fils.map((r, i) => { const f = byId(db.filaments, r[0]), col = colorOf(f, r[2]);
       return `<div class="mat-row ${filAmt(r) == null ? "missing" : ""}" data-kind="fils" data-i="${i}">
         <select data-k="id">${opt(db.filaments, r[0], (x) => x.name)}</select>
@@ -728,15 +763,17 @@ function openProduct(p, dl = dlg, preset = {}) {
         <div class="with-suffix"><input type="number" data-k="v" min="0" step="0.01" value="${r[1] || ""}" placeholder="0" title="소수 2자리까지 (예: 24.37)"><em>g</em></div>
         <span class="amt" data-amt="fils:${i}" title="${esc(filUnit(r))}"></span>
         <button type="button" class="icon-btn" data-remove title="빼기">✕</button></div>`; }).join("")}
-    <div class="mat-total strong"><span class="cnt" data-count="fils"></span><span>합계 <b data-total="fils"></b></span></div></div>` : '<div class="none">사용하는 필라멘트가 없어요</div>';
-  const partLines = () => d.parts.length ? `<div class="mat parts"><div class="mat-head"><span>부자재</span><span>수량</span><span class="r">금액</span><span></span></div>
+    <button type="button" class="mat-add" data-add="fils">+ 필라멘트 추가</button>
+    ${d.fils.length ? '<div class="mat-total strong"><span class="cnt" data-count="fils"></span><span>합계 <b data-total="fils"></b></span></div>' : ""}</div>`;
+  const partLines = () => `<div class="mat parts">${d.parts.length ? '<div class="mat-head"><span>부자재</span><span>수량</span><span class="r">금액</span><span></span></div>' : ""}
     ${d.parts.map((r, i) => { const x = byId(db.parts, r[0]);
       return `<div class="mat-row ${x.price == null || !r[1] ? "missing" : ""}" data-kind="parts" data-i="${i}">
         <select data-k="id">${opt(db.parts, r[0], (y) => y.name)}</select>
         <div class="with-suffix"><input type="number" data-k="v" min="0" step="1" value="${r[1] || ""}" placeholder="0"><em>${esc(x.unit)}</em></div>
         <span class="amt" data-amt="parts:${i}" title="${esc(partUnit(r))}"></span>
         <button type="button" class="icon-btn" data-remove title="빼기">✕</button></div>`; }).join("")}
-    <div class="mat-total strong"><span class="cnt" data-count="parts"></span><span>합계 <b data-total="parts"></b></span></div></div>` : '<div class="none">사용하는 부자재가 없어요</div>';
+    <button type="button" class="mat-add" data-add="parts">+ 부자재 추가</button>
+    ${d.parts.length ? '<div class="mat-total strong"><span class="cnt" data-count="parts"></span><span>합계 <b data-total="parts"></b></span></div>' : ""}</div>`;
 
   show(dl, `<div class="hero">
       <div class="hero-top"><label class="code-wrap">No.<input class="ghost" name="code" value="${esc(d.code)}"></label>
@@ -749,9 +786,9 @@ function openProduct(p, dl = dlg, preset = {}) {
     </div>
     <div class="dlg-body"><div class="product-form">
       <div>
-        <div class="lines"><div class="lines-head"><h4>사용 필라멘트<small>1개 기준</small></h4><div class="head-right"><button type="button" class="btn small" data-add="fils">+ 추가</button></div></div>
+        <div class="lines"><div class="lines-head"><h4>사용 필라멘트<small>1개 기준</small></h4></div>
           <div id="fils">${filLines()}</div></div>
-        <div class="lines"><div class="lines-head"><h4>사용 부자재<small>1개 기준</small></h4><div class="head-right"><button type="button" class="btn small" data-from-product>+ 다른 제품에서</button><button type="button" class="btn small" data-add="parts">+ 추가</button></div></div>
+        <div class="lines"><div class="lines-head"><h4>사용 부자재<small>1개 기준</small></h4><div class="head-right"><button type="button" class="btn small" data-from-product>+ 다른 제품에서</button></div></div>
           <div id="parts">${partLines()}</div></div>
         <label class="field full" style="margin-top:18px"><span>메모</span><textarea name="note" rows="2">${esc(d.note)}</textarea></label>
       </div>

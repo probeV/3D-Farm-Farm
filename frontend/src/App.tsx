@@ -103,7 +103,8 @@ function loadCollapsed() {
 }
 
 export default function App() {
-  const [page, setPage] = useState<Page>('filaments')
+  // 처음 여는 화면은 제품 원가 (v1.2.0)
+  const [page, setPage] = useState<Page>('products')
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [theme, setTheme] = useState(loadTheme)
   const current = NAV.find((n) => n.page === page)!

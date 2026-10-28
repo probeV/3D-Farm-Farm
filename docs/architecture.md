@@ -115,10 +115,12 @@ pages/filaments/
   BrandLogo.tsx        여러 기능 폴더에서 쓰는 작은 표시 부품
   Swatch.tsx
   list/                목록 (screens 1.2~1.4): BrandSummary(회사별 요약), FilamentCard(필라멘트 묶음 · 색상 타일), TileMenu
-  spools/              스풀 동작 (PRD 3.4 · 3.5): PurchaseDialog, PickDialog, AdjustDialog,
+  spools/              스풀 동작 (PRD 3.4 · 3.5): PurchaseDialog, PickDialog, SpoolTable(스풀 조정 표),
                        spoolActions.ts(동작 + 되돌리기), schemas.ts(재고 추가 검증)
+  ColorManageDialog.tsx  색상 · 스풀 관리 (TBD-13): 색상 정보 탭(catalog) + 스풀 탭(spools/SpoolTable) — 두 기능 폴더를 써서 여기에
   catalog/             회사 · 재질 · 필라멘트 · 색상 편집 (PRD 3.1): ManageDialog(필라멘트 관리),
-                       BrandDialog, MaterialDialog, FilamentDialog, ColorDialog, schemas.ts
+                       BrandDialog, MaterialDialog, FilamentDialog, ColorDialog(색상 추가 + 입력칸 · 머리 띠),
+                       useColorEditor.ts(색상 저장 · 삭제), schemas.ts
 
 pages/products/
   ProductsPage.tsx     화면 진입점: 상태별 개수 · 요약 카드 · 제품 목록, 대화상자 연결

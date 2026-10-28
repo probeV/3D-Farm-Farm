@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from 'react'
 import { useBrands, useFilaments, useMaterials, type ByStatus, type Color, type Filament } from '../../api/filaments'
 import ColorDialog from './catalog/ColorDialog'
+import ColorManageDialog from './ColorManageDialog'
 import FilamentDialog from './catalog/FilamentDialog'
 import ManageDialog from './catalog/ManageDialog'
 import BrandSummary, { type BrandKg } from './list/BrandSummary'
 import FilamentCard from './list/FilamentCard'
 import TileMenu, { type TileAction } from './list/TileMenu'
-import AdjustDialog from './spools/AdjustDialog'
 import PickDialog from './spools/PickDialog'
 import PurchaseDialog from './spools/PurchaseDialog'
 import { colorState, filamentKg, heldOf, sumByStatus, totalOf } from './stock'
@@ -217,7 +217,7 @@ export default function FilamentsPage() {
     if (dialog.kind === 'manage') return <ManageDialog onClose={closeDialog} />
     if (dialog.kind === 'addColor') {
       const filament = fils.find((f) => f.id === dialog.filamentId)
-      return filament && <ColorDialog filament={filament} color={null} onClose={closeDialog} />
+      return filament && <ColorDialog filament={filament} onClose={closeDialog} />
     }
     if (dialog.kind === 'editFilament') {
       const filament = fils.find((f) => f.id === dialog.filamentId)
@@ -233,10 +233,8 @@ export default function FilamentsPage() {
       case 'pickOpen':
       case 'pickFinish':
         return <PickDialog color={color} mode={dialog.kind === 'pickOpen' ? 'open' : 'finish'} onClose={closeDialog} />
-      case 'adjust':
-        return <AdjustDialog color={color} onClose={closeDialog} />
-      case 'editColor':
-        return <ColorDialog filament={filament} color={color} onClose={closeDialog} />
+      case 'colorManage':
+        return <ColorManageDialog filament={filament} color={color} onClose={closeDialog} />
     }
   }
 }

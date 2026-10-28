@@ -9,6 +9,7 @@
   - 더미 데이터로 동작하며 새로고침하면 초기화된다.
   - 스크린샷용: ?open=manage | manage-material | brand | filament | color | purchase | pick-open | pick-finish | adjust | adjust-detail | tile-menu,  ?only=list
                 ?theme=dark | light
+  - v1.2.0 TBD-13 시안: ?open=hub | hub-spools — 타일 메뉴의 스풀 조정 · 색상 수정을 버튼 하나(`⚙ 색상 · 스풀 관리`)로, 창 하나에 `색상 정보` · `스풀` 탭
 -->
 <style>
 :root {
@@ -135,7 +136,10 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; backgrou
 /* TBD-02: 제목 타일을 누르면 그 필라멘트의 수정 창 */
 button.fil-head { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 button.fil-head:hover { border-color: var(--accent); background: var(--accent-soft); }
-button.fil-head:hover .fil-title::after { content: " ✎"; font-size: 13px; color: var(--accent); }
+/* v1.2.0: 마우스를 올리면 이름 옆에 연필 (관리 창 수정 아이콘과 같은 모양) */
+.fil-edit { display: none; margin-left: 5px; color: var(--accent); vertical-align: -2px; }
+.fil-edit svg { width: 14px; height: 14px; }
+button.fil-head:hover .fil-edit { display: inline-block; }
 .fil-brand { font-size: 12px; color: var(--muted); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fil-title { font-size: 18px; font-weight: 800; color: var(--text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fil-meta { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--accent); white-space: nowrap; }
@@ -188,14 +192,22 @@ button.fil-head:hover .fil-title::after { content: " ✎"; font-size: 13px; colo
 .add-tile { width: 190px; align-items: center; justify-content: center; gap: 4px; font-size: 12px; border-style: dashed; color: var(--muted); font-weight: 600; background: transparent; }
 .add-tile span { font-size: 26px; line-height: 1; }
 .add-tile:hover { color: var(--accent); }
-.tile-menu { position: absolute; z-index: 50; min-width: 210px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.25); display: flex; flex-direction: column; }
-.tile-menu-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
-.tile-menu-head code { margin-left: auto; }
-.tile-menu button { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 0; background: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; text-align: left; }
-.tile-menu button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
-.tile-menu button:disabled { opacity: .4; cursor: default; }
-.tile-menu small { font-weight: 400; color: var(--muted); }
-.tile-menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.tile-menu { position: absolute; z-index: 50; width: 240px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 2px; }
+/* v1.2.0 TBD-13: 머리 = 색상 칩 · 이름 · 코드 · 상태별 개수, 오른쪽 톱니바퀴(색상 · 스풀 관리) */
+.tile-menu-head { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 6px 4px 10px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.tile-menu-head .chip { grid-row: span 2; width: 30px; height: 30px; border-radius: 8px; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.tile-menu-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-menu-head .meta { grid-column: 2; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tile-menu-head .meta code { font-size: 11px; }
+.tile-menu-head .gear { grid-row: 1 / span 2; grid-column: 3; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.tile-menu-head .gear:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.tile-menu-head .gear svg { width: 17px; height: 17px; }
+.tile-menu .act { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 10px; border: 0; background: none; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-weight: 600; text-align: left; }
+.tile-menu .act svg { width: 16px; height: 16px; color: var(--muted); }
+.tile-menu .act:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+.tile-menu .act:hover:not(:disabled) svg { color: var(--accent); }
+.tile-menu .act:disabled { opacity: .4; cursor: default; }
+.tile-menu .act small { font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
 .only-list .page-title, .only-list .top-row, .only-list .brand-slider { display: none; }
 .only-list .list-toolbar { margin-top: 0; }
 .empty { padding: 40px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
@@ -236,7 +248,8 @@ dialog.wide { width: min(760px, calc(100vw - 32px)); }
 .row-item:last-of-type { border-bottom: 0; }
 .row-item strong { font-size: 14px; }
 /* TBD-07: 필라멘트 줄에 복제 · ✕ */
-.row-item.fil-row { grid-template-columns: 1fr auto auto auto auto; gap: 8px; }
+/* v1.2.0: 관리 창 줄 오른쪽 아이콘 묶음 (복제 · 수정) — 모든 관리 창이 같은 크기 · 간격. 삭제는 수정 창 왼쪽 아래에서 */
+.row-btns { display: flex; align-items: center; gap: 2px; }
 .icon-btn { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: 6px; font-size: 14px; }
 .icon-btn:hover { background: var(--bad-soft); color: var(--bad); }
 /* TBD-06: 목록 위 제목 줄 오른쪽에 추가 버튼 (목록이 길어져도 항상 같은 자리, 관리 창은 높이 고정) */
@@ -266,6 +279,29 @@ dialog > form > .dlg-body { flex: 1; min-height: 0; max-height: none; }
 .color-hero .t { font-size: 16px; font-weight: 700; }
 .color-hero .s { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .color-hero code { margin-left: auto; font-size: 12px; color: var(--muted); }
+/* TBD-13 시안: 색상 창 탭 — 머리 띠 바로 아래 밑줄 탭. 스풀 탭의 간단 | 세부 는 탭 줄 오른쪽 */
+.hub-tabs { display: flex; align-items: flex-end; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--border); }
+.hub-tabs > button { border: 0; background: none; cursor: pointer; padding: 10px 12px 9px; margin-bottom: -1px; border-bottom: 2px solid transparent; font-weight: 600; color: var(--muted); }
+.hub-tabs > button:hover { color: var(--text); }
+.hub-tabs > button.active { color: var(--accent); border-bottom-color: var(--accent); }
+.hub-tabs > button small { margin-left: 4px; font-weight: 600; color: var(--muted); }
+.hub-tabs .spacer { flex: 1; }
+.hub-tabs .view-tabs { margin-bottom: 6px; }
+dialog.hub { width: min(760px, calc(100vw - 32px)); height: min(600px, calc(100vh - 32px)); }
+dialog.hub > form { height: 100%; max-height: none; }
+dialog.hub .color-hero { border-bottom: 0; }
+/* 색상 정보 탭: 왼쪽 입력칸, 오른쪽 이 색상 요약 (스풀 · 무게 · 평균 구매가 · 쓰는 제품) */
+.hub-info { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 20px; align-items: start; }
+.hub-info .form-grid { grid-template-columns: 1fr 1fr; }
+.hub-aside { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }
+.hub-aside h5 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.hub-aside .kv { display: flex; justify-content: space-between; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.hub-aside .kv b { font-weight: 700; }
+.hub-aside ul { margin: 0; padding-left: 16px; }
+.hub-aside .go { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; font-size: 12.5px; text-align: left; }
+@media (max-width: 760px) { .hub-info { grid-template-columns: 1fr; } }
+.hub-stock { display: flex; gap: 14px; margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.hub-stock b { color: var(--text); margin-left: 4px; font-variant-numeric: tabular-nums; }
 
 /* 확인 대화상자 (common.html TBD-09) */
 .btn.danger-line { color: var(--bad); border-color: var(--bad); }
@@ -333,6 +369,10 @@ input[type=color] { width: 44px; height: 36px; padding: 2px; cursor: pointer; }
   .spool-row.simple .status-btns button { flex: 1; }
   .spool-row.detail { grid-template-columns: auto auto 1fr 120px 28px; } .spool-row.detail > .d-open, .spool-row.detail > .d-empty { display: none; }
 }
+/* v1.2.0: 관리 창 줄의 수정 · 복제는 아이콘 (마우스를 올리면 파랑) */
+.icon-btn.edit { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; }
+.icon-btn.edit svg { width: 16px; height: 16px; }
+.icon-btn.edit:hover { color: var(--accent); background: var(--surface-2); }
 </style>
 </head>
 <body>
@@ -621,7 +661,7 @@ function filCard(f) {
     <div class="tiles">
       <button type="button" class="fil-head" data-act="edit-filament" data-id="${f.id}" title="${esc(filFullName(f))}${avg != null ? ` · 보유 스풀 평균 ${won(avg)}` : ""} · 제품 ${used}개에서 사용 · 누르면 수정">${logo(b)}
         <div class="fil-brand">${esc(b.name)}</div>
-        <div class="fil-title">${esc(filName(f))}</div>
+        <div class="fil-title">${esc(filName(f))}<span class="fil-edit" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span></div>
         <div class="fil-meta ${f.price == null ? "none" : ""}">${f.price == null ? "가격 미입력" : `${won(f.price)} / ${kgTxt(f.spool_g / 1000)}kg`}</div>
       </button>
       ${cs.map(colorTile).join("")}
@@ -647,18 +687,19 @@ function colorTile(c) {
   </button>`;
 }
 
+const GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 function openTileMenu(tile, c) {
   closeTileMenu();
   const s = colorStock(c);
   const m = document.createElement("div");
   m.className = "tile-menu"; m.id = "tile-menu";
   m.innerHTML = `
-    <div class="tile-menu-head">${swatch(c.hex)}<strong>${esc(c.name)}</strong><code>${c.hex}</code></div>
-    <button type="button" data-m="purchase">+ 재고 추가</button>
-    <button type="button" data-m="pick-open" ${s.sealed ? "" : "disabled"}>사용 중으로 <small>재고 ${s.sealed}</small></button>
-    <button type="button" data-m="pick-finish" ${s.open ? "" : "disabled"}>사용 완료로 <small>사용 중 ${s.open}</small></button>
-    <button type="button" data-m="adjust" ${s.sealed + s.open + s.empty ? "" : "disabled"}>⚙ 스풀 조정</button>
-    <hr><button type="button" data-m="edit-color">색상 수정</button>`;
+    <div class="tile-menu-head" style="--c:${c.hex}"><span class="chip"></span><strong>${esc(c.name)}</strong>
+      <button type="button" class="gear" data-m="hub" title="색상 · 스풀 관리" aria-label="색상 · 스풀 관리">${GEAR}</button>
+      <span class="meta"><code>${c.hex}</code> · 스풀 ${s.sealed + s.open + s.empty}개</span></div>
+    <button type="button" class="act" data-m="purchase"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>재고 추가<small></small></button>
+    <button type="button" class="act" data-m="pick-open" ${s.sealed ? "" : "disabled"}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5l11 7-11 7z"/></svg>사용 중으로<small>재고 ${s.sealed}</small></button>
+    <button type="button" class="act" data-m="pick-finish" ${s.open ? "" : "disabled"}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L19 7"/></svg>사용 완료로<small>사용 중 ${s.open}</small></button>`;
   document.body.appendChild(m);
   const r = tile.getBoundingClientRect();
   const left = Math.min(r.left + scrollX, scrollX + innerWidth - m.offsetWidth - 12);
@@ -671,10 +712,11 @@ function openTileMenu(tile, c) {
     if (!b || b.disabled) return;
     closeTileMenu();
     ({ purchase: () => openPurchase(c), "pick-open": () => openPicker(c, "open"), "pick-finish": () => openPicker(c, "finish"),
-       adjust: () => openAdjust(c, 1, "simple"), "edit-color": () => openColor(c) })[b.dataset.m]();
+       hub: () => openHub(c, "info") })[b.dataset.m]();
   };
 }
 function closeTileMenu() {
+  hub.c = null;
   $("#tile-menu")?.remove();
   document.querySelectorAll(".tile.selected").forEach((t) => t.classList.remove("selected"));
 }
@@ -753,12 +795,12 @@ function openManage(tab) {
     const fils = db.filaments.filter((f) => f.brand === b.id);
     body = `<div class="manage">
       <div><div class="col-head"><h4>회사</h4><span class="count">${db.brands.length}</span><div class="spacer"></div><button type="button" class="btn small add" data-add-brand>+ 회사 추가</button></div>
-        <div class="col-scroll"><div class="list">${db.brands.map((x) => `<div class="list-item ${x.id === b.id ? "active" : ""}" data-brand="${x.id}">${logo(x)}<div class="grow"><strong>${esc(x.name)}</strong><small>필라멘트 ${db.filaments.filter((f) => f.brand === x.id).length}개</small></div><button type="button" class="btn small" data-edit-brand="${x.id}">수정</button></div>`).join("")}</div></div></div>
+        <div class="col-scroll"><div class="list">${db.brands.map((x) => `<div class="list-item ${x.id === b.id ? "active" : ""}" data-brand="${x.id}">${logo(x)}<div class="grow"><strong>${esc(x.name)}</strong><small>필라멘트 ${db.filaments.filter((f) => f.brand === x.id).length}개</small></div><button type="button" class="icon-btn edit" data-edit-brand="${x.id}" title="수정" aria-label="수정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div>`).join("")}</div></div></div>
       <div class="manage-right"><div class="col-head"><h4>${esc(b.name)} 의 필라멘트</h4><span class="count">${fils.length}</span><div class="spacer"></div><button type="button" class="btn small add" data-add-fil>+ 필라멘트 추가</button></div>
-        <div class="col-scroll">${fils.map((f) => `<div class="row-item fil-row"><div><strong>${esc(filName(f))}</strong><div class="hint">색상 ${db.colors.filter((c) => c.filament === f.id).length}개</div></div><span class="muted">${f.price == null ? "가격 미입력" : `${won(f.price)} / ${f.spool_g}g`}</span><button type="button" class="btn small" data-copy-fil="${f.id}">복제</button><button type="button" class="btn small" data-edit-fil="${f.id}">수정</button><button type="button" class="icon-btn" data-del-fil="${f.id}" title="삭제">✕</button></div>`).join("") || '<p class="hint">등록된 필라멘트가 없어요.</p>'}</div></div>
+        <div class="col-scroll">${fils.map((f) => `<div class="row-item fil-row"><div><strong>${esc(filName(f))}</strong><div class="hint">색상 ${db.colors.filter((c) => c.filament === f.id).length}개</div></div><span class="muted">${f.price == null ? "가격 미입력" : `${won(f.price)} / ${f.spool_g}g`}</span><div class="row-btns"><button type="button" class="icon-btn edit" data-copy-fil="${f.id}" title="복제" aria-label="복제"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg></button><button type="button" class="icon-btn edit" data-edit-fil="${f.id}" title="수정" aria-label="수정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div></div>`).join("") || '<p class="hint">등록된 필라멘트가 없어요.</p>'}</div></div>
     </div>`;
   } else {
-    body = `<div class="col"><div class="col-head"><h4>재질</h4><span class="count">${db.materials.length}</span><div class="spacer"></div><button type="button" class="btn small add" data-add-mat>+ 재질 추가</button></div><div class="col-scroll">${db.materials.map((m) => `<div class="row-item"><strong>${esc(m.name)}</strong><span class="muted">필라멘트 ${db.filaments.filter((f) => f.material === m.id).length}개</span><button type="button" class="btn small" data-edit-mat="${m.id}">수정</button></div>`).join("")}</div></div>`;
+    body = `<div class="col"><div class="col-head"><h4>재질</h4><span class="count">${db.materials.length}</span><div class="spacer"></div><button type="button" class="btn small add" data-add-mat>+ 재질 추가</button></div><div class="col-scroll">${db.materials.map((m) => `<div class="row-item"><strong>${esc(m.name)}</strong><span class="muted">필라멘트 ${db.filaments.filter((f) => f.material === m.id).length}개</span><button type="button" class="icon-btn edit" data-edit-mat="${m.id}" title="수정" aria-label="수정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></div>`).join("")}</div></div>`;
   }
   show(dlg, `<div class="dlg-head"><span class="title">필라멘트 관리</span>${tabs}</div><div class="dlg-body cols">${body}</div>
     <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button></div>`, "wide fixed");
@@ -899,6 +941,7 @@ function openColor(c, preset) {
     if (e.target.name === "filament") priceHint();
   };
   form.onclick = (e) => { if (e.target.closest("[data-del]")) removeColor(c); };
+  if (hub.c === c) decorateHub(c, "info");
   form.onsubmit = (e) => {
     e.preventDefault(); const fd = new FormData(form); const v = fd.get("hex").trim();
     if (!HEX_RE.test(v)) return toast("색상 코드를 확인하세요");
@@ -999,6 +1042,51 @@ function openAdjust(c, page = 1, view = "simple") {
     if (ORDER[to] < ORDER[s.status] && !confirm(`${c.name} ${s.code}\n${STATUS[s.status]} → ${STATUS[to]}(으)로 되돌릴까요?`)) return;
     setStatus(s, to); render(); openAdjust(c, page, view); toast(`${c.name} ${s.code} → ${STATUS[to]}`, true);
   };
+  if (hub.c === c) decorateHub(c, "spools", view);
+}
+
+// ---------------------------------------------------------------- TBD-13 시안: 색상 창 하나 (색상 정보 · 스풀 탭)
+// 타일 메뉴의 `⚙ 스풀 조정` · `색상 수정` 을 버튼 하나 `⚙ 색상 · 스풀 관리` 로 합친다. 색상 정보 탭으로 열린다. 머리 띠(TBD-14)는 두 탭이 같이 쓴다.
+// 색상 정보 탭은 `저장` 으로 저장, 스풀 탭은 지금처럼 바꾸면 바로 저장 (아래 버튼은 `닫기`)
+const hub = { c: null };
+function openHub(c, tab) {
+  hub.c = c;
+  if (tab === "info") openColor(c); else openAdjust(c, 1, "simple");
+}
+function decorateHub(c, tab, view = "simple") {
+  const s = colorStock(c), n = s.sealed + s.open + s.empty;
+  const tabs = `<div class="hub-tabs"><button type="button" data-hub="info" class="${tab === "info" ? "active" : ""}">색상 정보</button>
+    <button type="button" data-hub="spools" class="${tab === "spools" ? "active" : ""}">스풀<small>${n}</small></button><span class="spacer"></span>
+    ${tab === "spools" ? `<div class="view-tabs"><button type="button" data-view="simple" class="${view === "simple" ? "active" : ""}">간단</button><button type="button" data-view="detail" class="${view === "detail" ? "active" : ""}">세부</button></div>` : ""}</div>`;
+  const hero = `<div class="color-hero" id="color-hero" style="--c:${c.hex}"><span class="chip"></span><div><div class="t">${esc(c.name)}</div><div class="s">${esc(filFullName(filamentOf(c)))}</div></div><code>${c.hex}</code></div>`;
+  const form = dlg.form;
+  if (tab === "info") {
+    $("#color-hero .t", form).textContent = c.name; // 두 탭의 머리를 같게 (창 이름 대신 색상 이름)
+    $("#color-hero", form).insertAdjacentHTML("afterend", tabs);
+    // 넓어진 창: 입력칸 오른쪽에 이 색상 요약
+    const grid = form.querySelector(".dlg-body > .form-grid");
+    const f = filamentOf(c), held = spoolsOf(c).filter((x) => x.status !== "empty" && x.price != null);
+    const avg = held.length ? held.reduce((a, x) => a + x.price, 0) / held.length : null;
+    const used = COLOR_USED_BY[c.id] || [];
+    grid.outerHTML = `<div class="hub-info">${grid.outerHTML}<aside class="hub-aside">
+      <div><h5>스풀 ${n}개</h5><div class="kv"><span>재고</span><b>${s.sealed}</b></div><div class="kv"><span>사용 중</span><b>${s.open}</b></div><div class="kv"><span>사용 완료</span><b>${s.empty}</b></div>
+        <button type="button" class="go" data-hub="spools">스풀 탭에서 보기 →</button></div>
+      <div><h5>남은 무게 · 구매가</h5><div class="kv"><span>재고 + 사용 중</span><b>${kgTxt((s.sealed + s.open) * f.spool_g / 1000)}kg</b></div><div class="kv"><span>평균 구매가</span><b>${won(avg)}</b></div></div>
+      <div><h5>쓰는 제품 ${used.length}개</h5>${used.length ? `<ul>${used.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : '<span class="muted">없음</span>'}</div>
+    </aside></div>`;
+  }
+  else {
+    form.querySelector(".dlg-head").outerHTML = hero + tabs;
+    form.querySelector(".dlg-body").insertAdjacentHTML("afterbegin", `<div class="hub-stock"><span>재고<b>${s.sealed}</b></span><span>사용 중<b>${s.open}</b></span><span>사용 완료<b>${s.empty}</b></span></div>`);
+  }
+  dlg.el.classList.add("hub");
+  // 탭 바꾸기 (창은 그대로 두고 내용만). 다른 클릭은 원래 창의 처리로
+  const own = form.onclick;
+  form.onclick = (e) => {
+    const t = e.target.closest("[data-hub]");
+    if (t) return t.dataset.hub === "info" ? openColor(c) : openAdjust(c, 1, "simple");
+    own?.(e);
+  };
 }
 
 // ---------------------------------------------------------------- 시작
@@ -1024,16 +1112,18 @@ let resizeTimer;
 addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (!document.activeElement || document.activeElement.id !== "q") render(); }, 150); });
 const white = db.colors[0];
 ({
+  hub: () => openHub(white, "info"),
+  "hub-spools": () => openHub(white, "spools"),
   manage: () => openManage("brands"),
   "manage-material": () => openManage("materials"),
   brand: () => { openManage("brands"); openBrand(db.brands[0]); },
   filament: () => { openManage("brands"); openFilament(db.filaments[1], dlg2); },
-  color: () => openColor(db.colors[1]),
+  color: () => openHub(db.colors[1], "info"),
   purchase: () => openPurchase(white),
   "pick-open": () => openPicker(white, "open"),
   "pick-finish": () => openPicker(white, "finish"),
-  adjust: () => openAdjust(white, 1, "simple"),
-  "adjust-detail": () => openAdjust(white, 1, "detail"),
+  adjust: () => openHub(white, "spools"),
+  "adjust-detail": () => { hub.c = white; openAdjust(white, 1, "detail"); },
   "tile-menu": () => openTileMenu($(`.tile[data-color="${white.id}"]`), white),
 })[params.get("open")]?.();
 
