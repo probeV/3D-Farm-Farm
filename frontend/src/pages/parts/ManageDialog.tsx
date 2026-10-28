@@ -10,6 +10,7 @@ import PartCategoryDialog from './PartCategoryDialog'
 import PartDialog from './PartDialog'
 import { inCategory, inShop, shopsOf, type CategorySel, type ShopSel } from './partList'
 import { usePartsData } from './usePartsData'
+import EditButton from '../../components/EditButton'
 
 // 관리 창 위에 겹쳐 여는 창
 type Sub = { kind: 'part'; part: Part | null; copyOf?: Part } | { kind: 'category'; category: PartCategory | null }
@@ -86,16 +87,12 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
         <small>부자재 {parts.filter((p) => inCategory(p, s)).length}개</small>
       </div>
       {category && (
-        <button
-          type="button"
-          className="btn small"
+        <EditButton
           onClick={(e) => {
             e.stopPropagation() // 카테고리 선택까지 같이 되지 않도록
             setSub({ kind: 'category', category })
           }}
-        >
-          수정
-        </button>
+        />
       )}
     </div>
   )
@@ -185,9 +182,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                     >
                       복제
                     </button>
-                    <button type="button" className="btn small" onClick={() => setSub({ kind: 'part', part: p })}>
-                      수정
-                    </button>
+                    <EditButton onClick={() => setSub({ kind: 'part', part: p })} />
                     <button
                       type="button"
                       className="icon-btn"

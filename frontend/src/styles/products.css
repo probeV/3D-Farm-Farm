@@ -286,6 +286,14 @@ button.sum-card.active {
   color: var(--bad);
   font-weight: 700;
 }
+/* No. 열: 5자리까지 보이고 더 길면 … (마우스를 올리면 전체, TBD-12). 표 칸은 max-width 가 안 먹어서 안쪽 span 으로 */
+.no-cell {
+  display: inline-block;
+  max-width: 5ch;
+  vertical-align: bottom;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 tr.discontinued td:not(:first-child) {
   opacity: 0.55;
 }
@@ -616,6 +624,25 @@ dialog.xwide .dlg-body {
 .lines-head .head-btns {
   display: flex;
   gap: 6px;
+}
+/* 표 맨 아래 `+` 줄 (v1.2.0): 점선 칸, 누르면 그 자리에 새 줄 */
+.mat-add {
+  display: block;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.mat-add:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* 다른 제품에서 부자재 가져오기 (TBD-22) */

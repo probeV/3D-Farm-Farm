@@ -1016,55 +1016,106 @@ button.fil-head:hover .fil-title::after {
 .tile-menu {
   position: absolute;
   z-index: 50;
-  min-width: 210px;
+  width: 240px;
   padding: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
+/* 머리: 색상 칩 · 이름 · 코드 · 스풀 수, 오른쪽 톱니바퀴(색상 · 스풀 관리, TBD-13) */
 .tile-menu-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 2px 10px;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px 8px;
-  border-bottom: 1px solid var(--border);
+  padding: 6px 4px 10px 6px;
   margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
 }
-.tile-menu-head code {
-  margin-left: auto;
+.tile-menu-head .chip {
+  grid-row: span 2;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--c);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
-.tile-menu button {
-  display: flex;
-  justify-content: space-between;
+.tile-menu-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tile-menu-head .meta {
+  grid-column: 2;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tile-menu-head .meta code {
+  font-size: 11px;
+}
+.tile-menu-head .gear {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.tile-menu-head .gear:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.tile-menu-head .gear svg {
+  width: 17px;
+  height: 17px;
+}
+/* 동작: 아이콘 · 이름 · 개수 */
+.tile-menu .act {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   border: 0;
   background: none;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
   text-align: left;
 }
-.tile-menu button:hover:not(:disabled) {
+.tile-menu .act svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+.tile-menu .act:hover:not(:disabled),
+.tile-menu .act:hover:not(:disabled) svg {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.tile-menu button:disabled {
+.tile-menu .act:hover:not(:disabled) svg {
+  background: none;
+}
+.tile-menu .act:disabled {
   opacity: 0.4;
   cursor: default;
 }
-.tile-menu small {
-  font-weight: 400;
+.tile-menu .act small {
+  font-weight: 500;
   color: var(--muted);
-}
-.tile-menu hr {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 4px 0;
+  font-variant-numeric: tabular-nums;
 }
 .only-list .page-title,
 .only-list .top-row,
@@ -1114,6 +1165,108 @@ button.fil-head:hover .fil-title::after {
   margin-left: auto;
   font-size: 12px;
   color: var(--muted);
+}
+
+/* 색상 · 스풀 관리 창 (TBD-13): 머리 띠 아래 밑줄 탭, 스풀 탭의 간단 | 세부 는 탭 줄 오른쪽 */
+.hub-head .color-hero {
+  border-bottom: 0;
+}
+.hub-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.hub-tabs > button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 10px 12px 9px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-weight: 600;
+  color: var(--muted);
+}
+.hub-tabs > button:hover {
+  color: var(--text);
+}
+.hub-tabs > button[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.hub-tabs > button small {
+  margin-left: 4px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.hub-tabs .spacer {
+  flex: 1;
+}
+.hub-tabs .view-tabs {
+  margin-bottom: 6px;
+}
+/* 색상 정보 탭: 왼쪽 입력칸, 오른쪽 이 색상 요약 */
+.hub-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 20px;
+  align-items: start;
+}
+.hub-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.hub-aside h5 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.hub-aside .kv {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+.hub-aside .kv b {
+  font-weight: 700;
+}
+.hub-aside ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.hub-aside .go {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12.5px;
+  text-align: left;
+}
+.hub-stock {
+  display: flex;
+  gap: 14px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hub-stock b {
+  color: var(--text);
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .hub-info {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 대화상자 */
@@ -1575,6 +1728,21 @@ input[type='color'] {
 .icon-btn:hover {
   background: var(--surface-2);
   color: var(--bad);
+}
+/* 관리 창 줄의 수정 연필 (EditButton) — 삭제 ✕ 와 같은 자리 크기, 마우스를 올리면 파랑 */
+.icon-btn.edit {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+.icon-btn.edit svg {
+  width: 16px;
+  height: 16px;
+}
+.icon-btn.edit:hover {
+  color: var(--accent);
 }
 .pager {
   display: flex;

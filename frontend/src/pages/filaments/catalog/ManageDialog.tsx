@@ -18,6 +18,7 @@ import BrandDialog from './BrandDialog'
 import BrandLogo from '../BrandLogo'
 import FilamentDialog from './FilamentDialog'
 import MaterialDialog from './MaterialDialog'
+import EditButton from '../../../components/EditButton'
 
 type Tab = 'brands' | 'materials'
 
@@ -92,16 +93,12 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                       <strong>{b.name}</strong>
                       <small>필라멘트 {b.filament_count}개</small>
                     </div>
-                    <button
-                      type="button"
-                      className="btn small"
+                    <EditButton
                       onClick={(e) => {
                         e.stopPropagation() // 회사 선택까지 같이 되지 않도록
                         setSub({ kind: 'brand', brand: b })
                       }}
-                    >
-                      수정
-                    </button>
+                    />
                   </div>
                 ))}
               </div>
@@ -128,13 +125,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                     >
                       복제
                     </button>
-                    <button
-                      type="button"
-                      className="btn small"
-                      onClick={() => setSub({ kind: 'filament', filament: f })}
-                    >
-                      수정
-                    </button>
+                    <EditButton onClick={() => setSub({ kind: 'filament', filament: f })} />
                     <button
                       type="button"
                       className="icon-btn"
@@ -164,9 +155,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
               <div key={m.id} className="row-item">
                 <strong>{m.name}</strong>
                 <span className="muted">필라멘트 {m.filament_count}개</span>
-                <button type="button" className="btn small" onClick={() => setSub({ kind: 'material', material: m })}>
-                  수정
-                </button>
+                <EditButton onClick={() => setSub({ kind: 'material', material: m })} />
               </div>
             ))}
             {!materials.length && <p className="hint">등록된 재질이 없어요.</p>}

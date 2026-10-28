@@ -12,6 +12,7 @@ import type { ProductRow } from '../list/productList'
 import StatusBadge from '../StatusBadge'
 import { useCostData } from '../useCostData'
 import CategoryDialog from './CategoryDialog'
+import EditButton from '../../../components/EditButton'
 
 // 관리 창 위에 겹쳐 여는 창
 type Sub =
@@ -81,9 +82,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           >
             복제
           </button>
-          <button type="button" className="btn small" onClick={() => setSub({ kind: 'product', product: p })}>
-            수정
-          </button>
+          <EditButton onClick={() => setSub({ kind: 'product', product: p })} />
           <button type="button" className="icon-btn" title="제품 삭제" onClick={() => remove(p)}>
             ✕
           </button>
@@ -134,16 +133,12 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
       </div>
       {opts.sub && <small>{count(s)}</small>}
       {opts.category && (
-        <button
-          type="button"
-          className="btn small"
+        <EditButton
           onClick={(e) => {
             e.stopPropagation() // 카테고리 선택까지 같이 되지 않도록
             setSub({ kind: 'category', category: opts.category! })
           }}
-        >
-          수정
-        </button>
+        />
       )}
     </div>
   )

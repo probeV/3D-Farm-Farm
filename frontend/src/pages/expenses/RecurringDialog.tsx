@@ -8,6 +8,7 @@ import { useToast } from '../../components/useToast'
 import { won } from '../../format'
 import { categoryInfo } from './categories'
 import RecurringFormDialog from './RecurringFormDialog'
+import EditButton from '../../components/EditButton'
 
 const HELP =
   "매달 같은 금액이 나가는 것(구독 · 월정액). 등록해 두면 결제일이 지난 달마다 '확인하고 넣기'로 지출 목록에 들어가요. " +
@@ -79,9 +80,7 @@ export default function RecurringDialog({ recurring, onClose }: Props) {
                 </div>
                 <div className="price">{won(r.amount)}</div>
                 <div className="row-btns">
-                  <button type="button" className="btn small" onClick={() => setEditing(r)}>
-                    수정
-                  </button>
+                  <EditButton onClick={() => setEditing(r)} />
                   <button
                     type="button"
                     className="icon-btn"
