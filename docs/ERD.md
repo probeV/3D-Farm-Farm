@@ -19,6 +19,7 @@ erDiagram
     PRODUCT ||--o{ PRODUCT_PART : "사용 부자재"
     PART ||--o{ PRODUCT_PART : "사용됨"
     PART_CATEGORY |o--o{ PART : "카테고리"
+    RECURRING_EXPENSE |o--o{ EXPENSE : "넣은 지출"
 
     BRAND {
         bigint id PK
@@ -105,6 +106,27 @@ erDiagram
         bigint part_id FK
         decimal qty "수량"
     }
+    EXPENSE {
+        bigint id PK
+        date date "지출 날짜 (오늘 이후 불가)"
+        varchar name "항목"
+        varchar category "invest / filament / part / supply / sub / sell / etc"
+        decimal amount "금액 (1원 이상)"
+        varchar shop "구매처, 빈 값 허용"
+        varchar url "주문 링크, 빈 값 허용"
+        text note
+        bigint recurring_id FK "반복 지출에서 넣은 줄, NULL=직접 입력"
+        datetime created_at
+    }
+    RECURRING_EXPENSE {
+        bigint id PK
+        varchar name
+        varchar category "EXPENSE.category 와 같은 7개"
+        decimal amount "금액 (1원 이상)"
+        smallint day "결제일 1~31"
+        date start "시작 달 (항상 1일)"
+        text note
+    }
     COST_SETTING {
         bigint id PK "항상 1개 행"
         decimal power_kw
@@ -121,6 +143,7 @@ erDiagram
 |---|---|
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` |
 | `products` | `Category`, `Subcategory`, `PartCategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
+| `expenses` | `Expense`, `RecurringExpense` |
 
 ## 모델 설명
 
@@ -139,6 +162,8 @@ erDiagram
 | `ProductFilament` | 제품 ↔ 필라멘트 (다대다) + 사용량 + 색상(선택). 같은 필라멘트를 색상별로 여러 줄 둘 수 있음 |
 | `ProductPart` | 제품 ↔ 부자재 (다대다) + 수량 |
 | `CostSetting` | 원가 계산 설정값. 항상 1개 행만 존재 (기본값은 PRD 3.8) |
+| `Expense` | 지출 한 줄 (PRD 3.10). 분류는 고정 7개 (`ExpenseCategory`) |
+| `RecurringExpense` | 반복 지출 (구독 · 월정액). 지출을 저절로 만들지 않고, 화면에서 확인하고 넣는다 |
 
 ## 계산 규칙
 ```
@@ -155,6 +180,10 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
   (재고 / 사용 중 / 사용 완료 각각 표시, 비율 막대는 세 값의 비율)
 
 보유 스풀 평균 구매가 (PRD INV-08) = 재고 + 사용 중 스풀의 Spool.price 평균
+
+반복 지출 결제일 (PRD EXP-04) = 그 달의 RecurringExpense.day, 그 달 말일보다 크면 말일 (RecurringExpense.pay_date)
+이번 달에 넣을 반복 지출 = 시작 달 ≤ 이번 달 이고, 이번 달 결제일 ≤ 오늘 이고, 이번 달에 그 반복에서 넣은 지출이 없는 것
+누적 투자금 (PRD EXP-05) = category 가 invest 인 Expense.amount 합계 (전체 기간)
 ```
 
 ## 관계와 삭제 규칙
@@ -173,6 +202,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Subcategory.category` → `Category` | CASCADE | 카테고리 삭제 시 (제품이 없을 때만 가능) 세부 분류도 함께 삭제 |
 | `ProductFilament.product` → `Product` | CASCADE | 제품 삭제 시 함께 삭제 |
 | `ProductPart.product` → `Product` | CASCADE | 제품 삭제 시 함께 삭제 |
+| `Expense.recurring` → `RecurringExpense` | SET_NULL | 반복 지출을 지워도 이미 넣은 지출은 남는다 (연결만 끊김) |
 
 ## 제약 조건 · 인덱스
 | 대상 | 종류 | 용도 |
@@ -191,6 +221,8 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Product.no` | UNIQUE | 제품 No. 중복 방지 |
 | `Product.subcategory` | 검사 | 세부 분류는 그 제품의 카테고리에 속해야 함 (`Product.clean`) |
 | `ProductFilament.color` | 검사 | 색상은 그 줄의 필라멘트에 속해야 함 (`ProductFilament.clean`) |
+| `Expense.category` · `RecurringExpense.category` | CHOICES | 고정 7개 (PRD EXP-03) |
+| `Expense (recurring, 연 · 월)` | 검사 | 같은 반복 지출은 한 달에 한 줄만 (`ExpenseSerializer.validate`) |
 
 ## 참고 사항
 - 금액·무게·수량은 `DecimalField` (부동소수점 오차 방지). 원 단위 반올림은 화면/CSV 에서 한다.

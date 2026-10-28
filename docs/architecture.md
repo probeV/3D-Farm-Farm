@@ -25,9 +25,11 @@ frontend/ (React)                          backend/ (Django)
 |---|---|---|
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` | 모델 완료 |
 | `products` | `Category`, `Subcategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 모델 · API 완료 |
+| `expenses` | `Expense`, `RecurringExpense` | 모델 · API 완료 |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
 - **참조 방향은 한쪽으로만**: `products` → `filaments` (제품이 필라멘트를 씀). `filaments` 는 `products` 를 import 하지 않는다.
+  `expenses` 는 다른 앱의 모델을 쓰지 않는다 (공통 `MONEY` · `BaseViewSet` 만 `filaments` 에서).
 - 부자재(`Part`)는 제품 원가에서만 쓰여서 `products` 에 둔다. 따로 커지면 그때 `parts` 앱으로 분리한다.
 - 새 앱: `backend/` 에서 `python manage.py startapp <앱>` → `config/settings.py` 의 `INSTALLED_APPS` 에 추가.
 
@@ -58,6 +60,7 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
   # config/urls.py
   path('api/v0/', include('filaments.urls')),
   path('api/v0/', include('products.urls')),
+  path('api/v0/', include('expenses.urls')),
   ```
 - 주소 · 응답 모양이 바뀌는 변경은 `v1` 을 새로 만들고 `v0` 는 그대로 둔다. 칸을 추가하는 정도는 같은 버전에서
 - 주소는 복수형 명사: `/api/v0/brands/`, `/api/v0/filaments/`, `/api/v0/colors/{id}/`, `/api/v0/spools/`
@@ -89,12 +92,13 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
 frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
                 client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
-  pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, settings/)
-  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch, Help …)
+  pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, expenses/, settings/)
+  components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch, Help, LinkBadge …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
                 products.css — 제품 원가 목업 CSS 중 app.css 에 없는 것
-                parts.css · settings.css — 부자재 · 제품 원가 설정 목업 CSS 중 위 두 파일에 없는 것
-  format.ts     화면 표시용 숫자 모양 (원, kg)
+                parts.css · settings.css · expenses.css — 부자재 · 제품 원가 설정 · 지출 목업 CSS 중 위 파일들에 없는 것
+  format.ts     화면 표시용 숫자 모양 (원, kg, 날짜)
+  csv.ts        CSV 만들기(UTF-8 BOM) · 파일로 내려받기 (제품 원가 · 지출)
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
   useForm.ts    폼 공통 흐름 훅: 입력 → 스키마 검사 → 저장 → 서버 오류 표시
   App.tsx       레이아웃(사이드바) + 화면 전환
@@ -131,6 +135,13 @@ pages/parts/
   usePartsData.ts      부자재 + 제품(부자재 줄)을 함께 불러와 부자재별 사용하는 제품까지 (목록 · 관리 창이 같이 씀)
   partList.ts          검색 · 정렬 · 요약 · 사용하는 제품 · 구매처 고르기
   ManageDialog.tsx     부자재 관리 (구매처 → 부자재, screens 3.4), PartDialog.tsx 추가 · 복제 · 수정, schemas.ts
+
+pages/expenses/
+  ExpensesPage.tsx     화면 진입점: 요약 카드 · 반복 지출 알림 · 분류별 합계 · 지출 목록, 대화상자 연결
+  categories.ts        분류 7개 (이름 · 예시 · v2 에서 쓰이는 곳), CategoryPick.tsx 분류 버튼
+  expenseList.ts       기간 · 검색 · 정렬 · 요약 · 분류별 합계 · 넣을 반복 지출 · CSV
+  ExpenseDialog.tsx    지출 추가 · 복제 · 수정, RecurringDialog.tsx 반복 지출 관리 (+ RecurringFormDialog.tsx),
+                       DueDialog.tsx 이번 달 반복 지출 넣기, schemas.ts
 
 pages/settings/
   SettingsPage.tsx     제품 원가 설정 (screens 4장): 설정 묶음 · 저장 줄. schemas.ts 에 항목 목록 · 검증 · 계산 예시

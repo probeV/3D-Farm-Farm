@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import { materialSchema } from './pages/filaments/catalog/schemas'
 import { purchaseSchema } from './pages/filaments/spools/schemas'
-import { date, decimal, fieldErrors, intRange, money, selectedId, text, validate } from './validation'
+import { amount, date, decimal, fieldErrors, intRange, money, selectedId, text, validate } from './validation'
 
 // 성공하면 변환된 값, 실패하면 첫 오류 문구
 const check = (schema: z.ZodType, input: unknown) => {
@@ -30,6 +30,17 @@ describe('money (금액: 비우면 null, 0 이상의 정수)', () => {
     ['10000000000', '금액이 너무 커요'], // 서버 max_digits=10
   ])('%j → 오류 %j', (input, message) => {
     expect(check(money, input)).toEqual({ error: message })
+  })
+})
+
+describe('amount (꼭 넣는 금액: 1 이상의 정수)', () => {
+  it('쉼표 허용', () => expect(check(amount, '29,000')).toEqual({ ok: 29000 }))
+  it.each([
+    ['', '입력하세요'],
+    ['0', '1원 이상으로 입력하세요'],
+    ['1.5', '원 단위 정수로 입력하세요'],
+  ])('%j → 오류 %j', (input, message) => {
+    expect(check(amount, input)).toEqual({ error: message })
   })
 })
 
