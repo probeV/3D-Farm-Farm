@@ -1,23 +1,35 @@
 import { useState } from 'react'
 import { useSpools, type Color, type Spool, type SpoolStatus } from '../../../api/filaments'
-import Dialog from '../../../components/Dialog'
 import Pager, { PAGE_SIZE } from '../../../components/Pager'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { dateText } from '../../../format'
 import { money } from '../../../validation'
 import { useSpoolActions } from './spoolActions'
 import { STATUSES, STATUS_LABEL } from '../stock'
-import Swatch from '../../../components/Swatch'
 
-type View = 'simple' | 'detail'
+export type SpoolView = 'simple' | 'detail'
 
-// 스풀 조정 (PRD INV-04 · INV-05, docs/screens.md 1.9)
-// 간단: 구매가 · 상태 버튼 / 세부: 날짜 · 구매가 · 삭제. 상태를 바꿔도 창은 열린 채 같은 페이지에 머문다
-export default function AdjustDialog({ color, onClose }: { color: Color; onClose: () => void }) {
+// 간단 | 세부 전환 (색상 · 스풀 관리 창의 탭 줄 오른쪽)
+export function SpoolViewTabs({ view, onView }: { view: SpoolView; onView: (v: SpoolView) => void }) {
+  return (
+    <div className="view-tabs">
+      {(['simple', 'detail'] as const).map((v) => (
+        <button key={v} type="button" className={v === view ? 'active' : ''} onClick={() => onView(v)}>
+          {v === 'simple' ? '간단' : '세부'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// 스풀 조정 표 (PRD INV-04 · INV-05, docs/screens.md 1.6 스풀 탭). 색상 · 스풀 관리 창의 스풀 탭에 들어간다
+// 간단: 구매가 · 상태 버튼 / 세부: 날짜 · 구매가 · 삭제. 상태를 바꿔도 같은 페이지에 머문다
+export default function SpoolTable({ color, view }: { color: Color; view: SpoolView }) {
   const spools = useSpools(color.id)
   const actions = useSpoolActions()
   const toast = useToast()
-  const [view, setView] = useState<View>('simple')
+  const confirm = useConfirm()
   const [page, setPage] = useState(1)
 
   const list = spools.data ?? []
@@ -26,42 +38,29 @@ export default function AdjustDialog({ color, onClose }: { color: Color; onClose
   const rows = list.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
 
   // 거꾸로 이동(사용 완료 → 사용 중 등)은 확인 후 실행 (PRD INV-07)
-  const changeStatus = (s: Spool, to: SpoolStatus) => {
+  const changeStatus = async (s: Spool, to: SpoolStatus) => {
     const backwards = STATUSES.indexOf(to) < STATUSES.indexOf(s.status)
-    const msg = `${color.name} ${s.code}\n${STATUS_LABEL[s.status]} → ${STATUS_LABEL[to]}(으)로 되돌릴까요?`
-    if (backwards && !confirm(msg)) return
+    const message = (
+      <>
+        <b>
+          {color.name} {s.code}
+        </b>
+        <br />
+        {STATUS_LABEL[s.status]} → {STATUS_LABEL[to]}(으)로 되돌릴까요?
+      </>
+    )
+    if (backwards && !(await confirm({ title: '스풀 되돌리기', message, okLabel: '되돌리기' }))) return
     actions.changeStatus(color, s, to).catch(actions.fail)
   }
-  const remove = (s: Spool) => {
-    if (!confirm(`${color.name} ${s.code} 스풀 기록을 삭제할까요?`)) return
+  const remove = async (s: Spool) => {
+    const message = `${color.name} ${s.code} 스풀 기록을 삭제할까요?`
+    if (!(await confirm({ title: '스풀 삭제', message, danger: true }))) return
     actions.remove(s).catch(actions.fail)
   }
   const setPrice = (s: Spool, price: number | null) => actions.setPrice(s, price).catch(actions.fail)
 
-  const tabs = (
-    <div className="view-tabs">
-      {(['simple', 'detail'] as const).map((v) => (
-        <button key={v} type="button" className={v === view ? 'active' : ''} onClick={() => setView(v)}>
-          {v === 'simple' ? '간단' : '세부'}
-        </button>
-      ))}
-    </div>
-  )
-
   return (
-    <Dialog
-      size="wide"
-      title={
-        <>
-          <Swatch hex={color.hex} /> {color.name} · 스풀 조정{' '}
-          <span className="muted" style={{ fontWeight: 400 }}>
-            ({list.length}개)
-          </span>
-        </>
-      }
-      headExtra={tabs}
-      onClose={onClose}
-    >
+    <>
       {view === 'simple' ? (
         <div className="spool-row simple head">
           <span>스풀 / 구매일</span>
@@ -118,8 +117,9 @@ export default function AdjustDialog({ color, onClose }: { color: Color; onClose
           ),
         )}
       </div>
+      {spools.data && !list.length && <p className="hint">스풀이 없어요. 타일 메뉴의 재고 추가로 넣으세요.</p>}
       <Pager page={current} pages={pages} onPage={setPage} />
-    </Dialog>
+    </>
   )
 }
 

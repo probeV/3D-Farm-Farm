@@ -1,22 +1,24 @@
 import { useState } from 'react'
 import { useBrands, useFilaments, useMaterials, type Brand, type Filament, type Material } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
+import ManageColumn from '../../../components/ManageColumn'
 import { won } from '../../../format'
 import BrandDialog from './BrandDialog'
 import BrandLogo from '../BrandLogo'
 import FilamentDialog from './FilamentDialog'
 import MaterialDialog from './MaterialDialog'
+import EditButton, { CopyButton } from '../../../components/EditButton'
 
 type Tab = 'brands' | 'materials'
 
-// 관리 창 위에 겹쳐 여는 창 (null = 추가)
+// 관리 창 위에 겹쳐 여는 창 (null = 추가, copyOf = 복제)
 type Sub =
   | { kind: 'brand'; brand: Brand | null }
-  | { kind: 'filament'; filament: Filament | null }
+  | { kind: 'filament'; filament: Filament | null; copyOf?: Filament }
   | { kind: 'material'; material: Material | null }
 
 // 필라멘트 관리 (PRD FIL-03, docs/screens.md 1.5)
-// 회사·필라멘트 탭: 왼쪽 회사 목록 / 오른쪽 고른 회사의 필라멘트. 재질 탭: 재질 목록
+// 회사·필라멘트 탭: 왼쪽 회사 목록 / 오른쪽 고른 회사의 필라멘트. 재질 탭: 재질 목록. 목록마다 따로 스크롤
 export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const brands = useBrands().data ?? []
   const materials = useMaterials().data ?? []
@@ -30,6 +32,8 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   const brand = brands.find((b) => b.id === brandId) ?? brands[0]
   const brandFilaments = filaments.filter((f) => f.brand === brand?.id)
 
+  // 색상이 있으면 지울 수 없어 확인 창 없이 이유만. 제품에서 쓰면 서버가 409 (PRD FIL-09)
+
   const tabs = (
     <div className="view-tabs">
       {(['brands', 'materials'] as const).map((t) => (
@@ -42,10 +46,15 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Dialog size="wide" title="필라멘트 관리" headExtra={tabs} onClose={onClose}>
+      <Dialog size="wide" fixed title="필라멘트 관리" headExtra={tabs} onClose={onClose}>
         {tab === 'brands' ? (
           <div className="manage">
-            <div>
+            <ManageColumn
+              title="회사"
+              count={brands.length}
+              addLabel="+ 회사 추가"
+              onAdd={() => setSub({ kind: 'brand', brand: null })}
+            >
               <div className="list">
                 {brands.map((b) => (
                   <div
@@ -58,86 +67,61 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                       <strong>{b.name}</strong>
                       <small>필라멘트 {b.filament_count}개</small>
                     </div>
-                    <button
-                      type="button"
-                      className="btn small"
+                    <EditButton
                       onClick={(e) => {
                         e.stopPropagation() // 회사 선택까지 같이 되지 않도록
                         setSub({ kind: 'brand', brand: b })
                       }}
-                    >
-                      수정
-                    </button>
+                    />
                   </div>
                 ))}
               </div>
-              <button
-                type="button"
-                className="btn small"
-                style={{ marginTop: 10 }}
-                onClick={() => setSub({ kind: 'brand', brand: null })}
+            </ManageColumn>
+            {brand ? (
+              <ManageColumn
+                className="manage-right"
+                title={`${brand.name} 의 필라멘트`}
+                count={brandFilaments.length}
+                addLabel="+ 필라멘트 추가"
+                onAdd={() => setSub({ kind: 'filament', filament: null })}
               >
-                + 회사 추가
-              </button>
-            </div>
-            <div className="manage-right">
-              {brand ? (
-                <>
-                  <h4>{brand.name} 의 필라멘트</h4>
-                  {brandFilaments.map((f) => (
-                    <div key={f.id} className="row-item">
-                      <div>
-                        <strong>{f.series ? `${f.material_name} ${f.series}` : f.material_name}</strong>
-                        <div className="hint">색상 {f.colors.length}개</div>
-                      </div>
-                      <span className="muted">
-                        {f.price == null ? '가격 미입력' : `${won(f.price)} / ${f.spool_g}g`}
-                      </span>
-                      <button
-                        type="button"
-                        className="btn small"
-                        onClick={() => setSub({ kind: 'filament', filament: f })}
-                      >
-                        수정
-                      </button>
+                {brandFilaments.map((f) => (
+                  <div key={f.id} className="row-item fil-row">
+                    <div>
+                      <strong>{f.series ? `${f.material_name} ${f.series}` : f.material_name}</strong>
+                      <div className="hint">색상 {f.colors.length}개</div>
                     </div>
-                  ))}
-                  {!brandFilaments.length && <p className="hint">등록된 필라멘트가 없어요.</p>}
-                  <button
-                    type="button"
-                    className="btn small"
-                    style={{ marginTop: 10 }}
-                    onClick={() => setSub({ kind: 'filament', filament: null })}
-                  >
-                    + 필라멘트 추가
-                  </button>
-                </>
-              ) : (
+                    <span className="muted">{f.price == null ? '가격 미입력' : `${won(f.price)} / ${f.spool_g}g`}</span>
+                    <div className="row-btns">
+                      <CopyButton onClick={() => setSub({ kind: 'filament', filament: null, copyOf: f })} />
+                      <EditButton onClick={() => setSub({ kind: 'filament', filament: f })} />
+                    </div>
+                  </div>
+                ))}
+                {!brandFilaments.length && <p className="hint">등록된 필라멘트가 없어요.</p>}
+              </ManageColumn>
+            ) : (
+              <div className="manage-right">
                 <p className="hint">회사를 먼저 추가하세요.</p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ) : (
-          <div style={{ minHeight: 340 }}>
+          <ManageColumn
+            title="재질"
+            count={materials.length}
+            addLabel="+ 재질 추가"
+            onAdd={() => setSub({ kind: 'material', material: null })}
+          >
             {materials.map((m) => (
               <div key={m.id} className="row-item">
                 <strong>{m.name}</strong>
                 <span className="muted">필라멘트 {m.filament_count}개</span>
-                <button type="button" className="btn small" onClick={() => setSub({ kind: 'material', material: m })}>
-                  수정
-                </button>
+                <EditButton onClick={() => setSub({ kind: 'material', material: m })} />
               </div>
             ))}
             {!materials.length && <p className="hint">등록된 재질이 없어요.</p>}
-            <button
-              type="button"
-              className="btn small"
-              style={{ marginTop: 10 }}
-              onClick={() => setSub({ kind: 'material', material: null })}
-            >
-              + 재질 추가
-            </button>
-          </div>
+          </ManageColumn>
         )}
       </Dialog>
 
@@ -150,7 +134,9 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           onDeleted={() => setBrandId(null)}
         />
       )}
-      {sub?.kind === 'filament' && brand && <FilamentDialog brand={brand} filament={sub.filament} onClose={closeSub} />}
+      {sub?.kind === 'filament' && brand && (
+        <FilamentDialog brand={brand} filament={sub.filament} copyOf={sub.copyOf} onClose={closeSub} />
+      )}
       {sub?.kind === 'material' && <MaterialDialog material={sub.material} onClose={closeSub} />}
     </>
   )

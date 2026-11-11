@@ -1,11 +1,12 @@
 import type { Color } from '../../../api/filaments'
 import type { Category, Product } from '../../../api/products'
+import SortTh from '../../../components/SortTh'
 import Swatch from '../../../components/Swatch'
-import { minutesText, pct, won } from '../../../format'
+import { gramsText, minutesText, pct, won } from '../../../format'
 import { findSubcategory } from '../categories'
 import { marginClass, type Catalog } from '../cost'
 import StatusBadge from '../StatusBadge'
-import type { ProductRow } from './productList'
+import type { ProductRow, Sort } from './productList'
 
 // 색상 칸: 5개가 넘으면 4개 + "+N" (PRD-01a)
 const MAX_SWATCH = 5
@@ -30,7 +31,7 @@ function Filaments({ product, catalog }: { product: Product; catalog: Catalog })
   const title = product.filaments
     .map((r) => {
       const color = r.color == null ? undefined : catalog.colors.get(r.color)
-      return `${catalog.filaments.get(r.filament)?.display_name ?? ''}${color ? ` · ${color.name}` : ''} ${r.grams}g`
+      return `${catalog.filaments.get(r.filament)?.display_name ?? ''}${color ? ` · ${color.name}` : ''} ${gramsText(r.grams)}g`
     })
     .join('\n')
   return (
@@ -45,32 +46,56 @@ interface Props {
   rows: ProductRow[]
   categories: Category[]
   catalog: Catalog
+  sort: Sort
+  onSort: (key: Sort['key']) => void
   onOpen: (product: Product) => void
 }
 
-// 제품 표 (docs/screens.md 2.3). 행을 누르면 제품 수정 창
-export default function ProductTable({ rows, categories, catalog, onOpen }: Props) {
+// 제품 표 (docs/screens.md 2.3). 행을 누르면 제품 수정 창, 열 제목을 누르면 정렬
+export default function ProductTable({ rows, categories, catalog, sort, onSort, onOpen }: Props) {
+  const th = { sort, onSort }
   return (
     <table>
       <thead>
         <tr>
-          <th>No.</th>
+          <SortTh sortKey="no" {...th}>
+            No.
+          </SortTh>
           <th>카테고리</th>
-          <th>제품명</th>
+          <SortTh sortKey="name" {...th}>
+            제품명
+          </SortTh>
           <th>색상</th>
           <th>필라멘트</th>
-          <th className="num">사용량</th>
-          <th className="num">출력시간</th>
-          <th className="num">원가</th>
-          <th className="num">판매가</th>
-          <th className="num">순이익</th>
-          <th className="num">순마진율</th>
+          <SortTh sortKey="grams" num {...th}>
+            사용량
+          </SortTh>
+          <SortTh sortKey="minutes" num {...th}>
+            출력시간
+          </SortTh>
+          <SortTh sortKey="cost" num {...th}>
+            원가
+          </SortTh>
+          <SortTh sortKey="price" num {...th}>
+            판매가
+          </SortTh>
+          <SortTh sortKey="net" num {...th}>
+            순이익
+          </SortTh>
+          <SortTh sortKey="margin" num {...th}>
+            순마진율
+          </SortTh>
         </tr>
       </thead>
       <tbody>
         {rows.map(({ product: p, cost: c, colors }) => (
           <tr key={p.id} className={p.status === 'discontinued' ? 'discontinued' : ''} onClick={() => onOpen(p)}>
-            <td className="muted">{p.no}</td>
+            {/* 큰 번호는 줄이고 마우스를 올리면 전체 (TBD-12) */}
+            <td className="muted">
+              <span className="no-cell" title={`No. ${p.no}`}>
+                {p.no}
+              </span>
+            </td>
             <td>
               {p.category == null ? (
                 <span className="muted">미분류</span>
@@ -89,7 +114,7 @@ export default function ProductTable({ rows, categories, catalog, onOpen }: Prop
               <Swatches colors={colors} />
             </td>
             <Filaments product={p} catalog={catalog} />
-            <td className="num">{c.grams ? `${c.grams.toLocaleString('ko-KR')}g` : '-'}</td>
+            <td className="num">{c.grams ? `${gramsText(c.grams)}g` : '-'}</td>
             <td className="num">{minutesText(p.print_minutes)}</td>
             <td className="num">{won(c.cost)}</td>
             <td className="num">{won(p.sale_price)}</td>

@@ -1,5 +1,6 @@
 // 엑셀(CSV) 내보내기 (PRD-10): 제품별 원가 내역, UTF-8 BOM (엑셀에서 한글이 깨지지 않게). 검색 · 필터와 상관없이 전체
 import type { Category } from '../../../api/products'
+import { toCsv } from '../../../csv'
 import { findSubcategory } from '../categories'
 import { STATUS_LABEL } from '../status'
 import type { ProductRow } from './productList'
@@ -36,7 +37,7 @@ export function productsCsv(rows: ProductRow[], categories: Category[]) {
       p.name,
       colors.map((x) => x.name).join(' · '),
       STATUS_LABEL[p.status],
-      c.grams,
+      Math.round(c.grams * 100) / 100, // 소수 2자리까지 (더하면서 생기는 끝자리 오차 없이)
       p.print_minutes ?? '',
       round(c.filament),
       round(c.electricity),
@@ -48,16 +49,5 @@ export function productsCsv(rows: ProductRow[], categories: Category[]) {
       c.margin == null ? '' : (c.margin * 100).toFixed(1),
       c.warnings.join(' / '),
     ])
-  // 모든 칸을 따옴표로 감싸고, 칸 안의 따옴표는 두 번 ("" )
-  const csv = [HEAD, ...lines].map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n')
-  return '﻿' + csv
-}
-
-// 브라우저에서 파일로 내려받기
-export function downloadText(filename: string, text: string) {
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }))
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(a.href)
+  return toCsv([HEAD, ...lines])
 }

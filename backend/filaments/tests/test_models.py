@@ -134,9 +134,15 @@ class FilamentModelTests(TestCase):
     def test_delete_protection(self):
         color = Color.objects.create(filament=self.filament, name='화이트', hex='#FFFFFF')
         Spool.objects.create(color=color)
-        for obj in [self.bambu, self.pla, self.filament, color]:
+        for obj in [self.bambu, self.pla, self.filament]:
             with self.subTest(obj=obj), transaction.atomic(), self.assertRaises(ProtectedError):
                 obj.delete()
+
+    def test_delete_color_deletes_spools(self):
+        color = Color.objects.create(filament=self.filament, name='화이트', hex='#FFFFFF')
+        Spool.objects.create(color=color)
+        color.delete()
+        self.assertFalse(Spool.objects.exists())
 
 
 class SpoolTests(TestCase):

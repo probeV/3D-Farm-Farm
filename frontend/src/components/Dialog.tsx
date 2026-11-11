@@ -6,6 +6,7 @@ interface Props {
   headExtra?: ReactNode // 머리 오른쪽 (예: 간단 | 세부 전환)
   header?: ReactNode // 머리 전체를 바꿀 때 (제품 창의 머리 띠). 주면 title · headExtra 는 쓰지 않음
   size?: 'narrow' | 'wide' | 'xwide'
+  fixed?: boolean // 관리 창: 항목 수와 상관없이 높이 고정 (styles/app.css --dlg-fixed-h)
   onClose: () => void
   // 주면 아래에 `취소` + 이 이름의 저장 버튼, 없으면 `닫기` 만
   submitLabel?: string
@@ -21,6 +22,7 @@ export default function Dialog({
   headExtra,
   header,
   size,
+  fixed,
   onClose,
   submitLabel,
   onSubmit,
@@ -29,6 +31,7 @@ export default function Dialog({
   children,
 }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const addToastLayer = useContext(ToastLayerContext)
 
   useEffect(() => {
@@ -42,10 +45,31 @@ export default function Dialog({
     return addToastLayer(el) // 열려 있는 동안 알림을 이 대화상자 안에 그린다
   }, [addToastLayer])
 
+  // 본문이 스크롤되면 위 · 아래 경계에 그림자 ("더 있음"). 내용이 바뀌거나 창 크기가 바뀌어도 다시 계산
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    const update = () => {
+      body.classList.toggle('scroll-top', body.scrollTop > 0)
+      body.classList.toggle('scroll-bottom', body.scrollTop + body.clientHeight < body.scrollHeight - 1)
+    }
+    update()
+    body.addEventListener('scroll', update)
+    const resize = new ResizeObserver(update)
+    resize.observe(body)
+    const mutation = new MutationObserver(update)
+    mutation.observe(body, { childList: true, subtree: true })
+    return () => {
+      body.removeEventListener('scroll', update)
+      resize.disconnect()
+      mutation.disconnect()
+    }
+  }, [])
+
   return (
     <dialog
       ref={ref}
-      className={size}
+      className={[size, fixed && 'fixed'].filter(Boolean).join(' ') || undefined}
       onCancel={(e) => {
         e.preventDefault()
         onClose()
@@ -65,7 +89,9 @@ export default function Dialog({
             {headExtra}
           </div>
         )}
-        <div className="dlg-body">{children}</div>
+        <div className="dlg-body" ref={bodyRef}>
+          {children}
+        </div>
         <div className="dlg-foot">
           {footerLeft}
           <div className="spacer" />

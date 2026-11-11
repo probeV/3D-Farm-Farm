@@ -1,12 +1,16 @@
 import { useCallback, useState } from 'react'
 import Help from '../../components/Help'
 import { unitWon, won } from '../../format'
+import BuyLink from './BuyLink'
 import ManageDialog from './ManageDialog'
 import PartDialog from './PartDialog'
-import { filterParts, NO_FILTER, SORTS, summarize, type ListFilter, type Sort } from './partList'
+import ReplaceDialog from './ReplaceDialog'
+import SortTh from '../../components/SortTh'
+import { nextSort } from '../../sort'
+import { filterParts, NO_FILTER, SORT_COLUMNS, summarize, type ListFilter, type Sort } from './partList'
 import { usePartsData } from './usePartsData'
 
-type DialogState = { kind: 'manage' } | { kind: 'part'; partId: number }
+type DialogState = { kind: 'manage' } | { kind: 'replace' } | { kind: 'part'; partId: number }
 
 // 부자재 화면: 사용 여부 개수 → 요약 카드 → 부자재 목록 (docs/screens.md 3장)
 export default function PartsPage() {
@@ -27,13 +31,23 @@ export default function PartsPage() {
   }
   if (!data) return <div className="empty">불러오는 중…</div>
 
-  const { parts, products, usagesOf } = data
+  const { parts, categories, products, usagesOf } = data
+  const categoryName = (id: number | null) => categories.find((c) => c.id === id)?.name
   const set = (patch: Partial<ListFilter>) => setFilter((f) => ({ ...f, ...patch }))
   const sum = summarize(parts, products)
   // 가격 미입력이 모두 채워졌으면 필터도 풀림
   const noPriceOnly = filter.noPriceOnly && sum.noPrice > 0
-  const list = filterParts(parts, { ...filter, noPriceOnly })
-  const filtered = filter.q !== '' || noPriceOnly
+  // 고른 카테고리가 지워졌으면 전체로
+  const category =
+    filter.category === '' || filter.category === 'none' || categoryName(Number(filter.category.slice(2)))
+      ? filter.category
+      : ''
+  const list = filterParts(parts, { ...filter, noPriceOnly, category })
+  const filtered = filter.q !== '' || noPriceOnly || category !== ''
+  const th = {
+    sort: filter.sort,
+    onSort: (key: Sort['key']) => set({ sort: nextSort(SORT_COLUMNS, filter.sort, key) }),
+  }
 
   return (
     <>
@@ -47,6 +61,13 @@ export default function PartsPage() {
           </span>
         </div>
         <div className="spacer" />
+        <button
+          className="btn"
+          title="제품에서 쓰는 부자재를 다른 부자재로 한 번에 바꿔요"
+          onClick={() => setDialog({ kind: 'replace' })}
+        >
+          제품의 부자재 바꾸기
+        </button>
         <button className="btn" onClick={() => setDialog({ kind: 'manage' })}>
           부자재 관리
         </button>
@@ -98,15 +119,17 @@ export default function PartsPage() {
           value={filter.q}
           onChange={(e) => set({ q: e.target.value })}
         />
-        <select value={filter.sort} onChange={(e) => set({ sort: e.target.value as Sort })}>
-          {Object.entries(SORTS).map(([v, label]) => (
-            <option key={v} value={v}>
-              정렬: {label}
+        <select value={category} onChange={(e) => set({ category: e.target.value as ListFilter['category'] })}>
+          <option value="">카테고리: 전체</option>
+          {categories.map((c) => (
+            <option key={c.id} value={`c:${c.id}`}>
+              {c.name}
             </option>
           ))}
+          {parts.some((p) => p.category == null) && <option value="none">미분류</option>}
         </select>
         {filtered && (
-          <button className="btn small" onClick={() => set({ q: '', noPriceOnly: false })}>
+          <button className="btn small" onClick={() => set({ q: '', category: '', noPriceOnly: false })}>
             필터 지우기
           </button>
         )}
@@ -117,12 +140,25 @@ export default function PartsPage() {
           <table className="parts-table">
             <thead>
               <tr>
-                <th>품목</th>
-                <th>회사/구매처</th>
-                <th className="num">구매가</th>
-                <th className="num">묶음 수량</th>
-                <th className="num">개당 단가</th>
-                <th className="num">사용 제품</th>
+                <SortTh sortKey="name" {...th}>
+                  품목
+                </SortTh>
+                <th>카테고리</th>
+                <SortTh sortKey="shop" {...th}>
+                  회사/구매처
+                </SortTh>
+                <SortTh sortKey="price" num {...th}>
+                  구매가
+                </SortTh>
+                <SortTh sortKey="packQty" num {...th}>
+                  묶음 수량
+                </SortTh>
+                <SortTh sortKey="unitPrice" num {...th}>
+                  개당 단가
+                </SortTh>
+                <SortTh sortKey="used" num {...th}>
+                  사용 제품
+                </SortTh>
                 <th>비고</th>
               </tr>
             </thead>
@@ -131,7 +167,17 @@ export default function PartsPage() {
                 const usages = usagesOf(p.id)
                 return (
                   <tr key={p.id} onClick={() => setDialog({ kind: 'part', partId: p.id })}>
-                    <td className="pname">{p.name}</td>
+                    <td className="pname">
+                      {p.name}
+                      <BuyLink part={p} />
+                    </td>
+                    <td>
+                      {p.category == null ? (
+                        <span className="cat none">미분류</span>
+                      ) : (
+                        <span className="cat">{categoryName(p.category)}</span>
+                      )}
+                    </td>
                     <td>{p.shop || <span className="muted">-</span>}</td>
                     <td className="num">
                       {p.price == null ? <span className="badge warn">미입력</span> : won(p.price)}
@@ -169,6 +215,7 @@ export default function PartsPage() {
       )}
 
       {dialog?.kind === 'manage' && <ManageDialog onClose={closeDialog} />}
+      {dialog?.kind === 'replace' && <ReplaceDialog parts={parts} usagesOf={usagesOf} onClose={closeDialog} />}
       {dialog?.kind === 'part' && renderPart(dialog.partId)}
     </>
   )
@@ -176,6 +223,16 @@ export default function PartsPage() {
   // 부자재가 지워졌으면(다른 창에서) 그리지 않는다
   function renderPart(id: number) {
     const part = parts.find((p) => p.id === id)
-    return part && <PartDialog part={part} usages={usagesOf(part.id)} onClose={closeDialog} />
+    return (
+      part && (
+        <PartDialog
+          part={part}
+          categories={categories}
+          parts={parts}
+          usages={usagesOf(part.id)}
+          onClose={closeDialog}
+        />
+      )
+    )
   }
 }

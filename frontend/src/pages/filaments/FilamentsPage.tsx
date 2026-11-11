@@ -1,11 +1,12 @@
 import { useCallback, useRef, useState } from 'react'
 import { useBrands, useFilaments, useMaterials, type ByStatus, type Color, type Filament } from '../../api/filaments'
 import ColorDialog from './catalog/ColorDialog'
+import ColorManageDialog from './ColorManageDialog'
+import FilamentDialog from './catalog/FilamentDialog'
 import ManageDialog from './catalog/ManageDialog'
 import BrandSummary, { type BrandKg } from './list/BrandSummary'
 import FilamentCard from './list/FilamentCard'
 import TileMenu, { type TileAction } from './list/TileMenu'
-import AdjustDialog from './spools/AdjustDialog'
 import PickDialog from './spools/PickDialog'
 import PurchaseDialog from './spools/PurchaseDialog'
 import { colorState, filamentKg, heldOf, sumByStatus, totalOf } from './stock'
@@ -31,6 +32,7 @@ const NO_FILTER: Filter = { q: '', brand: null, material: null, sort: 'name' }
 type DialogState =
   | { kind: TileAction; colorId: number } // 타일 메뉴에서
   | { kind: 'addColor'; filamentId: number } // `+ 색상` 타일에서
+  | { kind: 'editFilament'; filamentId: number } // 제목 타일에서
   | { kind: 'manage' } // `필라멘트 관리` 버튼에서
 
 const byName = (a: string, b: string) => a.localeCompare(b, 'ko')
@@ -186,6 +188,7 @@ export default function FilamentsPage() {
               selectedColor={menu?.colorId ?? null}
               onTile={onTile}
               onAddColor={(f) => setDialog({ kind: 'addColor', filamentId: f.id })}
+              onEdit={(f) => setDialog({ kind: 'editFilament', filamentId: f.id })}
             />
           ))}
         </div>
@@ -214,7 +217,12 @@ export default function FilamentsPage() {
     if (dialog.kind === 'manage') return <ManageDialog onClose={closeDialog} />
     if (dialog.kind === 'addColor') {
       const filament = fils.find((f) => f.id === dialog.filamentId)
-      return filament && <ColorDialog filament={filament} color={null} onClose={closeDialog} />
+      return filament && <ColorDialog filament={filament} onClose={closeDialog} />
+    }
+    if (dialog.kind === 'editFilament') {
+      const filament = fils.find((f) => f.id === dialog.filamentId)
+      const brand = brands.data?.find((b) => b.id === filament?.brand)
+      return filament && brand && <FilamentDialog brand={brand} filament={filament} onClose={closeDialog} />
     }
     const target = find(dialog.colorId)
     if (!target) return null
@@ -225,10 +233,8 @@ export default function FilamentsPage() {
       case 'pickOpen':
       case 'pickFinish':
         return <PickDialog color={color} mode={dialog.kind === 'pickOpen' ? 'open' : 'finish'} onClose={closeDialog} />
-      case 'adjust':
-        return <AdjustDialog color={color} onClose={closeDialog} />
-      case 'editColor':
-        return <ColorDialog filament={filament} color={color} onClose={closeDialog} />
+      case 'colorManage':
+        return <ColorManageDialog filament={filament} color={color} onClose={closeDialog} />
     }
   }
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createProduct, deleteProduct, updateProduct, useRefreshProducts } from '../../../api/products'
 import Dialog from '../../../components/Dialog'
+import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
 import { useForm } from '../../../useForm'
 import CategoryDialog from '../catalog/CategoryDialog'
@@ -8,8 +9,9 @@ import { calcCost } from '../cost'
 import { STATUS_LABEL, STATUSES } from '../status'
 import { useCostData, type CostData } from '../useCostData'
 import CostPanel from './CostPanel'
-import { initialValues, previewOf, type Start } from './draft'
+import { initialValues, newKey, previewOf, type Start } from './draft'
 import MaterialLines from './MaterialLines'
+import PartsFromDialog from './PartsFromDialog'
 import { productSchema } from './schemas'
 
 const NEW_CATEGORY = 'new'
@@ -29,14 +31,25 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
   const { catalog, categories, filaments, parts, rows } = data
   const refresh = useRefreshProducts()
   const toast = useToast()
+
+  const confirm = useConfirm()
   const products = rows.map((r) => r.product)
   const form = useForm(productSchema, initialValues({ product, copyOf, preset }, products, filaments))
   const { values, errors, busy, change, update, submit } = form
   const [addingCategory, setAddingCategory] = useState(false)
+  const [pickingParts, setPickingParts] = useState(false) // `+ 다른 제품에서`
 
   const preview = previewOf(values)
   const cost = calcCost(preview, catalog)
   const subcategories = categories.find((c) => String(c.id) === values.category)?.subcategories ?? []
+
+  // 다른 제품의 부자재 항목만 넣고 (수량은 빈칸 → 직접 입력), 첫 새 줄의 수량 칸으로 (TBD-22)
+  const addPartsFrom = (partIds: number[]) => {
+    const from = values.parts.length
+    change('parts', [...values.parts, ...partIds.map((id) => ({ key: newKey(), part: String(id), qty: '' }))])
+    setPickingParts(false)
+    setTimeout(() => document.querySelectorAll<HTMLInputElement>('.mat.parts .mat-row input')[from]?.focus())
+  }
 
   const save = () =>
     submit(async ({ no, filaments: lines, ...rest }) => {
@@ -54,7 +67,11 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
     })
 
   const remove = async () => {
-    if (!product || !confirm(`${product.name} 제품을 삭제할까요?`)) return
+    if (
+      !product ||
+      !(await confirm({ title: '제품 삭제', message: `${product.name} 제품을 삭제할까요?`, danger: true }))
+    )
+      return
     try {
       await deleteProduct(product.id)
       await refresh()
@@ -177,6 +194,7 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
               catalog={catalog}
               filaments={filaments}
               parts={parts}
+              onPickFrom={() => setPickingParts(true)}
               filamentTotal={cost.filament}
               partTotal={cost.parts}
               onFilaments={(r) => change('filaments', r)}
@@ -194,6 +212,8 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
             cost={cost}
             preview={preview}
             setting={catalog.setting}
+            catalog={catalog}
+            partCategories={data.partCategories}
           />
         </div>
       </Dialog>
@@ -203,6 +223,15 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
           category={null}
           onClose={() => setAddingCategory(false)}
           onSaved={(c) => update({ category: String(c.id), subcategory: '' })}
+        />
+      )}
+      {pickingParts && (
+        <PartsFromDialog
+          products={products.filter((p) => p.id !== product?.id)}
+          parts={catalog.parts}
+          existing={new Set(values.parts.map((r) => Number(r.part)))}
+          onPick={addPartsFrom}
+          onClose={() => setPickingParts(false)}
         />
       )}
     </>
