@@ -20,6 +20,8 @@ erDiagram
     PART ||--o{ PRODUCT_PART : "사용됨"
     PART_CATEGORY |o--o{ PART : "카테고리"
     RECURRING_EXPENSE |o--o{ EXPENSE : "넣은 지출"
+    SALE ||--o{ SALE_ITEM : "판매 제품"
+    PRODUCT |o--o{ SALE_ITEM : "팔린 제품"
 
     BRAND {
         bigint id PK
@@ -127,6 +129,26 @@ erDiagram
         date start "시작 달 (항상 1일)"
         text note
     }
+    SALE {
+        bigint id PK
+        date date "판매 날짜"
+        varchar channel "store / direct / etc"
+        varchar order_no "주문번호, 빈 값 허용 (비어 있지 않으면 UNIQUE)"
+        decimal shipping_received "손님이 낸 배송비"
+        decimal fee "수수료"
+        decimal shipping_cost "판매자가 낸 택배비 (주문별 이익 참고용)"
+        text note
+        datetime created_at
+    }
+    SALE_ITEM {
+        bigint id PK
+        bigint sale_id FK
+        bigint product_id FK "NULL=제품을 지움"
+        varchar product_name "팔 때의 제품명"
+        int qty "수량 (1 이상)"
+        decimal unit_price "단가"
+        decimal unit_cost "팔 때 복사한 개당 원가, NULL=원가 없음"
+    }
     COST_SETTING {
         bigint id PK "항상 1개 행"
         decimal power_kw
@@ -144,6 +166,7 @@ erDiagram
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` |
 | `products` | `Category`, `Subcategory`, `PartCategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
 | `expenses` | `Expense`, `RecurringExpense` |
+| `sales` | `Sale`, `SaleItem` |
 
 ## 모델 설명
 
@@ -164,6 +187,8 @@ erDiagram
 | `CostSetting` | 원가 계산 설정값. 항상 1개 행만 존재 (기본값은 PRD 3.8) |
 | `Expense` | 지출 한 줄 (PRD 3.10). 분류는 고정 7개 (`ExpenseCategory`) |
 | `RecurringExpense` | 반복 지출 (구독 · 월정액). 지출을 저절로 만들지 않고, 화면에서 확인하고 넣는다 |
+| `Sale` | 판매 한 건 = 주문 하나 (v2 SALE). 판매처는 고정 3개 (`SaleChannel`). 배송비 · 수수료는 주문 단위 |
+| `SaleItem` | 판매 안의 제품 한 줄. 단가 · 수량 · 팔 때 복사한 개당 원가 · 제품명 |
 
 ## 계산 규칙
 ```
@@ -184,6 +209,12 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 반복 지출 결제일 (PRD EXP-04) = 그 달의 RecurringExpense.day, 그 달 말일보다 크면 말일 (RecurringExpense.pay_date)
 이번 달에 넣을 반복 지출 = 시작 달 ≤ 이번 달 이고, 이번 달 결제일 ≤ 오늘 이고, 이번 달에 그 반복에서 넣은 지출이 없는 것
 누적 투자금 (PRD EXP-05) = category 가 invest 인 Expense.amount 합계 (전체 기간)
+
+판매가 합계 (v2 SALE-01) = Σ SaleItem.unit_price × qty
+스마트스토어 수수료 (SALE-03) = (판매가 합계 + Sale.shipping_received) × (CostSetting.fee_order + fee_sales)%, 원 단위 반올림 (Sale.store_fee)
+  직접 판매 · 기타는 0 (있으면 직접 입력). 고친 수수료는 그대로 저장
+정산 금액 = 판매가 합계 + shipping_received − fee
+주문별 이익 (SALE-05, 참고) = 정산 금액 − Σ SaleItem.unit_cost × qty − shipping_cost. unit_cost 가 NULL 인 줄이 있으면 이익 없음
 ```
 
 ## 관계와 삭제 규칙
@@ -203,6 +234,8 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `ProductFilament.product` → `Product` | CASCADE | 제품 삭제 시 함께 삭제 |
 | `ProductPart.product` → `Product` | CASCADE | 제품 삭제 시 함께 삭제 |
 | `Expense.recurring` → `RecurringExpense` | SET_NULL | 반복 지출을 지워도 이미 넣은 지출은 남는다 (연결만 끊김) |
+| `SaleItem.sale` → `Sale` | CASCADE | 판매를 지우면 그 제품 줄도 함께 삭제 |
+| `SaleItem.product` → `Product` | SET_NULL | 제품을 지워도 판매 줄은 남고, 팔 때 저장한 `product_name` 으로 보인다 |
 
 ## 제약 조건 · 인덱스
 | 대상 | 종류 | 용도 |
@@ -223,6 +256,9 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `ProductFilament.color` | 검사 | 색상은 그 줄의 필라멘트에 속해야 함 (`ProductFilament.clean`) |
 | `Expense.category` · `RecurringExpense.category` | CHOICES | 고정 7개 (PRD EXP-03) |
 | `Expense (recurring, 연 · 월)` | 검사 | 같은 반복 지출은 한 달에 한 줄만 (`ExpenseSerializer.validate`) |
+| `Sale.channel` | CHOICES | `store`(스마트스토어) / `direct`(직접 판매) / `etc`(기타) |
+| `Sale.order_no` | UNIQUE (빈 값 제외) | 같은 주문을 두 번 넣지 않게 (스마트스토어 가져오기). 빈 주문번호는 여러 개 가능 |
+| `SaleItem.qty` | 검사 | 1 이상 |
 
 ## 참고 사항
 - 금액·무게·수량은 `DecimalField` (부동소수점 오차 방지). 원 단위 반올림은 화면/CSV 에서 한다.
