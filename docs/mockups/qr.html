@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR 스풀 관리 — 3D Farm Farm 목업</title>
+<!--
+  QR 스풀 관리 HTML 목업 (v2 TBD-18)
+  - 정한 것: 라벨 프린터로 출력 · 폰 카메라로 찍기 · 필라멘트 화면 안 QR 버튼 · 번호 예약(발급 기록) 없이 인쇄만
+  - 왼쪽: PC 의 라벨 인쇄 (필라멘트 › QR). 오른쪽: 폰 카메라로 라벨을 찍으면 열리는 폰 화면 (위 버튼으로 찍는 흉내)
+  - QR 안에는 주소: {PUBLIC_URL}/s/{코드}. PUBLIC_URL 은 backend/.env (폰과 PC 가 같은 와이파이)
+  - 더미 데이터, 오늘은 2026-10-28 로 고정. 스크린샷용: ?scan=S00101 | S00042 | S00031 | S00012 | S00999,  ?theme=dark | light
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f1f3f6; --border: #e2e5ea;
+  --text: #1c2026; --muted: #6b7380; --accent: #2f6fed; --accent-soft: #e8efff;
+  --good: #1f9254; --warn: #b7791f; --bad: #d64545; --good-soft: #e6f5ec; --warn-soft: #fff6e5; --bad-soft: #fdecec;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
+  --radius: 10px; color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #14161a; --surface: #1c1f24; --surface-2: #24282e; --border: #30353d;
+  --text: #e8eaee; --muted: #9aa2ad; --accent: #6b9bff; --accent-soft: #1f2a44;
+  --good: #4cc38a; --warn: #e5b04a; --bad: #ff6b6b; --good-soft: #1b3127; --warn-soft: #3a3020; --bad-soft: #3d2224;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+
+/* 사이드바 (다른 목업과 같음) */
+.layout { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; --side-w: 220px; transition: grid-template-columns .15s; }
+.layout.collapsed { --side-w: 64px; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; background: var(--surface); border-right: 1px solid var(--border); overflow: hidden; }
+.side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; font-weight: 700; font-size: 15px; white-space: nowrap; }
+.side-brand .mark { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -.5px; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border: 0; background: none; border-radius: 8px; color: var(--muted); font-weight: 600; white-space: nowrap; cursor: pointer; text-align: left; text-decoration: none; }
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); }
+.nav-item svg { width: 20px; height: 20px; flex: none; }
+.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.layout.collapsed .label { display: none; }
+.layout.collapsed .nav-item, .layout.collapsed .side-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.mock-tag { font-size: 11px; color: var(--muted); padding: 0 10px; white-space: nowrap; }
+.layout.collapsed .mock-tag { display: none; }
+main { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+/* 공통 */
+h3, h4 { margin: 0; }
+h3 { font-size: 15px; }
+.hint { color: var(--muted); font-size: 13px; }
+.muted { color: var(--muted); }
+.btn { border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+.btn:disabled { opacity: .4; cursor: default; }
+input, select { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+input[type=number], input.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* 숫자칸 위 · 아래 버튼 없음 */
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; }
+.help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: 0; }
+.help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; text-align: left; }
+.help:hover::after, .help:focus::after { opacity: 1; }
+code { padding: 0 4px; border-radius: 4px; background: var(--surface-2); font-size: 12.5px; }
+
+.crumb { font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+.crumb a { color: var(--muted); text-decoration: none; }
+.crumb a:hover { color: var(--accent); }
+.page-title { margin: 0 0 14px; font-size: 20px; }
+
+/* 2단: PC 라벨 인쇄 | 폰 화면 */
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.panel-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.panel-head .spacer { flex: 1; }
+.panel-body { padding: 14px 16px; }
+.panel-foot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.panel-foot .spacer { flex: 1; }
+.where { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); font-size: 11.5px; font-weight: 700; }
+
+/* 라벨 인쇄 입력 */
+.form-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.with-suffix { display: flex; align-items: center; gap: 6px; }
+.with-suffix input { flex: 1; width: 100%; }
+.with-suffix em { font-style: normal; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.field .note { font-size: 12px; color: var(--muted); }
+.field .note.warn { color: var(--warn); font-weight: 600; }
+.url-line { margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.url-line b { color: var(--text); font-family: ui-monospace, Consolas, monospace; font-weight: 600; }
+
+/* 라벨 미리보기: 40×30mm 비율 */
+.labels { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.lbl-card { aspect-ratio: 4 / 3; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px; background: #fff; color: #111; border: 1px dashed #c3c8d0; border-radius: 6px; }
+.lbl-card svg { width: 64px; height: 64px; display: block; }
+.lbl-card .code { font: 700 17px/1.1 ui-monospace, Consolas, monospace; letter-spacing: .5px; }
+.lbl-card .brand { font-size: 10px; color: #666; margin-top: 4px; }
+.lbl-card.again { border-color: var(--warn); }
+.more { display: grid; place-items: center; aspect-ratio: 4 / 3; border: 1px dashed var(--border); border-radius: 6px; color: var(--muted); font-size: 13px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); margin-left: 6px; }
+.seg button { border: 0; background: none; padding: 4px 12px; border-radius: 7px; font-weight: 600; color: var(--muted); cursor: pointer; font-size: 13px; }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.unreg-line { background: var(--warn-soft); }
+.again-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.again-top input[type=search] { flex: 1; min-width: 180px; }
+.pick-list { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; max-height: 360px; overflow-y: auto; }
+.pick-sec { position: sticky; top: 0; padding: 7px 10px; background: var(--surface-2); font-size: 12.5px; font-weight: 700; border-bottom: 1px solid var(--border); }
+.pick-sec .hint { font-weight: 400; font-size: 12px; margin-left: 6px; }
+.pick-row { display: grid; grid-template-columns: 20px 70px 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 13px; cursor: pointer; }
+.pick-row:last-child { border-bottom: 0; }
+.pick-row:hover { background: var(--surface-2); }
+.pick-row .pc { font-family: ui-monospace, Consolas, monospace; }
+.pick-row .sw { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
+.pick-row .sw.empty { border-style: dashed; background: none; }
+.pick-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
+.dlg-head { display: flex; align-items: baseline; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 16px; flex: none; }
+.dlg-body { padding: 8px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+.dlg-foot { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); flex: none; }
+.dlg-foot .spacer { flex: 1; }
+.log-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.log-row:last-child { border-bottom: 0; }
+.log-row .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.log-row .tag { display: inline-block; padding: 0 7px; margin-right: 4px; border-radius: 99px; background: var(--warn-soft); color: var(--warn); font-size: 11.5px; font-weight: 700; }
+.log-row .tag.new { background: var(--accent-soft); color: var(--accent); }
+
+/* 폰 화면 흉내 */
+.scan-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.scan-bar .btn { font-size: 12.5px; padding: 4px 9px; }
+.scan-bar .btn.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.phone { width: 360px; max-width: 100%; margin: 0 auto; border: 10px solid #1b1e23; border-radius: 34px; background: var(--bg); overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,.25); }
+.phone .bar { height: 26px; display: flex; align-items: center; justify-content: center; background: #1b1e23; color: #9aa2ad; font-size: 11px; }
+.phone .addr { padding: 6px 12px; background: var(--surface); border-bottom: 1px solid var(--border); font: 11.5px ui-monospace, Consolas, monospace; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone .scr { min-height: 560px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ph-top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.ph-top .mark { width: 20px; height: 20px; border-radius: 6px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 9px; font-weight: 800; }
+.ph-code { font: 800 26px/1.1 ui-monospace, Consolas, monospace; letter-spacing: .5px; }
+.ph-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.ph-color { display: flex; align-items: center; gap: 12px; }
+.ph-color .sw { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); flex: none; }
+.ph-color .nm { font-weight: 700; font-size: 16px; line-height: 1.3; }
+.ph-color .sub { font-size: 12.5px; color: var(--muted); }
+.ph-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-top: 12px; font-size: 13px; }
+.ph-meta span:nth-child(odd) { color: var(--muted); }
+.st { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 700; }
+.st.sealed { background: var(--surface-2); color: var(--text); }
+.st.open { background: var(--accent-soft); color: var(--accent); }
+.st.empty { background: var(--surface-2); color: var(--muted); }
+.st.new { background: var(--warn-soft); color: var(--warn); }
+.big { width: 100%; padding: 15px; font-size: 17px; border-radius: 12px; }
+.ph-links { display: flex; justify-content: center; gap: 14px; font-size: 13px; }
+.ph-links button { border: 0; background: none; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px; }
+.ph-form { display: flex; flex-direction: column; gap: 10px; }
+.ph-form select, .ph-form input { width: 100%; padding: 10px 12px; font-size: 15px; }
+.ph-form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.same { padding: 12px; border-radius: 12px; border: 1px solid var(--accent); background: var(--accent-soft); }
+.same .t { font-size: 12px; color: var(--accent); font-weight: 700; }
+.same .v { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; font-weight: 700; }
+.same .v .sw { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
+.ph-done { padding: 10px 12px; border-radius: 10px; background: var(--good-soft); color: var(--good); font-weight: 700; font-size: 13.5px; }
+.ph-err { padding: 14px; border-radius: 12px; background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+.divider { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 600; z-index: 100; }
+.toast[hidden] { display: none; }
+
+@media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  main { padding: 16px; } .layout { --side-w: 64px; } .layout .label { display: none; } .layout .nav-item, .layout .side-brand { justify-content: center; padding-left: 0; padding-right: 0; } .mock-tag, [data-act="toggle-side"] { display: none; }
+  .form-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="layout" id="layout">
+  <aside class="sidebar">
+    <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
+    <a class="nav-item" href="products.html" title="제품 원가">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
+    <a class="nav-item active" href="filaments.html" title="필라멘트">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
+    <a class="nav-item" href="parts.html" title="부자재">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></a>
+    <a class="nav-item" href="sales.html" title="판매">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
+    <a class="nav-item" href="expenses.html" title="지출">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
+    <a class="nav-item" href="pl.html" title="손익">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="label">손익</span></a>
+    <div class="side-bottom">
+      <span class="mock-tag">목업 · 더미 데이터</span>
+      <a class="nav-item" href="settings.html" title="설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="label">설정</span></a>
+      <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
+    </div>
+  </aside>
+  <main>
+    <div class="crumb"><a href="filaments.html">필라멘트</a> ›</div>
+    <h2 class="page-title">QR 스풀 관리</h2>
+    <div class="cols">
+      <section class="panel" id="print"></section>
+      <section id="phone-col"></section>
+    </div>
+  </main>
+</div>
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+const TODAY = "2026-10-28";
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const won = (n) => (n == null ? "-" : Math.round(n).toLocaleString("ko-KR") + "원");
+const help = (tip) => `<span class="help" tabindex="0" data-tip="${esc(tip)}">?</span>`;
+const dot = (d) => d.replaceAll("-", ".");
+const codeOf = (n) => `S${String(n).padStart(5, "0")}`;
+const numOf = (c) => Number(String(c).replace(/\D/g, ""));
+let toastTimer;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2400); }
+
+// ---------------------------------------------------------------- 더미 데이터
+// QR 안의 주소 앞부분: backend/.env 의 PUBLIC_URL (폰이 PC 에 접속하는 주소, 같은 와이파이)
+const PUBLIC_URL = "http://192.168.0.10:8000";
+// 필라멘트 · 색상 (filaments.html 일부). price = 1kg 스풀 가격 (색상 가격 → 필라멘트 가격)
+const FILS = [
+  { id: 1, name: "Bambu Lab › PLA Basic", price: 14400, colors: [{ id: 1, name: "화이트", hex: "#F5F5F5" }, { id: 2, name: "블랙", hex: "#1A1A1A", price: 15000 }, { id: 3, name: "그레이", hex: "#8E9196" }] },
+  { id: 2, name: "Bambu Lab › PLA Matte", price: 16000, colors: [{ id: 4, name: "아이보리", hex: "#EDE6D6" }, { id: 5, name: "차콜", hex: "#3B3B3B" }] },
+  { id: 4, name: "Esun › PLA", price: 8000, colors: [{ id: 7, name: "화이트", hex: "#FFFFFF" }, { id: 8, name: "레드", hex: "#D32F2F" }] },
+  { id: 6, name: "Coobean › PLA", price: 9000, colors: [{ id: 10, name: "블루", hex: "#1E5BB8" }, { id: 11, name: "옐로우", hex: "#F2C230" }] },
+];
+const colorById = (id) => { for (const f of FILS) { const c = f.colors.find((x) => x.id === Number(id)); if (c) return { f, c }; } return null; };
+const priceOf = (f, c) => c.price ?? f.price;
+const STATUS = { sealed: ["재고", "sealed"], open: ["사용 중", "open"], empty: ["사용 완료", "empty"] };
+// 등록된 스풀 (코드 → 상태). 가장 큰 코드는 S00100. STATUS 는 아래 폰 쪽과 같음
+const SPOOLS = {
+  S00012: { color: 8, status: "empty", price: 8000, bought: "2026-08-03", opened: "2026-09-02", finished: "2026-10-05" },
+  S00031: { color: 10, status: "open", price: 9000, bought: "2026-09-10", opened: "2026-10-14", finished: null },
+  S00042: { color: 4, status: "sealed", price: 16000, bought: "2026-09-22", opened: null, finished: null },
+  S00100: { color: 1, status: "sealed", price: 14400, bought: "2026-10-20", opened: null, finished: null },
+};
+// 나머지 S00001 ~ S00099 도 등록돼 있음 (S00057 · S00088 은 라벨을 잃어버려 등록 안 된 번호)
+(() => { const ids = [1, 2, 3, 4, 5, 7, 8, 10, 11]; for (let n = 1; n < 100; n++) { const code = codeOf(n); if (SPOOLS[code] || n === 57 || n === 88) continue;
+  const color = ids[n % ids.length], { f, c } = colorById(color), status = n < 40 ? "empty" : n < 75 ? (n % 3 ? "empty" : "open") : n % 4 ? "sealed" : "open";
+  SPOOLS[code] = { color, status, price: priceOf(f, c), bought: `2026-${String(5 + Math.floor(n / 20)).padStart(2, "0")}-${String(1 + (n * 7) % 27).padStart(2, "0")}`, opened: status === "sealed" ? null : "2026-10-01", finished: status === "empty" ? "2026-10-10" : null }; } })();
+// 번호 예약은 하지 않고, '마지막으로 인쇄한 번호' 하나만 기억한다 (같은 번호를 두 번 뽑지 않게)
+// S00101 ~ S00110 은 인쇄해서 붙여 두었지만 아직 등록 안 함
+const printState = { lastPrinted: 110, log: [{ at: "2026-10-27 16:20", from: 101, to: 110 }, { at: "2026-10-20 14:02", from: 91, to: 100 }, { at: "2026-09-22 10:31", from: 71, to: 90 }] };
+const maxSpool = () => Math.max(...Object.keys(SPOOLS).map(numOf));
+const nextNo = () => Math.max(printState.lastPrinted, maxSpool()) + 1;
+// 폰에서 '지난번과 같게' (폰 브라우저에 기억)
+let lastReg = { color: 1, price: 14400, bought: TODAY };
+
+// ---------------------------------------------------------------- 가짜 QR (모양만)
+function qrSvg(text) {
+  const N = 21; let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const rnd = () => ((h = (h * 1103515245 + 12345) >>> 0) >>> 16) & 1;
+  const fin = (x, y) => { for (const [a, b] of [[0, 0], [N - 7, 0], [0, N - 7]]) { if (x >= a && x < a + 7 && y >= b && y < b + 7) { const i = x - a, j = y - b; return i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4); } } return null; };
+  let r = "";
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const f = fin(x, y); if (f === true || (f === null && rnd())) r += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
+  return `<svg viewBox="-1 -1 ${N + 2} ${N + 2}" shape-rendering="crispEdges"><rect x="-1" y="-1" width="${N + 2}" height="${N + 2}" fill="#fff"/><g fill="#111">${r}</g></svg>`;
+}
+
+// ---------------------------------------------------------------- PC: 라벨 인쇄
+// mode: new 새 라벨 (다음 번호부터) · again 다시 인쇄 (등록된 스풀 · 등록 안 된 번호를 골라서)
+const pr = { mode: "new", from: nextNo(), count: 10, size: "40x30", q: "", only: "all", picked: new Set() };
+// 인쇄했지만 등록 안 된 번호 (번호를 미리 예약하지 않으므로 비어 있어도 괜찮음)
+const unregistered = () => { const out = []; for (let n = 1; n <= printState.lastPrinted; n++) if (!SPOOLS[codeOf(n)]) out.push(codeOf(n)); return out; };
+const recentFrom = () => printState.log[0]?.from ?? Infinity;
+const sizeSelect = () => `<label class="field"><span>라벨 크기</span><select id="p-size">
+    <option value="40x30" ${pr.size === "40x30" ? "selected" : ""}>40 × 30 mm (라벨 프린터)</option>
+    <option value="50x30" ${pr.size === "50x30" ? "selected" : ""}>50 × 30 mm (라벨 프린터)</option>
+    <option value="a4" ${pr.size === "a4" ? "selected" : ""}>A4 라벨지 24칸 (일반 프린터)</option></select></label>`;
+// 라벨 한 장: 등록된 스풀이면 색상 · 필라멘트도 찍음
+function labelCard(code, cls = "") {
+  const sp = SPOOLS[code], cb = sp ? colorById(sp.color) : null;
+  return `<div class="lbl-card ${cls}">${qrSvg(code)}<div><div class="code">${code}</div>
+    <div class="brand">${cb ? `${esc(cb.c.name)} · ${esc(cb.f.name.split(" › ")[1] ?? cb.f.name)}` : "3D Farm Farm"}</div></div></div>`;
+}
+
+function renderPrint() {
+  const un = unregistered();
+  $("#print").innerHTML = `
+    <div class="panel-head"><span class="where">PC</span><h3>라벨 인쇄</h3>${help("번호만 들어간 QR 라벨을 뽑아 스풀에 붙여요. 등록은 폰으로 라벨을 찍어서 해요. 번호는 미리 예약하지 않고, 마지막으로 인쇄한 번호만 기억해서 다음 번호부터 이어서 뽑아요")}
+      <div class="seg" role="tablist"><button type="button" class="${pr.mode === "new" ? "on" : ""}" data-mode="new">새 라벨</button><button type="button" class="${pr.mode === "again" ? "on" : ""}" data-mode="again">다시 인쇄</button></div>
+      <div class="spacer"></div><button type="button" class="btn small" data-log>인쇄 기록</button></div>
+    ${pr.mode === "new" ? newBody(un) : againBody(un)}`;
+  bindPrint();
+}
+
+function newBody(un) {
+  const from = pr.from, to = pr.from + pr.count - 1, shown = Math.min(pr.count, 11);
+  return `<div class="panel-body">
+      <div class="form-row">
+        <label class="field"><span>시작 번호</span><input class="num" value="${codeOf(from)}" readonly aria-label="시작 번호" title="새 라벨은 항상 다음 번호부터예요. 이미 뽑은 번호는 '다시 인쇄'에서"></label>
+        <label class="field"><span>장수</span><div class="with-suffix"><input type="number" id="p-count" min="1" max="200" value="${pr.count}"><em>장</em></div></label>
+        ${sizeSelect()}
+      </div>
+      <div class="url-line">QR 안의 주소 <b>${PUBLIC_URL}/s/${codeOf(from)}</b>${help("폰 기본 카메라로 찍으면 이 주소가 열려요. 앞부분은 backend/.env 의 PUBLIC_URL. 폰과 PC 가 같은 와이파이여야 하고, PC 주소가 바뀌면 붙인 라벨이 안 열려요 — 공유기에서 PC 주소를 고정(DHCP 예약)해 두세요")}</div>
+      ${un.length ? `<div class="url-line unreg-line">인쇄했지만 등록 안 된 번호 <b>${un.length}개</b>${help("번호는 예약하지 않아서 비어 있어도 괜찮아요. 라벨을 잃어버렸으면 그 번호는 그냥 건너뛰거나 '다시 인쇄'로 같은 번호를 뽑으면 돼요. 나중에 찾은 라벨을 찍어도 정상으로 등록돼요")}
+        <button type="button" class="btn small" data-show-unreg>보기</button></div>` : ""}
+      <div class="labels">${Array.from({ length: shown }, (_, i) => labelCard(codeOf(from + i))).join("")}
+        ${pr.count > shown ? `<div class="more">외 ${pr.count - shown}장</div>` : ""}</div>
+    </div>
+    <div class="panel-foot"><div class="spacer"></div>
+      <button type="button" class="btn primary" id="p-go">${pr.count}장 인쇄</button></div>`;
+}
+
+function againBody(un) {
+  const q = pr.q.trim().toLowerCase();
+  const reg = Object.keys(SPOOLS).sort((a, b) => numOf(b) - numOf(a)).filter((code) => {
+    const { f, c } = colorById(SPOOLS[code].color);
+    return !q || [code, c.name, f.name].join(" ").toLowerCase().includes(q);
+  });
+  const unq = un.filter((code) => !q || code.toLowerCase().includes(q));
+  const showReg = pr.only !== "unreg", showUn = pr.only !== "reg";
+  const picked = [...pr.picked].sort((a, b) => numOf(a) - numOf(b));
+  const row = (code) => {
+    const sp = SPOOLS[code];
+    const right = sp ? (() => { const { f, c } = colorById(sp.color); const [sl, sc] = STATUS[sp.status];
+      return `<span class="sw" style="background:${c.hex}"></span><span class="nm">${esc(c.name)} <span class="hint">${esc(f.name)}</span></span><span class="st ${sc}">${sl}</span>`; })()
+      : `<span class="sw empty"></span><span class="nm muted">등록 안 됨${numOf(code) >= recentFrom() ? " · 최근 인쇄" : " · 라벨 분실?"}</span><span></span>`;
+    return `<label class="pick-row"><input type="checkbox" data-pick="${code}" ${pr.picked.has(code) ? "checked" : ""}><b class="pc">${code}</b>${right}</label>`;
+  };
+  return `<div class="panel-body">
+      <div class="again-top">
+        <input type="search" id="p-q" placeholder="코드 · 색상 · 필라멘트 검색" value="${esc(pr.q)}">
+        <select id="p-only"><option value="all" ${pr.only === "all" ? "selected" : ""}>전체</option><option value="reg" ${pr.only === "reg" ? "selected" : ""}>등록된 스풀 ${Object.keys(SPOOLS).length}</option><option value="unreg" ${pr.only === "unreg" ? "selected" : ""}>등록 안 된 번호 ${un.length}</option></select>
+        ${sizeSelect().replace('<label class="field"><span>라벨 크기</span>', '<label class="field" style="min-width:200px">')}
+      </div>
+      <div class="pick-list">
+        ${showReg ? `<div class="pick-sec">등록된 스풀 <span class="hint">라벨에 색상 · 필라멘트도 찍혀요</span></div>${reg.slice(0, 8).map(row).join("") || '<p class="hint">없음</p>'}${reg.length > 8 ? `<div class="hint" style="padding:6px 4px">외 ${reg.length - 8}개 · 검색으로 좁히세요</div>` : ""}` : ""}
+        ${showUn ? `<div class="pick-sec">인쇄했지만 등록 안 된 번호 <span class="hint">비어 있어도 괜찮아요 · 라벨을 잃어버렸으면 같은 번호로 다시 뽑기</span></div>${unq.map(row).join("") || '<p class="hint">없음</p>'}` : ""}
+      </div>
+      ${picked.length ? `<div class="labels">${picked.slice(0, 11).map((c) => labelCard(c, "again")).join("")}${picked.length > 11 ? `<div class="more">외 ${picked.length - 11}장</div>` : ""}</div>` : ""}
+    </div>
+    <div class="panel-foot"><span class="hint">${picked.length ? `${picked.length}장 고름` : "다시 뽑을 라벨을 고르세요"}</span>${picked.length ? '<button type="button" class="btn small" data-clear>모두 풀기</button>' : ""}<div class="spacer"></div>
+      <button type="button" class="btn primary" id="p-again" ${picked.length ? "" : "disabled"}>${picked.length}장 다시 인쇄</button></div>`;
+}
+
+// 인쇄 기록: 버튼을 누르면 창으로
+function openLog() {
+  const d = $("#dlg");
+  $("#dlg-form").innerHTML = `<div class="dlg-head">인쇄 기록<span class="hint" style="font-weight:400">마지막으로 인쇄한 번호 ${codeOf(printState.lastPrinted)}</span></div>
+    <div class="dlg-body">${printState.log.map((l) => `<div class="log-row"><span class="when">${esc(l.at.replace(/-/g, "."))}</span>
+      <span>${l.again ? `<span class="tag">다시 인쇄</span> ${esc(l.again)}` : `<span class="tag new">새 라벨</span> ${codeOf(l.from)} ~ ${codeOf(l.to)}`}</span>
+      <span class="hint">${l.again ? "" : `${l.to - l.from + 1}장`}</span></div>`).join("")}</div>
+    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button></div>`;
+  d.showModal();
+  $("#dlg-form").onclick = (e) => { if (e.target.closest("[data-close]")) d.close(); };
+}
+
+function bindPrint() {
+  const P = $("#print");
+  P.onclick = (e) => {
+    if (e.target.closest(".help")) return;
+    const m = e.target.closest("[data-mode]"); if (m) { pr.mode = m.dataset.mode; return renderPrint(); }
+    if (e.target.closest("[data-show-unreg]")) { Object.assign(pr, { mode: "again", only: "unreg", q: "" }); return renderPrint(); }
+    if (e.target.closest("[data-clear]")) { pr.picked.clear(); return renderPrint(); }
+    if (e.target.closest("[data-log]")) return openLog();
+    if (e.target.closest("#p-go")) {
+      const from = pr.from, to = pr.from + pr.count - 1;
+      printState.log.unshift({ at: `${TODAY} ${new Date().toTimeString().slice(0, 5)}`, from, to });
+      printState.lastPrinted = Math.max(printState.lastPrinted, to);
+      pr.from = nextNo(); renderPrint(); renderPhone();
+      return toast(`${codeOf(from)} ~ ${codeOf(to)} 인쇄 창을 열었어요 (목업)`);
+    }
+    if (e.target.closest("#p-again")) {
+      const list = [...pr.picked].sort((a, b) => numOf(a) - numOf(b));
+      printState.log.unshift({ at: `${TODAY} ${new Date().toTimeString().slice(0, 5)}`, again: list.length > 1 ? `${list[0]} 외 ${list.length - 1}장` : list[0] });
+      pr.picked.clear(); renderPrint();
+      return toast(`${list.length}장 다시 인쇄 창을 열었어요 (목업) · 번호는 그대로`);
+    }
+  };
+  P.onchange = (e) => {
+    const t = e.target;
+    if (t.dataset.pick) { t.checked ? pr.picked.add(t.dataset.pick) : pr.picked.delete(t.dataset.pick); return renderPrint(); }
+    if (t.id === "p-count") { pr.count = Math.max(1, Math.min(200, Math.round(Number(t.value)) || 1)); return renderPrint(); }
+    if (t.id === "p-size") { pr.size = t.value; return renderPrint(); }
+    if (t.id === "p-only") { pr.only = t.value; return renderPrint(); }
+  };
+  const q = $("#p-q");
+  if (q) q.oninput = () => { pr.q = q.value; const pos = q.selectionStart; renderPrint(); const n = $("#p-q"); n.focus(); n.setSelectionRange(pos, pos); };
+}
+
+// ---------------------------------------------------------------- 폰: 라벨을 찍으면 열리는 화면
+const ph = { code: "S00101", step: null };
+const SCANS = [["S00101", "새 라벨"], ["S00042", "재고"], ["S00031", "사용 중"], ["S00012", "사용 완료"], ["S00999", "인쇄 안 한 번호"]];
+
+function renderPhone() {
+  const code = ph.code, sp = SPOOLS[code];
+  let body;
+  if (!sp && numOf(code) > printState.lastPrinted) body = `<div class="ph-code">${code}</div>
+      <div class="ph-err">인쇄한 적 없는 번호예요.<br><span style="font-weight:400;font-size:13px">다른 라벨이거나 잘못 찍혔을 수 있어요.</span></div>`;
+  else if (!sp) body = registerView(code);
+  else body = spoolView(code, sp);
+  $("#phone-col").innerHTML = `
+    <div class="panel" style="margin-bottom:12px"><div class="panel-head"><span class="where">폰</span><h3>라벨을 찍으면</h3>${help("폰 기본 카메라로 라벨을 찍으면 그 스풀 화면이 열려요. 앱 설치 없이 브라우저로. 상태는 자동으로 넘기지 않고, 화면의 버튼을 눌러야 바뀌어요")}</div>
+      <div class="panel-body"><div class="hint" style="margin-bottom:6px">찍는 흉내</div>
+        <div class="scan-bar">${SCANS.map(([c, l]) => `<button type="button" class="btn ${c === code ? "on" : ""}" data-scan="${c}">${c} · ${l}</button>`).join("")}</div></div></div>
+    <div class="phone"><div class="bar">9:41</div><div class="addr">${PUBLIC_URL.replace("http://", "")}/s/${code}</div>
+      <div class="scr" id="scr"><div class="ph-top"><span class="mark">3D</span>3D Farm Farm · 스풀</div>${ph.done ? `<div class="ph-done">✓ ${esc(ph.done)}</div>` : ""}${body}</div></div>`;
+  $("#phone-col").onclick = onPhoneClick;
+  $("#phone-col").onchange = onPhoneChange;
+}
+
+function colorLine(colorId, sub) {
+  const { f, c } = colorById(colorId);
+  return `<div class="ph-color"><span class="sw" style="background:${c.hex}"></span><div><div class="nm">${esc(c.name)}</div><div class="sub">${esc(f.name)}${sub ? ` · ${sub}` : ""}</div></div></div>`;
+}
+
+function spoolView(code, sp) {
+  const [sl, sc] = STATUS[sp.status];
+  const action = { sealed: ["open", "사용 시작"], open: ["empty", "사용 완료"], empty: null }[sp.status];
+  const back = { sealed: null, open: ["sealed", "재고로 되돌리기"], empty: ["open", "사용 중으로 되돌리기"] }[sp.status];
+  return `<div style="display:flex;align-items:center;gap:10px"><div class="ph-code">${code}</div><span class="st ${sc}">${sl}</span></div>
+    <div class="ph-card">${colorLine(sp.color)}
+      <div class="ph-meta"><span>구매가</span><span>${won(sp.price)}</span><span>구매일</span><span>${dot(sp.bought)}</span>
+        ${sp.opened ? `<span>사용 시작</span><span>${dot(sp.opened)}</span>` : ""}${sp.finished ? `<span>사용 완료</span><span>${dot(sp.finished)}</span>` : ""}</div></div>
+    ${action ? `<button type="button" class="btn primary big" data-to="${action[0]}">${action[1]}</button><div class="hint" style="text-align:center;margin-top:-6px">오늘(${dot(TODAY)}) 날짜로 기록돼요</div>` : '<div class="hint" style="text-align:center">다 쓴 스풀이에요. 라벨은 떼서 버려도 돼요.</div>'}
+    <div class="ph-links">${back ? `<button type="button" data-to="${back[0]}">${back[1]}</button>` : ""}<button type="button" data-edit>정보 고치기</button></div>`;
+}
+
+function registerView(code) {
+  const st = ph.reg ?? { ...lastReg, fil: colorById(lastReg.color).f.id };
+  ph.reg = st;
+  const L = colorById(lastReg.color);
+  const f = FILS.find((x) => x.id === st.fil);
+  return `<div style="display:flex;align-items:center;gap:10px"><div class="ph-code">${code}</div><span class="st new">새 라벨</span></div>
+    <div class="same"><div class="t">지난번과 같게</div>
+      <div class="v"><span class="sw" style="background:${L.c.hex}"></span>${esc(L.f.name.split(" › ")[1] ?? L.f.name)} · ${esc(L.c.name)} · ${won(lastReg.price)}</div>
+      <button type="button" class="btn primary big" data-reg-same>이 값으로 등록</button></div>
+    <div class="divider">다른 색이면</div>
+    <div class="ph-form">
+      <select data-r="fil" aria-label="필라멘트">${FILS.map((x) => `<option value="${x.id}" ${x.id === st.fil ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
+      <select data-r="color" aria-label="색상">${f.colors.map((c) => `<option value="${c.id}" ${c.id === st.color ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+      <div class="row2"><input type="number" data-r="price" value="${st.price}" placeholder="구매가" aria-label="구매가"><input type="date" data-r="bought" value="${st.bought}" max="${TODAY}" aria-label="구매일"></div>
+      <button type="button" class="btn big" data-reg>등록</button>
+    </div>`;
+}
+
+function onPhoneClick(e) {
+  if (e.target.closest(".help")) return;
+  const s = e.target.closest("[data-scan]");
+  if (s) { ph.code = s.dataset.scan; ph.reg = null; ph.done = null; return renderPhone(); }
+  const code = ph.code;
+  const to = e.target.closest("[data-to]");
+  if (to) {
+    const sp = SPOOLS[code], t = to.dataset.to;
+    if (t === "open") { sp.opened = TODAY; if (sp.status === "empty") sp.finished = null; }
+    if (t === "empty") sp.finished = TODAY;
+    if (t === "sealed") sp.opened = null;
+    sp.status = t;
+    ph.done = { open: "사용 시작으로 바꿨어요", empty: "사용 완료로 바꿨어요", sealed: "재고로 되돌렸어요" }[t];
+    return renderPhone();
+  }
+  if (e.target.closest("[data-edit]")) return toast("정보 고치기: 색상 · 구매가 · 날짜 (목업)");
+  const same = e.target.closest("[data-reg-same]"), reg = e.target.closest("[data-reg]");
+  if (same || reg) {
+    const v = same ? { ...lastReg } : { color: ph.reg.color, price: Number(ph.reg.price) || null, bought: ph.reg.bought };
+    SPOOLS[code] = { color: v.color, status: "sealed", price: v.price, bought: v.bought, opened: null, finished: null };
+    lastReg = { ...v };
+    const { c } = colorById(v.color);
+    ph.reg = null; ph.done = `${code} · ${c.name} 재고로 등록했어요. 다음 라벨을 찍으세요`;
+    renderPhone(); renderPrint();
+  }
+}
+function onPhoneChange(e) {
+  const k = e.target.dataset.r; if (!k) return;
+  if (k === "fil") { ph.reg.fil = Number(e.target.value); const f = FILS.find((x) => x.id === ph.reg.fil); ph.reg.color = f.colors[0].id; ph.reg.price = priceOf(f, f.colors[0]); }
+  if (k === "color") { ph.reg.color = Number(e.target.value); const { f, c } = colorById(ph.reg.color); ph.reg.price = priceOf(f, c); }
+  if (k === "price") ph.reg.price = e.target.value;
+  if (k === "bought") ph.reg.bought = e.target.value;
+  renderPhone();
+}
+
+// ---------------------------------------------------------------- 시작
+const params = new URLSearchParams(location.search);
+document.documentElement.dataset.theme = params.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+function toggleSide(force) {
+  const el = $("#layout");
+  const collapsed = force ?? !el.classList.contains("collapsed");
+  el.classList.toggle("collapsed", collapsed);
+  $("[data-act='toggle-side'] .label").textContent = collapsed ? "펼치기" : "접기";
+  try { localStorage.setItem("pff-side-collapsed", collapsed ? "1" : "0"); } catch { /* 저장 불가 */ }
+}
+let savedSide = null;
+try { savedSide = localStorage.getItem("pff-side-collapsed"); } catch { /* 저장 불가 */ }
+if (params.get("side") === "collapsed" || savedSide === "1") toggleSide(true);
+if (SCANS.some(([c]) => c === params.get("scan"))) ph.code = params.get("scan");
+renderPrint();
+renderPhone();
+</script>
+</body>
+</html>
