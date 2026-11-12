@@ -52,13 +52,9 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
   }
 
   const save = () =>
-    submit(async ({ no, filaments: lines, ...rest }) => {
-      const body = {
-        ...rest,
-        no: no ?? undefined, // 비우면 서버가 다음 번호 (수정이면 그대로)
-        // 사용량이 0 인 줄은 빼고 저장 (줄이 하나뿐이면 남김)
-        filaments: lines.filter((r) => r.grams || lines.length === 1),
-      }
+    submit(async ({ no, ...rest }) => {
+      // 사용량이 0 인 필라멘트 줄도 그대로 저장 — 색상만 먼저 골라 두고 g 은 나중에 넣을 수 있게 (TBD-32)
+      const body = { ...rest, no: no ?? undefined } // no 를 비우면 서버가 다음 번호 (수정이면 그대로)
       if (product) await updateProduct(product.id, body)
       else await createProduct(body)
       await refresh()
