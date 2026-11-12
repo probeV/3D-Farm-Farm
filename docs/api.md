@@ -64,6 +64,8 @@
 | GET · PATCH · DELETE | `/api/v0/expenses/{id}/` | 지출 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/recurring-expenses/` | 반복 지출 목록 / 추가 |
 | GET · PATCH · DELETE | `/api/v0/recurring-expenses/{id}/` | 반복 지출 하나 / 수정 / 삭제 |
+| GET · POST | `/api/v0/sales/` | **판매 화면 데이터 전부** (제품 줄 · 합계 포함) / 판매 추가 |
+| GET · PATCH · DELETE | `/api/v0/sales/{id}/` | 판매 하나 / 수정 / 삭제 |
 
 ---
 
@@ -323,7 +325,7 @@
 - **줄 저장**: `filaments` · `parts` 를 보내면 그 목록으로 통째로 바꾼다 (기존 줄을 지우고 새로 만들어서 줄 `id` 가 바뀐다).
   보내지 않으면 줄은 그대로 (`PATCH {"status": "discontinued"}` 처럼). 하나라도 틀리면 400, 아무것도 바뀌지 않음
 - **복제** (PRD-04a): 서버 기능 없음. 화면이 원본을 복사해 추가 창에 채우고(`no` 는 비우거나 다음 번호, 이름 `(복사)`, 상태 `developing`) 저장할 때 `POST /products/`
-- 삭제: 줄도 함께 삭제 (204)
+- 삭제: 줄도 함께 삭제 (204). 팔린 적 있는 제품도 지울 수 있다 — 판매 줄은 남고 `product: null`, 팔 때 저장한 `product_name` 으로 보인다
 - 목록 순서: No. 순 (숫자 순서)
 
 ### 화면에서 계산하는 값 (참고)
@@ -396,3 +398,47 @@
 - 목록 순서: 결제일순 → 이름순
 - 지출을 저절로 만들지 않는다. 화면이 "결제일이 지났는데 이번 달에 안 넣은 것"을 보여 주고, 확인하면 위의 여러 줄 추가로 넣는다
 - 삭제: 막는 것 없음 (204). 이미 넣은 지출은 남고 `recurring` 이 `null` 이 된다. 해지 달은 없다 (그만 낼 때는 삭제)
+
+## 판매 `sales`
+```json
+{
+  "id": 22, "date": "2026-10-23", "channel": "store", "order_no": "2026102389012",
+  "items": [
+    { "id": 41, "product": 1, "product_name": "분수 원판 세트", "qty": 2, "unit_price": 18900, "unit_cost": 3227, "amount": 37800 },
+    { "id": 42, "product": 4, "product_name": "이름 키링", "qty": 1, "unit_price": 4900, "unit_cost": 191, "amount": 4900 }
+  ],
+  "shipping_received": 0, "fee": 2011, "shipping_cost": 3300, "note": "",
+  "gross": 42700, "settle": 40689, "cost": 6645, "profit": 30744,
+  "created_at": "2026-10-23T05:12:00Z"
+}
+```
+| 칸 | 쓰기 | 설명 |
+|---|---|---|
+| `date` | 선택 | 판매 날짜, 기본 오늘. 오늘 이후면 400 `오늘 이후 날짜는 넣을 수 없습니다.` |
+| `channel` | 선택 | 판매처 `store`(스마트스토어, 기본) · `direct`(직접 판매) · `etc`(기타). 그 밖이면 400 `없는 판매처입니다.` |
+| `order_no` | 선택 | 주문번호 (최대 50자, 앞뒤 공백 제거). 비어 있지 않은데 이미 있으면 400 `이미 넣은 주문번호입니다.` 빈 값은 여러 개 가능 |
+| `items` | ✅ 필수 | 제품 줄 `{product, product_name, qty, unit_price, unit_cost}`. 비어 있으면 400 `제품을 한 개 이상 넣으세요.` |
+| `items[].product` | 선택 | 제품 id. 제품을 지운 줄이면 `null` — 이때는 `product_name` 이 있어야 함 (둘 다 없으면 400 `제품을 고르세요.`) |
+| `items[].product_name` | 선택 | 팔 때의 제품명. 비우면 제품 이름을 복사. 수정할 때는 받은 이름을 그대로 보내면 팔 때 이름이 유지된다 |
+| `items[].qty` | ✅ 필수 | 수량, 1 이상 정수 |
+| `items[].unit_price` | ✅ 필수 | 단가 (0 이상 정수). 화면이 제품 판매가를 기본값으로 |
+| `items[].unit_cost` | 선택 | 개당 원가 (SALE-05). 화면이 저장할 때 원가 계산표 값을 원 단위로 반올림해서 보낸다. `null` = 원가 없음 |
+| `shipping_received` | 선택 | 손님이 낸 배송비, 기본 0 |
+| `fee` | 선택 | 수수료. **추가할 때 보내지 않으면** 스마트스토어는 자동 계산(아래), 직접 판매 · 기타는 0. 보내면 그 값 그대로 (고친 수수료) |
+| `shipping_cost` | 선택 | 판매자가 낸 택배비 (주문별 이익 참고용), 기본 0. 화면이 설정의 SET-08 을 기본값으로 |
+| `note` | 선택 | 메모 |
+| `items[].amount` · `gross` · `settle` · `cost` · `profit` | — | 판매가(단가 × 수량) · 판매가 합계 · 정산 금액 · 원가 합계 · 주문별 이익. 원가 없는 줄이 있으면 `cost` · `profit` 은 `null` |
+
+- **줄 저장**: `items` 를 보내면 그 목록으로 통째로 바꾼다 (줄 `id` 가 바뀐다). 보내지 않으면 줄은 그대로 (`PATCH {"note": "..."}`).
+  하나라도 틀리면 400, 아무것도 바뀌지 않음
+- **수수료는 수정할 때 다시 계산하지 않는다** — 화면이 판매가 · 배송비를 바꾸면 새 수수료를 함께 보낸다 (`다시 계산`)
+- 삭제: 줄도 함께 삭제 (204)
+- 목록 순서: 날짜 최근순 (같은 날이면 나중에 넣은 것 먼저)
+
+### 계산 (참고)
+```
+판매가 합계 gross   = Σ items.unit_price × qty
+수수료 (자동)       = (gross + shipping_received) × (원가 설정 fee_order + fee_sales)%, 원 단위 반올림
+정산 금액 settle    = gross + shipping_received − fee
+주문별 이익 profit  = settle − Σ items.unit_cost × qty − shipping_cost   (원가 없는 줄이 있으면 null)
+```
