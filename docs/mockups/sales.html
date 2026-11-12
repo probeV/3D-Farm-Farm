@@ -225,10 +225,10 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
     <a class="nav-item" href="expenses.html" title="지출">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
-    <a class="nav-item" href="settings.html" title="제품 원가 설정">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="label">제품 원가 설정</span></a>
     <div class="side-bottom">
       <span class="mock-tag">목업 · 더미 데이터</span>
+      <a class="nav-item" href="settings.html" title="설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="label">설정</span></a>
       <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
     </div>
@@ -248,7 +248,7 @@ const CHANNELS = [
   { key: "etc", label: "기타" },
 ];
 const channel = (k) => CHANNELS.find((c) => c.key === k);
-// 제품 원가 설정 SET-06 · 07 (settings.html 저장값)
+// 설정 › 스마트스토어 SET-06 · 07 (settings.html 저장값)
 const FEE_RATE = { order: 1.98, sales: 2.73 };
 const STORE_RATE = (FEE_RATE.order + FEE_RATE.sales) / 100;
 
@@ -268,7 +268,7 @@ const PRODUCTS = [
 // 지금 원가 계산표의 개당 원가 (products.html calc 결과: 필라멘트 + 부자재 + 전기료, 원 단위 반올림). null = 입력이 덜 돼 원가를 못 냄
 const COSTS = { 1: 3227, 2: 3868, 3: 1291, 4: 191, 5: 7284, 6: null, 7: 4787, 8: null };
 const costOf = (p) => (p ? COSTS[p.id] ?? null : null);
-// 제품 원가 설정 SET-08 건당 판매자 부담 배송비 (settings.html 저장값 0원) → 새 주문의 '낸 택배비' 기본값
+// 설정 › 스마트스토어 SET-08 건당 판매자 부담 배송비 (settings.html 저장값 0원) → 새 주문의 '낸 택배비' 기본값
 const SHIP_COST_DEFAULT = 0;
 const STATUS = { on_sale: "판매중", developing: "개발중", discontinued: "판매중지" };
 const product = (id) => PRODUCTS.find((p) => p.id === Number(id));
@@ -389,6 +389,7 @@ function render() {
       <div class="spacer"></div>
       <a class="btn" href="store.html" title="스마트스토어에서 주문 가져오기 (STORE)">스마트스토어 가져오기</a>
       <button type="button" class="btn primary" data-act="add">+ 판매 추가</button>
+      <a class="btn" href="settings.html?tab=store" title="설정 › 스마트스토어" aria-label="설정 › 스마트스토어" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;width:36px;padding:7px 0">⚙</a>
     </div>
     <div class="sum-cards">
       <div class="sum-card main"><span>이번 달 매출${help(`${THIS_MONTH.replace("-", "년 ")}월 · 판매가 합계 (배송비 · 수수료 빼기 전)`)}</span>
@@ -526,7 +527,7 @@ function openSale(x, preset = {}) {
     const noCost = picked.some((it) => itemCost(it) == null);
     const cs = picked.reduce((a, it) => a + it[1] * (itemCost(it) ?? 0), 0);
     const pf = g + st.ship - f - cs - st.shipCost;
-    const rateTip = `스마트스토어: (판매가 합계 + 배송비) × ${FEE_RATE.order}% (네이버페이 주문관리) + ${FEE_RATE.sales}% (판매). 제품 원가 설정 SET-06 · 07 값. 정산 엑셀과 다르면 직접 고치세요`;
+    const rateTip = `스마트스토어: (판매가 합계 + 배송비) × ${FEE_RATE.order}% (네이버페이 주문관리) + ${FEE_RATE.sales}% (판매). 설정 › 스마트스토어 SET-06 · 07 값. 정산 엑셀과 다르면 직접 고치세요`;
     show(dlg, `<div class="dlg-head">${x ? "판매 수정" : "판매 추가"}${!x && src ? `<span class="hint" style="font-weight:400">${src.date.replaceAll("-", ".")} 주문에서 복제</span>` : ""}</div>
       <div class="dlg-body">
         <div class="form-grid">
@@ -563,7 +564,7 @@ function openSale(x, preset = {}) {
         <div class="calc profit-box">
           <span class="lbl">정산 금액</span><span class="v">${won(g + st.ship - f)}</span>
           <span class="lbl">− 원가 합계<small>${noCost ? "원가 없는 제품이 있어요 — 제품 원가 화면에서 채우세요" : "줄마다 개당 원가 × 수량"}</small></span><span class="v">${noCost ? "-" : won(cs)}</span>
-          <span class="lbl">− 낸 택배비<small>판매자가 택배사에 낸 돈. 기본값은 제품 원가 설정 SET-08</small></span>
+          <span class="lbl">− 낸 택배비<small>판매자가 택배사에 낸 돈. 기본값은 설정 › 스마트스토어 SET-08</small></span>
           <span class="with-suffix"><input type="number" name="shipCost" min="0" step="100" value="${st.shipCost}"><em>원</em></span>
           <span class="lbl total">= 이익 ${help("이 주문이 대략 얼마 남았는지 보는 참고값. 구독 · 광고 같은 운영비와 실패 출력은 빠져 있어서, 실제 월 이익은 손익 화면에서 따로 봐요")}</span>
           <span class="v total">${noCost ? "-" : `${won(pf)}<span class="rate">${pct(pf, g)}</span>`}</span>
