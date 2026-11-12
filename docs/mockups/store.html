@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스마트스토어 연동 — 3D Farm Farm 목업</title>
+<!--
+  스마트스토어 연동 HTML 목업 (docs/plans/v2.md STORE-01 ~ 03 기준)
+  - 커머스API(내스토어 애플리케이션)로 주문 · 정산을 가져와 판매 장부에 넣는다. 엑셀 올리기는 예비.
+  - 판매 화면의 하위 화면 (사이드바는 '판매'). 더미 데이터, 오늘은 2026-10-28 로 고정.
+  - 스크린샷용: ?step=fetched,  ?open=map | conn,  ?conn=nokey | fail,  ?theme=dark | light
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f1f3f6; --border: #e2e5ea;
+  --text: #1c2026; --muted: #6b7380; --accent: #2f6fed; --accent-soft: #e8efff;
+  --good: #1f9254; --warn: #b7791f; --bad: #d64545; --good-soft: #e6f5ec; --warn-soft: #fff6e5; --bad-soft: #fdecec;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
+  --radius: 10px; color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #14161a; --surface: #1c1f24; --surface-2: #24282e; --border: #30353d;
+  --text: #e8eaee; --muted: #9aa2ad; --accent: #6b9bff; --accent-soft: #1f2a44;
+  --good: #4cc38a; --warn: #e5b04a; --bad: #ff6b6b; --good-soft: #1b3127; --warn-soft: #3a3020; --bad-soft: #3d2224;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+
+/* 사이드바 (다른 목업과 같음) */
+.layout { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; --side-w: 220px; transition: grid-template-columns .15s; }
+.layout.collapsed { --side-w: 64px; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; background: var(--surface); border-right: 1px solid var(--border); overflow: hidden; }
+.side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; font-weight: 700; font-size: 15px; white-space: nowrap; }
+.side-brand .mark { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -.5px; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border: 0; background: none; border-radius: 8px; color: var(--muted); font-weight: 600; white-space: nowrap; cursor: pointer; text-align: left; text-decoration: none; }
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); }
+.nav-item svg { width: 20px; height: 20px; flex: none; }
+.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.layout.collapsed .label { display: none; }
+.layout.collapsed .nav-item, .layout.collapsed .side-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.mock-tag { font-size: 11px; color: var(--muted); padding: 0 10px; white-space: nowrap; }
+.layout.collapsed .mock-tag { display: none; }
+main { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+/* 공통 */
+h3, h4 { margin: 0; }
+h3 { font-size: 15px; }
+.hint { color: var(--muted); font-size: 13px; }
+.muted { color: var(--muted); }
+.btn { border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn .count { padding: 0 6px; border-radius: 99px; background: var(--warn); color: #fff; font-size: 11.5px; }
+input, select { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.badge.good { background: var(--good-soft); color: var(--good); }
+.badge.info { background: var(--accent-soft); color: var(--accent); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; }
+.help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: 0; }
+.help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; text-align: left; }
+.help:hover::after, .help:focus::after { opacity: 1; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 제목 줄: 판매 › 스마트스토어 연동 */
+.crumb { font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+.crumb a { color: var(--muted); text-decoration: none; }
+.crumb a:hover { color: var(--accent); }
+.title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.title-row h2 { margin: 0; font-size: 20px; }
+.title-row .spacer { flex: 1; }
+
+/* 연결 상태 줄 */
+.conn { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); font-size: 13.5px; }
+.dot { flex: none; } .conn .dot, .stat .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+.conn .dot.off, .stat .dot.off { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+.conn .sep { width: 1px; height: 18px; background: var(--border); }
+.conn .spacer { flex: 1; }
+
+/* 가져오기 패널 */
+.panel { margin-top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.panel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.panel-head .spacer { flex: 1; }
+.range { display: inline-flex; align-items: center; gap: 6px; }
+.range input { width: 150px; }
+.panel-body { padding: 14px 16px; }
+.empty { padding: 34px 16px; text-align: center; color: var(--muted); }
+.empty .big { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.loading { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 가져온 주문 미리보기 */
+.sum-line { display: flex; gap: 14px; flex-wrap: wrap; padding: 10px 16px; background: var(--surface-2); font-size: 13px; }
+.sum-line b { font-variant-numeric: tabular-nums; }
+.sum-line .warn-t { color: var(--warn); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; white-space: nowrap; }
+tbody.order:last-of-type tr:last-child td { border-bottom: 0; }
+tbody.order tr.item td { border-bottom: 0; padding-top: 0; }
+tbody.order tr:last-child td { border-bottom: 1px solid var(--border); }
+tbody.order.off td { color: var(--muted); }
+tbody.order.off .store-name, tbody.order.off .num { text-decoration: line-through; }
+.chk { width: 34px; }
+.date { color: var(--muted); font-variant-numeric: tabular-nums; }
+.ono { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+.store-name { font-weight: 600; white-space: normal; }
+.store-opt { font-size: 12px; color: var(--muted); }
+.arrow-to { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12.5px; }
+.arrow-to .to { color: var(--muted); }
+.app-prod { font-weight: 700; color: var(--accent); }
+.arrow-to select { padding: 3px 8px; font-size: 12.5px; border-color: var(--warn); background: var(--warn-soft); }
+.amount { font-weight: 700; }
+.table-wrap { overflow-x: auto; }
+.panel-foot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.panel-foot .spacer { flex: 1; }
+
+/* 가져오기 기록 */
+.log-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.log-row:last-child { border-bottom: 0; }
+.log-row .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* 대화상자 */
+dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+dialog.wide { width: min(820px, calc(100vw - 32px)); }
+dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
+.dlg-head { padding: 14px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; flex: none; }
+.dlg-body { padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+.dlg-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); flex: none; }
+.dlg-foot .spacer { flex: 1; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.field > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.note-box { padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; color: var(--muted); }
+.note-box ol { margin: 4px 0 0; padding-left: 18px; }
+.note-box li { margin: 2px 0; }
+.note-box code { padding: 0 4px; border-radius: 4px; background: var(--surface); font-size: 12px; }
+.env { margin: 6px 0; padding: 8px 10px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); font-size: 12px; color: var(--text); white-space: pre-wrap; }
+.stat { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+.stat .dot { margin-top: 7px; }
+.map-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px 260px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.map-row:last-child { border-bottom: 0; }
+.map-row .to { color: var(--muted); text-align: center; }
+.map-row select { width: 100%; }
+.map-row select.need { border-color: var(--warn); background: var(--warn-soft); }
+.map-row .price { font-size: 12px; color: var(--muted); }
+.map-filter { display: flex; gap: 8px; margin-bottom: 6px; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 600; z-index: 100; }
+.toast[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  main { padding: 16px; } .layout { --side-w: 64px; } .layout .label { display: none; } .layout .nav-item, .layout .side-brand { justify-content: center; padding-left: 0; padding-right: 0; } .mock-tag, [data-act="toggle-side"] { display: none; }
+  .conn .sep { display: none; }
+  .map-row { grid-template-columns: 1fr; } .map-row .to { display: none; }
+  .log-row { grid-template-columns: 1fr; gap: 2px; }
+}
+</style>
+</head>
+<body>
+<div class="layout" id="layout">
+  <aside class="sidebar">
+    <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
+    <a class="nav-item" href="products.html" title="제품 원가">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
+    <a class="nav-item" href="filaments.html" title="필라멘트">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
+    <a class="nav-item" href="parts.html" title="부자재">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></a>
+    <a class="nav-item active" href="sales.html" title="판매">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
+    <a class="nav-item" href="expenses.html" title="지출">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
+    <a class="nav-item" href="pl.html" title="손익">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="label">손익</span></a>
+    <a class="nav-item" href="settings.html" title="제품 원가 설정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="label">제품 원가 설정</span></a>
+    <div class="side-bottom">
+      <span class="mock-tag">목업 · 더미 데이터</span>
+      <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
+    </div>
+  </aside>
+  <main id="view"></main>
+</div>
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+const TODAY = "2026-10-28";
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const won = (n) => (n == null ? "-" : Math.round(n).toLocaleString("ko-KR") + "원");
+const help = (tip) => `<span class="help" tabindex="0" data-tip="${esc(tip)}">?</span>`;
+const dot = (d) => d.replaceAll("-", ".");
+let toastTimer;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2400); }
+
+// ---------------------------------------------------------------- 더미 데이터
+// 이 앱의 제품 (sales.html 과 같은 것)
+const PRODUCTS = [
+  { id: 1, code: "001", name: "분수 원판 세트", status: "on_sale" }, { id: 2, code: "002", name: "정다면체 전개도 모형", status: "on_sale" },
+  { id: 3, code: "003", name: "소마 큐브", status: "on_sale" }, { id: 4, code: "004", name: "이름 키링", status: "on_sale" },
+  { id: 5, code: "005", name: "USB 무드등", status: "on_sale" }, { id: 6, code: "006", name: "기어 원리 키트", status: "developing" },
+  { id: 7, code: "007", name: "하노이 탑", status: "discontinued" }, { id: 8, code: "008", name: "도형 칠교", status: "developing" },
+];
+const product = (id) => PRODUCTS.find((p) => p.id === Number(id));
+// 연결 (커머스API 내스토어 애플리케이션). ID · 시크릿은 화면에서 넣지 않고 backend/.env 에서 읽는다
+// state: ok 연결됨 · nokey .env 에 값 없음 · fail 키가 틀리거나 네이버 응답 없음
+const ENV_ID = "NAVER_COMMERCE_CLIENT_ID", ENV_SECRET = "NAVER_COMMERCE_CLIENT_SECRET";
+const conn = { state: ["nokey", "fail"].includes(new URLSearchParams(location.search).get("conn")) ? new URLSearchParams(location.search).get("conn") : "ok",
+  appId: "4Xk9…aE2", store: "쓰리디팜팜", checkedAt: "2026-10-28 09:10", lastSync: "2026-10-27 09:12", lastTo: "2026-10-27" };
+Object.defineProperty(conn, "connected", { get: () => conn.state === "ok" });
+// 상품 연결 (STORE-02): 스토어 상품 + 옵션 → 이 앱의 제품. product null = 아직 연결 안 함
+const MAP = [
+  { key: "8812001", name: "[수학 교구] 분수 원판 세트 자석형", opt: "", price: 18900, product: 1 },
+  { key: "8812002", name: "정다면체 전개도 모형 5종", opt: "", price: 24000, product: 2 },
+  { key: "8812003", name: "소마 큐브 입체 퍼즐", opt: "", price: 12900, product: 3 },
+  { key: "8812004-1", name: "이름 키링 주문제작", opt: "모양: 원형", price: 4900, product: 4 },
+  { key: "8812004-2", name: "이름 키링 주문제작", opt: "모양: 하트", price: 5400, product: null },
+  { key: "8812005", name: "USB 무드등 (달 · 행성)", opt: "", price: 9900, product: 5 },
+  { key: "8812007", name: "하노이 탑 원판 7단", opt: "", price: 4500, product: 7 },
+];
+const mapOf = (key) => MAP.find((m) => m.key === key);
+// 판매 장부에 이미 있는 주문번호 (sales.html 의 10/23 · 10/27 주문)
+const IN_LEDGER = new Set(["2026102389012", "2026102790123"]);
+// API 로 가져올 주문 (주문번호 하나에 상품주문 여러 줄). 수수료 · 정산 금액은 API 의 실제 값
+// status: paid 결제완료 · shipping 배송중 · done 구매확정 · cancel 취소. settled: 정산 완료 여부
+const REMOTE = [
+  { no: "2026102790123", date: "2026-10-27", status: "shipping", ship: 3000, fee: 1272, settled: false, items: [["8812002", 1, 24000]] },
+  { no: "2026102791577", date: "2026-10-27", status: "shipping", ship: 0, fee: 2410, settled: false, items: [["8812001", 2, 18900], ["8812003", 1, 12900]] },
+  { no: "2026102802231", date: "2026-10-28", status: "paid", ship: 3000, fee: 457, settled: false, items: [["8812004-1", 1, 4900], ["8812004-2", 1, 5400]] },
+  { no: "2026102803460", date: "2026-10-28", status: "cancel", ship: 3000, fee: 0, settled: false, items: [["8812005", 1, 9900]] },
+  { no: "2026102804118", date: "2026-10-28", status: "paid", ship: 3000, fee: 749, settled: false, items: [["8812003", 1, 12900]] },
+];
+const STATUS = { paid: ["결제완료", "info"], shipping: ["배송중", "info"], done: ["구매확정", "good"], cancel: ["취소", "bad"] };
+// 가져오기 기록
+const LOG = [
+  { at: "2026-10-27 09:12", range: "2026.10.20 ~ 10.27", added: 3, skipped: 0, note: "" },
+  { at: "2026-10-20 08:40", range: "2026.10.13 ~ 10.20", added: 2, skipped: 1, note: "취소 1건 제외" },
+  { at: "2026-10-13 21:05", range: "2026.10.01 ~ 10.13", added: 3, skipped: 0, note: "정산 완료 2건 수수료 맞춤" },
+];
+
+// ---------------------------------------------------------------- 상태
+const params = new URLSearchParams(location.search);
+const state = { from: conn.lastTo, to: TODAY, step: "idle", rows: [], checked: new Set() };
+const gross = (o) => o.items.reduce((a, [, q, u]) => a + q * u, 0);
+const settle = (o) => gross(o) + o.ship - o.fee;
+const unmapped = (o) => o.items.some(([k]) => !mapOf(k).product);
+// 줄 상태: dup 이미 판매 장부에 있음 · cancel 취소 · need 상품 연결 필요 · ok 넣을 수 있음
+const kind = (o) => (IN_LEDGER.has(o.no) ? "dup" : o.status === "cancel" ? "cancel" : unmapped(o) ? "need" : "ok");
+
+// ---------------------------------------------------------------- 그리기
+function render() {
+  const needMap = MAP.filter((m) => !m.product).length;
+  $("#view").innerHTML = `
+    <div class="crumb"><a href="sales.html">판매</a> ›</div>
+    <div class="title-row"><h2>스마트스토어 연동</h2><div class="spacer"></div>
+      <button type="button" class="btn" data-act="map">상품 연결${needMap ? ` <span class="count">${needMap}</span>` : ""}</button>
+      <button type="button" class="btn" data-act="conn">연결 상태</button></div>
+    <div class="conn">
+      ${conn.connected
+        ? `<span class="dot"></span><b>연결됨</b><span class="muted">${esc(conn.store)} · 커머스API 내스토어 애플리케이션</span><span class="sep"></span>
+           <span>마지막 가져오기 <b>${esc(conn.lastSync.replace(/-/g, "."))}</b></span>`
+        : conn.state === "nokey" ? `<span class="dot off"></span><b>연결 안 됨</b><span class="muted">backend/.env 에 애플리케이션 ID · 시크릿이 없어요</span><button type="button" class="btn small" data-act="conn">방법 보기</button>`
+        : `<span class="dot off"></span><b>연결 실패</b><span class="muted">애플리케이션 ID · 시크릿을 확인하세요</span><button type="button" class="btn small" data-act="conn">자세히</button>`}
+      <div class="spacer"></div>
+      <button type="button" class="btn small" data-act="excel" title="API 가 안 될 때 판매자센터에서 받은 엑셀로">엑셀로 올리기</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>주문 가져오기</h3>${help("기간 안의 주문을 스마트스토어에서 가져와 미리 보여 줘요. 판매 장부에는 확인하고 넣어요. 같은 주문번호는 두 번 들어가지 않아요")}
+        <div class="spacer"></div>
+        <span class="range"><span class="hint">주문일</span><input type="date" id="from" value="${state.from}" max="${TODAY}" aria-label="시작일">~<input type="date" id="to" value="${state.to}" max="${TODAY}" aria-label="종료일"></span>
+        <button type="button" class="btn primary" data-act="fetch" ${conn.connected && state.step !== "loading" ? "" : "disabled"}>${state.step === "loading" ? '<span class="loading"></span> 가져오는 중' : "가져오기"}</button>
+      </div>
+      ${state.step === "fetched" ? preview() : `<div class="empty">${state.step === "loading" ? "스마트스토어에서 주문을 가져오는 중이에요…"
+        : `<div class="big">마지막으로 가져온 날(${dot(conn.lastTo)}) 이후 주문을 가져와요</div>기간을 바꿔서 지난 주문을 다시 가져올 수도 있어요.`}</div>`}
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>가져오기 기록</h3></div>
+      ${LOG.map((l) => `<div class="log-row"><span class="when">${esc(l.at.replace(/-/g, "."))}</span><span>${esc(l.range)} · 판매 장부에 <b>${l.added}건</b> 넣음${l.skipped ? ` · ${l.skipped}건 뺌` : ""}${l.note ? ` <span class="hint">· ${esc(l.note)}</span>` : ""}</span><span></span></div>`).join("")}
+    </div>`;
+  bind();
+}
+
+function preview() {
+  const rows = state.rows;
+  const k = (t) => rows.filter((o) => kind(o) === t);
+  const picked = rows.filter((o) => state.checked.has(o.no));
+  return `
+    <div class="sum-line">
+      <span>가져온 주문 <b>${rows.length}건</b></span>
+      <span>넣을 수 있음 <b>${k("ok").length}건</b></span>
+      ${k("need").length ? `<span class="warn-t">상품 연결 필요 ${k("need").length}건</span>` : ""}
+      ${k("dup").length ? `<span>이미 있음 ${k("dup").length}건</span>` : ""}
+      ${k("cancel").length ? `<span>취소 ${k("cancel").length}건</span>` : ""}
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th class="chk"><input type="checkbox" id="chk-all" aria-label="모두 고르기" ${k("ok").length && k("ok").every((o) => state.checked.has(o.no)) ? "checked" : ""}></th>
+        <th>주문일 · 주문번호</th><th>스토어 상품 → 이 앱의 제품</th><th class="num">수량</th><th class="num">판매가</th><th class="num">배송비</th>
+        <th class="num">수수료${help("스마트스토어가 알려 준 실제 수수료 (네이버페이 주문관리 + 판매). 정산 전이면 예정 금액이고, 다음 가져오기 때 정산 완료 값으로 맞춰져요")}</th>
+        <th class="num">정산 금액</th><th>상태</th></tr></thead>
+      ${rows.map(orderRows).join("")}
+    </table></div>
+    <div class="panel-foot">
+      <span class="hint">취소된 주문 · 이미 판매 장부에 있는 주문은 넣지 않아요.</span><div class="spacer"></div>
+      <span>${picked.length}건 · ${won(picked.reduce((a, o) => a + gross(o), 0))}</span>
+      <button type="button" class="btn primary" data-act="add" ${picked.length ? "" : "disabled"}>${picked.length}건 판매 장부에 넣기</button>
+    </div>`;
+}
+
+function orderRows(o) {
+  const t = kind(o), on = state.checked.has(o.no);
+  const [stl, scls] = STATUS[o.status];
+  const tag = { dup: '<span class="badge">이미 있음</span>', cancel: "", need: '<span class="badge warn">상품 연결 필요</span>', ok: "" }[t];
+  return `<tbody class="order ${t === "dup" || t === "cancel" ? "off" : ""}" data-no="${o.no}">
+    ${o.items.map(([key, q, u], i) => {
+      const m = mapOf(key), p = product(m.product);
+      const to = p ? `<span class="to">→</span><span class="app-prod">${esc(p.code)} ${esc(p.name)}</span>`
+        : `<span class="to">→</span><select data-map="${key}" aria-label="이 앱의 제품 고르기"><option value="">제품 고르기</option>${PRODUCTS.map((x) => `<option value="${x.id}">${esc(x.code)} ${esc(x.name)}</option>`).join("")}</select>`;
+      return `<tr class="${i ? "item" : ""}">
+        ${i ? "<td></td><td></td>" : `<td class="chk"><input type="checkbox" data-chk="${o.no}" ${on ? "checked" : ""} ${t === "ok" ? "" : "disabled"} aria-label="이 주문 넣기"></td>
+          <td><div class="date">${dot(o.date)}</div><div class="ono">${o.no}</div></td>`}
+        <td><div class="store-name">${esc(m.name)}${m.opt ? ` <span class="store-opt">${esc(m.opt)}</span>` : ""}</div><div class="arrow-to">${to}</div></td>
+        <td class="num">${q}</td><td class="num">${won(q * u)}</td>
+        ${i ? "<td></td><td></td><td></td><td></td>" : `<td class="num">${o.ship ? won(o.ship) : "-"}</td><td class="num">${o.fee ? "−" + won(o.fee) : "-"}</td>
+          <td class="num amount">${won(settle(o))}</td><td><span class="badge ${scls}">${stl}</span>${o.settled ? "" : ' <span class="hint" title="정산 전 · 예정 금액">예정</span>'}<div style="margin-top:3px">${tag}</div></td>`}
+      </tr>`;
+    }).join("")}
+  </tbody>`;
+}
+
+function bind() {
+  const v = $("#view");
+  if ($("#from")) { $("#from").onchange = (e) => (state.from = e.target.value); $("#to").onchange = (e) => (state.to = e.target.value); }
+  v.onchange = (e) => {
+    const t = e.target;
+    if (t.id === "chk-all") { state.rows.filter((o) => kind(o) === "ok").forEach((o) => (t.checked ? state.checked.add(o.no) : state.checked.delete(o.no))); return render(); }
+    if (t.dataset.chk) { t.checked ? state.checked.add(t.dataset.chk) : state.checked.delete(t.dataset.chk); return render(); }
+    // 미리보기에서 바로 연결: 한 번 고르면 기억해서 다음 가져오기부터 자동 (STORE-02)
+    if (t.dataset.map && t.value) {
+      const m = mapOf(t.dataset.map); m.product = Number(t.value);
+      state.rows.filter((o) => kind(o) === "ok" && o.items.some(([k]) => k === m.key)).forEach((o) => state.checked.add(o.no));
+      toast(`'${m.name}${m.opt ? " · " + m.opt : ""}' → ${product(m.product).name} 로 연결했어요. 다음부터 자동이에요`);
+      return render();
+    }
+  };
+  v.onclick = (e) => {
+    if (e.target.closest(".help")) return;
+    const b = e.target.closest("[data-act]"); if (!b) return;
+    ({
+      fetch: fetchOrders,
+      add: addToLedger,
+      map: openMap,
+      conn: openConn,
+      excel: () => toast("엑셀 올리기: 판매자센터 › 정산관리에서 받은 파일을 고르면 같은 미리보기로 (목업)"),
+    })[b.dataset.act]?.();
+  };
+}
+
+function fetchOrders() {
+  if (state.from > state.to) return toast("시작일이 종료일보다 늦어요");
+  state.step = "loading"; render();
+  setTimeout(() => {
+    state.rows = REMOTE.filter((o) => o.date >= state.from && o.date <= state.to);
+    state.checked = new Set(state.rows.filter((o) => kind(o) === "ok").map((o) => o.no));
+    state.step = "fetched"; render();
+  }, 700);
+}
+
+function addToLedger() {
+  const picked = state.rows.filter((o) => state.checked.has(o.no));
+  picked.forEach((o) => IN_LEDGER.add(o.no));
+  const skipped = state.rows.length - picked.length;
+  const at = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+  LOG.unshift({ at, range: `${dot(state.from)} ~ ${dot(state.to).slice(5)}`, added: picked.length, skipped, note: "" });
+  conn.lastSync = at; conn.lastTo = state.to;
+  state.checked.clear();
+  render();
+  toast(`판매 장부에 ${picked.length}건 넣었어요 · 판매처 '스마트스토어', 수수료는 실제 값`);
+}
+
+// ---------------------------------------------------------------- 상품 연결 (STORE-02)
+const dlg = { el: $("#dlg"), form: $("#dlg-form") };
+function show(html, cls = "") { dlg.el.className = cls; dlg.form.innerHTML = html; dlg.form.onclick = dlg.form.onchange = null; if (!dlg.el.open) dlg.el.showModal(); }
+
+function openMap(onlyNeed = false) {
+  const list = MAP.filter((m) => !onlyNeed || !m.product);
+  const need = MAP.filter((m) => !m.product).length;
+  show(`<div class="dlg-head">상품 연결${help("스마트스토어 상품(옵션)마다 이 앱의 제품을 한 번 짝지어 두면, 가져올 때 자동으로 그 제품으로 들어가요. 옵션마다 다른 제품이면 옵션별로 연결해요")}</div>
+    <div class="dlg-body">
+      <div class="map-filter"><button type="button" class="btn small ${onlyNeed ? "" : "primary"}" data-f="all">전체 ${MAP.length}</button><button type="button" class="btn small ${onlyNeed ? "primary" : ""}" data-f="need">연결 필요 ${need}</button>
+        <div style="flex:1"></div><button type="button" class="btn small" data-reload title="스토어에 새로 올린 상품을 불러와요">스토어 상품 다시 불러오기</button></div>
+      ${list.map((m) => `<div class="map-row">
+        <div><div class="store-name">${esc(m.name)}</div><div class="price">${m.opt ? esc(m.opt) + " · " : ""}스토어 판매가 ${won(m.price)} · 상품번호 ${esc(m.key)}</div></div>
+        <span class="to">→</span>
+        <select data-k="${m.key}" class="${m.product ? "" : "need"}" aria-label="이 앱의 제품"><option value="">연결 안 함</option>${PRODUCTS.map((p) => `<option value="${p.id}" ${p.id === m.product ? "selected" : ""}>${esc(p.code)} ${esc(p.name)}${p.status === "on_sale" ? "" : p.status === "developing" ? " (개발중)" : " (판매중지)"}</option>`).join("")}</select>
+      </div>`).join("") || '<p class="hint">연결이 필요한 상품이 없어요.</p>'}
+    </div>
+    <div class="dlg-foot"><span class="hint">바꾸면 바로 저장돼요. 이미 판매 장부에 넣은 주문은 그대로예요.</span><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button></div>`, "wide");
+  dlg.form.onchange = (e) => { const s = e.target.closest("[data-k]"); if (!s) return; mapOf(s.dataset.k).product = s.value ? Number(s.value) : null; openMap(onlyNeed); render(); toast("연결을 저장했어요"); };
+  dlg.form.onclick = (e) => {
+    if (e.target.closest(".help")) return;
+    if (e.target.closest("[data-close]")) return dlg.el.close();
+    const f = e.target.closest("[data-f]"); if (f) return openMap(f.dataset.f === "need");
+    if (e.target.closest("[data-reload]")) toast("스토어 상품 7개를 불러왔어요 · 새 상품 없음 (목업)");
+  };
+}
+
+// ---------------------------------------------------------------- 연결 상태 (키는 backend/.env 에서. 화면은 확인만)
+function openConn() {
+  const envBlock = `<pre class="env"># backend/.env
+${ENV_ID}=발급받은 애플리케이션 ID
+${ENV_SECRET}=발급받은 애플리케이션 시크릿</pre>`;
+  const how = `<ol><li>커머스API센터 › 애플리케이션 등록 › <b>내스토어 애플리케이션</b> (API 권한: 주문 조회 · 정산 조회)</li>
+      <li><code>backend/.env</code> 에 아래 두 줄을 넣어요 (<code>.env.example</code> 참고)</li>${envBlock}<li>서버를 다시 켜고 <b>연결 확인</b></li></ol>`;
+  const body = {
+    ok: `<div class="stat"><span class="dot"></span><div><b>연결됨</b> · ${esc(conn.store)}<div class="hint">애플리케이션 ID ${esc(conn.appId)} · 마지막 확인 ${esc(conn.checkedAt.replace(/-/g, "."))}</div></div></div>
+      <div class="note-box">ID · 시크릿은 <code>backend/.env</code> 의 <code>${ENV_ID}</code> · <code>${ENV_SECRET}</code> 에서 읽어요. 바꾸려면 파일을 고치고 서버를 다시 켜세요. 화면 · DB · 백업에는 저장되지 않아요.</div>`,
+    nokey: `<div class="stat"><span class="dot off"></span><div><b>연결 안 됨</b><div class="hint">backend/.env 에 애플리케이션 ID · 시크릿이 없어요</div></div></div>
+      <div class="note-box">${how}</div>`,
+    fail: `<div class="stat"><span class="dot off"></span><div><b>연결 실패</b><div class="hint">네이버가 인증을 거절했어요 (401) · ${esc(conn.checkedAt.replace(/-/g, "."))}</div></div></div>
+      <div class="note-box">backend/.env 의 값이 커머스API센터의 값과 같은지 확인하세요. 시크릿을 다시 발급했다면 새 값으로 바꾸고 서버를 다시 켜요.${envBlock}</div>`,
+  }[conn.state];
+  show(`<div class="dlg-head">연결 상태</div><div class="dlg-body">${body}</div>
+    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-test>연결 확인</button></div>`);
+  dlg.form.onclick = (e) => {
+    if (e.target.closest("[data-close]")) return dlg.el.close();
+    if (e.target.closest("[data-test]")) {
+      conn.checkedAt = `${TODAY} ${new Date().toTimeString().slice(0, 5)}`;
+      dlg.el.close(); render();
+      toast(conn.state === "ok" ? `연결돼 있어요 · ${conn.store}` : conn.state === "nokey" ? "아직 .env 에 값이 없어요" : "연결 실패 · ID · 시크릿을 확인하세요");
+    }
+  };
+}
+
+// ---------------------------------------------------------------- 시작
+document.documentElement.dataset.theme = params.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+function toggleSide(force) {
+  const el = $("#layout");
+  const collapsed = force ?? !el.classList.contains("collapsed");
+  el.classList.toggle("collapsed", collapsed);
+  $("[data-act='toggle-side'] .label").textContent = collapsed ? "펼치기" : "접기";
+  try { localStorage.setItem("pff-side-collapsed", collapsed ? "1" : "0"); } catch { /* 저장 불가 */ }
+}
+let savedSide = null;
+try { savedSide = localStorage.getItem("pff-side-collapsed"); } catch { /* 저장 불가 */ }
+if (params.get("side") === "collapsed" || savedSide === "1") toggleSide(true);
+if (params.get("step") === "fetched") {
+  state.rows = REMOTE.filter((o) => o.date >= state.from && o.date <= state.to);
+  state.checked = new Set(state.rows.filter((o) => kind(o) === "ok").map((o) => o.no));
+  state.step = "fetched";
+}
+render();
+({ map: () => openMap(), conn: () => openConn() })[params.get("open")]?.();
+</script>
+</body>
+</html>
