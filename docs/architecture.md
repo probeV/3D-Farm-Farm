@@ -26,10 +26,12 @@ frontend/ (React)                          backend/ (Django)
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` | 모델 완료 |
 | `products` | `Category`, `Subcategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 모델 · API 완료 |
 | `expenses` | `Expense`, `RecurringExpense` | 모델 · API 완료 |
+| `sales` | `Sale`, `SaleItem` | 모델 완료 (v2) |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
 - **참조 방향은 한쪽으로만**: `products` → `filaments` (제품이 필라멘트를 씀). `filaments` 는 `products` 를 import 하지 않는다.
   `expenses` 는 다른 앱의 모델을 쓰지 않는다 (공통 `MONEY` · `BaseViewSet` 만 `filaments` 에서).
+  `sales` → `products` (판매 줄이 제품 · 원가 설정을 씀). `products` 는 `sales` 를 import 하지 않는다.
 - 부자재(`Part`)는 제품 원가에서만 쓰여서 `products` 에 둔다. 따로 커지면 그때 `parts` 앱으로 분리한다.
 - 새 앱: `backend/` 에서 `python manage.py startapp <앱>` → `config/settings.py` 의 `INSTALLED_APPS` 에 추가.
 

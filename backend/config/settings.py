@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'filaments',
     'products',
     'expenses',
+    'sales',
 ]
 
 MIDDLEWARE = [
