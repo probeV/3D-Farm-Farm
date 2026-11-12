@@ -26,7 +26,7 @@ frontend/ (React)                          backend/ (Django)
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` | 모델 완료 |
 | `products` | `Category`, `Subcategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 모델 · API 완료 |
 | `expenses` | `Expense`, `RecurringExpense` | 모델 · API 완료 |
-| `sales` | `Sale`, `SaleItem` | 모델 · API 완료 (v2) |
+| `sales` | `Sale`, `SaleItem` | 모델 · API · 화면 완료 (v2) |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
 - **참조 방향은 한쪽으로만**: `products` → `filaments` (제품이 필라멘트를 씀). `filaments` 는 `products` 를 import 하지 않는다.
