@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>판매 — 3D Farm Farm 목업</title>
+<!--
+  판매 장부 HTML 목업 (docs/plans/v2.md SALE-01 · 02 · 04 기준)
+  - 더미 데이터로 동작하며 새로고침하면 초기화된다. 오늘은 2026-10-28 로 고정 (지출 목업과 같은 날).
+  - 스크린샷용: ?open=sale | sale-new,  ?theme=dark | light
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f1f3f6; --border: #e2e5ea;
+  --text: #1c2026; --muted: #6b7380; --accent: #2f6fed; --accent-soft: #e8efff;
+  --good: #1f9254; --warn: #b7791f; --bad: #d64545; --good-soft: #e6f5ec; --warn-soft: #fff6e5; --bad-soft: #fdecec;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
+  --radius: 10px; color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #14161a; --surface: #1c1f24; --surface-2: #24282e; --border: #30353d;
+  --text: #e8eaee; --muted: #9aa2ad; --accent: #6b9bff; --accent-soft: #1f2a44;
+  --good: #4cc38a; --warn: #e5b04a; --bad: #ff6b6b; --good-soft: #1b3127; --warn-soft: #3a3020; --bad-soft: #3d2224;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* 사이드바: 접으면 아이콘만, 펼치면 이름까지 */
+.layout { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; --side-w: 220px; transition: grid-template-columns .15s; }
+.layout.collapsed { --side-w: 64px; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; background: var(--surface); border-right: 1px solid var(--border); overflow: hidden; }
+.side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; font-weight: 700; font-size: 15px; white-space: nowrap; }
+.side-brand .mark { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -.5px; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border: 0; background: none; border-radius: 8px; color: var(--muted); font-weight: 600; white-space: nowrap; cursor: pointer; text-align: left; text-decoration: none; }
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); }
+.nav-item svg { width: 20px; height: 20px; flex: none; }
+.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.layout.collapsed .label { display: none; }
+.layout.collapsed .nav-item, .layout.collapsed .side-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.mock-tag { font-size: 11px; color: var(--muted); padding: 0 10px; white-space: nowrap; }
+.layout.collapsed .mock-tag { display: none; }
+main { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px; }
+.page-title { margin: 0 0 14px; font-size: 20px; }
+
+/* 공통 */
+h4 { margin: 0; font-size: 14px; }
+.hint { color: var(--muted); font-size: 13px; }
+.muted { color: var(--muted); }
+.btn { border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap; text-decoration: none; display: inline-block; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.add { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.btn.add:hover { background: var(--accent); color: #fff; }
+input, select, textarea { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+input[type=number] { text-align: right; }
+textarea { resize: vertical; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.icon-btn { border: 0; background: none; cursor: pointer; color: var(--muted); border-radius: 6px; font-size: 15px; width: 32px; height: 32px; }
+.icon-btn:hover { background: var(--surface-2); color: var(--bad); }
+
+/* 위쪽 줄 · 요약 카드 (지출 화면과 같은 모양) */
+.top-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top-row .spacer { flex: 1; }
+.sum-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0 4px; padding: 2px; }
+.sum-card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); text-align: left; }
+.sum-card > span { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.sum-card strong { display: block; font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.sum-card .sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sum-card.main strong { color: var(--good); }
+.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; }
+.help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: 0; }
+.help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 260px; padding: 6px 10px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; }
+.help:hover::after, .help:focus::after { opacity: 1; }
+
+/* 제품별 판매: 기간을 따라 바뀜. 줄을 누르면 그 제품이 든 주문만 (지출의 분류별 합계와 같은 모양) */
+.by-cat { margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 16px; }
+.by-cat-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.by-cat-head h4 { font-size: 13px; }
+.by-cat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.cat-row { display: grid; grid-template-columns: minmax(0, 150px) minmax(0, 1fr) 44px 96px; gap: 10px; align-items: center; padding: 5px 6px; margin: 0 -6px; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; font-size: 13px; }
+.cat-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-row:hover { background: var(--surface-2); }
+.cat-row.active { background: var(--accent-soft); }
+.cat-row .bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.cat-row .bar i { display: block; height: 100%; border-radius: 99px; background: var(--good); }
+.cat-row .qty { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cat-row .amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* 목록 제목 줄 */
+.section-head { display: flex; align-items: center; gap: 8px; margin: 22px 0 10px; flex-wrap: wrap; }
+.section-head .spacer { flex: 1; }
+.section-head h3 { margin: 0 4px 0 0; font-size: 15px; }
+.section-head input[type=search] { width: 200px; }
+.section-head .total { font-weight: 700; font-variant-numeric: tabular-nums; }
+.range { display: inline-flex; align-items: center; gap: 4px; }
+.range input { width: 140px; }
+
+/* 판매 표 */
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface-2); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--surface-2); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.date { font-variant-numeric: tabular-nums; color: var(--muted); }
+.pname { font-weight: 700; font-size: 14px; }
+.pname .more { margin-left: 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.amount { font-weight: 700; }
+.minus { color: var(--muted); }
+.amount.neg { color: var(--bad); }
+.rate { display: inline-block; min-width: 38px; margin-left: 6px; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.note { max-width: 200px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.empty { padding: 40px; text-align: center; color: var(--muted); }
+th.sortable { padding: 0; }
+th.sortable button { display: inline-flex; align-items: center; gap: 4px; width: 100%; padding: 10px 12px; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+th.num.sortable button { justify-content: flex-end; }
+th.sortable button:hover { color: var(--text); }
+th.sortable .arrow { width: 10px; opacity: 0; }
+th.sortable button:hover .arrow { opacity: .4; }
+th.sorted { color: var(--accent); }
+th.sorted .arrow, th.sorted button:hover .arrow { opacity: 1; }
+
+/* 판매처 배지: 스마트스토어만 초록 */
+.ch { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); color: var(--text); font-size: 12px; font-weight: 600; }
+.ch.store { background: var(--good-soft); color: var(--good); }
+
+/* 대화상자 */
+dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+dialog.wide { width: min(800px, calc(100vw - 32px)); }
+dialog.narrow { width: min(400px, calc(100vw - 32px)); }
+.dlg-head { padding: 14px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+.dlg-body { padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
+.dlg-head, .dlg-foot { flex: none; }
+.dlg-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.dlg-foot .spacer { flex: 1; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.full { grid-column: 1 / -1; }
+.field > span, .sub-title { font-size: 12px; color: var(--muted); font-weight: 600; }
+.with-suffix { display: flex; align-items: center; gap: 6px; }
+.with-suffix input, .with-suffix select { flex: 1; }
+.with-suffix em { font-style: normal; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick label { cursor: pointer; }
+.pick input { position: absolute; opacity: 0; pointer-events: none; }
+.pick span { display: inline-block; padding: 5px 12px; border: 1px solid var(--border); border-radius: 99px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.pick input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.pick input:focus-visible + span { outline: 2px solid var(--accent); }
+
+/* 주문 안 제품 줄 (SALE-04) */
+.items { margin-top: 16px; }
+.items-head, .item-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 110px 100px 90px 32px; gap: 8px; align-items: center; }
+.items-head { font-size: 12px; color: var(--muted); font-weight: 600; padding: 0 0 4px; border-bottom: 1px solid var(--border); }
+.items-head .num { text-align: right; }
+.item-row { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.item-row input, .item-row select { width: 100%; }
+.item-row .sub { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.item-row .changed { grid-column: 3 / 6; font-size: 11.5px; color: var(--warn); margin-top: -4px; }
+.items-foot { display: flex; align-items: center; gap: 8px; padding: 8px 0 0; }
+.items-foot .spacer { flex: 1; }
+
+/* 정산 계산 상자: 판매가 합계 + 받은 배송비 − 수수료 = 정산 금액 */
+.calc { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 8px 14px; align-items: center; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px; }
+.calc .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.calc .lbl small { display: block; color: var(--muted); font-size: 12px; }
+.calc .total { border-top: 1px solid var(--border); padding-top: 8px; font-weight: 700; font-size: 15px; }
+.profit-box { margin-top: 8px; background: var(--good-soft); }
+.profit-box .total.v { color: var(--good); }
+/* 원가 버튼: 누르면 아래에 원가 내역이 펼쳐짐 */
+.cost-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.cost-val.missing { color: var(--warn); }
+/* 숫자 입력칸의 위 · 아래 버튼 없애기 (직접 입력만) */
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.calc input { width: 100%; }
+.fee-reset { border: 0; background: none; padding: 0; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* 확인 대화상자 (common.html TBD-09) */
+.btn.danger-fill { background: var(--bad); border-color: var(--bad); color: #fff; }
+.confirm .dlg-head { border-bottom: 0; padding-bottom: 4px; }
+.confirm .dlg-body { padding-top: 4px; }
+.confirm .dlg-foot { border-top: 0; padding-top: 4px; }
+.confirm .lead { margin: 0; }
+
+/* 알림 */
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 600; z-index: 100; }
+.toast[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  main { padding: 16px; } .layout { --side-w: 64px; } .layout .label { display: none; } .layout .nav-item, .layout .side-brand { justify-content: center; padding-left: 0; padding-right: 0; } .mock-tag, [data-act="toggle-side"] { display: none; }
+  .section-head input[type=search] { width: 100%; }
+  .sum-cards, .form-grid, .by-cat-grid { grid-template-columns: 1fr; }
+  .items-head { display: none; }
+  .item-row { grid-template-columns: 1fr 1fr 32px; }
+  .item-row select { grid-column: 1 / -1; }
+  .item-row .cost-val { grid-column: 1; text-align: left; } .item-row .sub { grid-column: 2; } .item-row [data-rm] { grid-column: 3; }
+  .calc { grid-template-columns: 1fr 130px; }
+}
+</style>
+</head>
+<body>
+<div class="layout" id="layout">
+  <aside class="sidebar">
+    <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
+    <a class="nav-item" href="products.html" title="제품 원가">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
+    <a class="nav-item" href="filaments.html" title="필라멘트">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
+    <a class="nav-item" href="parts.html" title="부자재">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></a>
+    <a class="nav-item active" href="sales.html" title="판매">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
+    <a class="nav-item" href="expenses.html" title="지출">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
+    <a class="nav-item" href="settings.html" title="제품 원가 설정">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="label">제품 원가 설정</span></a>
+    <div class="side-bottom">
+      <span class="mock-tag">목업 · 더미 데이터</span>
+      <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
+    </div>
+  </aside>
+  <main id="view"></main>
+</div>
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+<dialog id="dlg2"><form method="dialog" id="dlg2-form"></form></dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- 판매처 (고정 3개)
+const CHANNELS = [
+  { key: "store", label: "스마트스토어" },
+  { key: "direct", label: "직접 판매" },
+  { key: "etc", label: "기타" },
+];
+const channel = (k) => CHANNELS.find((c) => c.key === k);
+// 제품 원가 설정 SET-06 · 07 (settings.html 저장값)
+const FEE_RATE = { order: 1.98, sales: 2.73 };
+const STORE_RATE = (FEE_RATE.order + FEE_RATE.sales) / 100;
+
+// ---------------------------------------------------------------- 더미 데이터
+const TODAY = "2026-10-28";
+// 제품 (products.html 과 같은 것). sale = 제품의 판매가 → 주문 줄 단가 기본값
+const PRODUCTS = [
+  { id: 1, code: "001", name: "분수 원판 세트", status: "on_sale", sale: 18900 },
+  { id: 2, code: "002", name: "정다면체 전개도 모형", status: "on_sale", sale: 24000 },
+  { id: 3, code: "003", name: "소마 큐브", status: "on_sale", sale: 12900 },
+  { id: 4, code: "004", name: "이름 키링", status: "on_sale", sale: 4900 },
+  { id: 5, code: "005", name: "USB 무드등", status: "on_sale", sale: 9900 },
+  { id: 6, code: "006", name: "기어 원리 키트", status: "developing", sale: null },
+  { id: 7, code: "007", name: "하노이 탑", status: "discontinued", sale: 4500 },
+  { id: 8, code: "008", name: "도형 칠교", status: "developing", sale: 8900 },
+];
+// 지금 원가 계산표의 개당 원가 (products.html calc 결과: 필라멘트 + 부자재 + 전기료, 원 단위 반올림). null = 입력이 덜 돼 원가를 못 냄
+const COSTS = { 1: 3227, 2: 3868, 3: 1291, 4: 191, 5: 7284, 6: null, 7: 4787, 8: null };
+const costOf = (p) => (p ? COSTS[p.id] ?? null : null);
+// 제품 원가 설정 SET-08 건당 판매자 부담 배송비 (settings.html 저장값 0원) → 새 주문의 '낸 택배비' 기본값
+const SHIP_COST_DEFAULT = 0;
+const STATUS = { on_sale: "판매중", developing: "개발중", discontinued: "판매중지" };
+const product = (id) => PRODUCTS.find((p) => p.id === Number(id));
+
+// 주문 (SALE-01 · 04). items: [제품 id, 수량, 단가, 개당 원가]. ship: 손님이 낸 배송비. fee: 수수료 (스마트스토어는 자동 계산 후 고칠 수 있음)
+// 개당 원가: 판매를 저장할 때 원가 계산표 값을 복사해 둔다 (나중에 필라멘트 · 부자재 가격을 바꿔도 지난 판매는 그대로). 고칠 수 있음
+// shipCost: 판매자가 낸 택배비 — 주문별 이익 참고용. 손익 계산에는 지출 장부(판매비)의 택배비를 쓴다
+const raw = [
+  ["2026-06-18", "direct", [[7, 3, 4500]], 0, "", "학교 방과후 선생님 · 현금"],
+  ["2026-07-04", "store", [[1, 1, 18900]], 3000, "2026070412345", ""],
+  ["2026-07-11", "store", [[3, 1, 12900]], 3000, "2026071123456", ""],
+  ["2026-07-19", "store", [[4, 2, 4900]], 3000, "2026071934567", "이름: 민준 · 서연"],
+  ["2026-07-26", "store", [[1, 1, 18900], [3, 1, 12900]], 0, "2026072645678", "무료배송 이벤트"],
+  ["2026-08-02", "store", [[2, 1, 24000]], 3000, "2026080256789", ""],
+  ["2026-08-09", "direct", [[4, 10, 4000]], 0, "", "플리마켓 · 10개 묶음 할인"],
+  ["2026-08-15", "store", [[5, 1, 9900]], 3000, "2026081567890", ""],
+  ["2026-08-22", "store", [[1, 2, 18900]], 0, "2026082278901", ""],
+  ["2026-08-30", "store", [[3, 1, 12900], [4, 1, 4900]], 3000, "2026083089012", "이름: 하준"],
+  ["2026-09-03", "store", [[2, 1, 24000]], 3000, "2026090390123", ""],
+  ["2026-09-07", "store", [[1, 1, 18900]], 3000, "2026090701234", ""],
+  ["2026-09-12", "etc", [[1, 5, 17000]], 0, "", "지인 학원 단체 주문 · 계좌이체"],
+  ["2026-09-16", "store", [[5, 2, 9900]], 3000, "2026091612345", ""],
+  ["2026-09-21", "store", [[3, 2, 12900]], 0, "2026092123456", ""],
+  ["2026-09-28", "store", [[4, 3, 4900]], 3000, "2026092834567", "이름 3개 메모"],
+  ["2026-10-02", "store", [[2, 1, 24000], [1, 1, 18900]], 0, "2026100245678", ""],
+  ["2026-10-06", "store", [[1, 1, 18900]], 3000, "2026100656789", ""],
+  ["2026-10-11", "direct", [[3, 2, 12000], [4, 5, 4500]], 0, "", "동네 플리마켓"],
+  ["2026-10-14", "store", [[5, 1, 9900]], 3000, "2026101467890", ""],
+  ["2026-10-19", "store", [[3, 1, 12900]], 3000, "2026101978901", ""],
+  ["2026-10-23", "store", [[1, 2, 18900], [4, 1, 4900]], 0, "2026102389012", ""],
+  ["2026-10-27", "store", [[2, 1, 24000]], 3000, "2026102790123", ""],
+];
+const itemsSum = (items) => items.reduce((a, [, q, u]) => a + q * u, 0);
+const autoFee = (ch, items, ship) => (ch === "store" ? Math.round((itemsSum(items) + ship) * STORE_RATE) : 0);
+const db = {
+  sales: raw.map(([date, ch, items, ship, orderNo, note], i) => ({ id: i + 1, date, channel: ch, items: items.map(([p, q, u]) => [p, q, u, costOf(product(p))]),
+    ship, fee: autoFee(ch, items, ship), shipCost: ch === "store" ? 3300 : 0, orderNo, note })),
+};
+
+// ---------------------------------------------------------------- 유틸
+const $ = (s, r = document) => r.querySelector(s);
+const byId = (list, id) => list.find((x) => x.id === Number(id));
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const won = (n) => (n == null ? "-" : Math.round(n).toLocaleString("ko-KR") + "원");
+const help = (tip) => `<span class="help" tabindex="0" data-tip="${esc(tip)}">?</span>`;
+const nextId = (list) => Math.max(0, ...list.map((x) => x.id)) + 1;
+const month = (d) => d.slice(0, 7);
+const THIS_MONTH = month(TODAY);
+// 주문 하나의 값들
+const gross = (s) => itemsSum(s.items);                // 판매가 합계 (= 매출)
+const qty = (s) => s.items.reduce((a, [, q]) => a + q, 0);
+const settle = (s) => gross(s) + s.ship - s.fee;         // 정산 금액 (통장에 들어오는 돈)
+// 주문 줄 [제품 id, 수량, 단가, 원가 내역]
+const itemCost = (it) => it[3];
+const costMissing = (s) => s.items.some((it) => itemCost(it) == null);
+const costSum = (s) => s.items.reduce((a, it) => a + it[1] * (itemCost(it) ?? 0), 0);
+const profit = (s) => (costMissing(s) ? null : settle(s) - costSum(s) - s.shipCost); // 주문별 이익 (참고용)
+const pct = (n, d) => (d ? `${Math.round((n / d) * 100)}%` : "-");
+const total = (list, f) => list.reduce((a, s) => a + f(s), 0);
+const chBadge = (k) => `<span class="ch ${k === "store" ? "store" : ""}">${esc(channel(k).label)}</span>`;
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200);
+}
+
+// ---------------------------------------------------------------- 화면
+const state = { q: "", ch: "", product: 0, period: "all", from: "", to: "", sort: { key: "date", dir: "desc" } };
+const PERIODS = [["month", "이번 달"], ["year", "올해"], ["all", "전체"], ["custom", "직접 지정"]];
+const inPeriod = (x) => ({
+  month: () => month(x.date) === THIS_MONTH,
+  year: () => x.date.slice(0, 4) === TODAY.slice(0, 4),
+  all: () => true,
+  custom: () => (!state.from || x.date >= state.from) && (!state.to || x.date <= state.to),
+})[state.period]();
+const periodLabel = () => (state.period === "custom" ? `${state.from || "처음"} ~ ${state.to || "오늘"}` : PERIODS.find(([k]) => k === state.period)[1]);
+
+const COLS = [
+  { key: "date", label: "날짜", get: (x) => x.date },
+  { key: "channel", label: "판매처", get: (x) => CHANNELS.findIndex((c) => c.key === x.channel) },
+  { key: "product", label: "제품", get: (x) => product(x.items[0][0]).name },
+  { key: "qty", label: "수량", get: qty, num: true },
+  { key: "gross", label: "판매가", get: gross, num: true, tip: "주문 안 제품들의 판매가 × 수량 합계. 손익의 매출로 들어가요" },
+  { key: "ship", label: "배송비", get: (x) => x.ship, num: true, tip: "손님이 낸 배송비 (받은 돈). 판매자가 낸 택배비는 지출 장부의 판매비로 따로 적어요" },
+  { key: "fee", label: "수수료", get: (x) => x.fee, num: true },
+  { key: "settle", label: "정산 금액", get: settle, num: true, tip: "판매가 + 배송비 − 수수료. 통장에 들어오는 돈 (손익의 현금 기준)" },
+  { key: "cost", label: "원가", get: costSum, num: true, tip: "판매를 저장할 때 원가 계산표에서 복사해 둔 개당 원가 × 수량. 나중에 가격이 바뀌어도 지난 판매는 그대로예요" },
+  { key: "profit", label: "이익", get: (x) => profit(x) ?? -Infinity, num: true, tip: "정산 금액 − 원가 − 낸 택배비. 주문 하나가 대략 얼마 남았는지 보는 참고값이에요. 월 손익은 실제 지출 · 스풀 구매가로 따로 계산해요" },
+  { key: "note", label: "메모", get: (x) => x.note, nosort: true },
+];
+function sorter() {
+  const c = COLS.find((x) => x.key === state.sort.key), d = state.sort.dir === "asc" ? 1 : -1;
+  const cmp = (a, b) => (typeof a === "number" ? a - b : String(a).localeCompare(String(b)));
+  return (a, b) => d * cmp(c.get(a), c.get(b)) || b.date.localeCompare(a.date) || b.id - a.id;
+}
+
+function render() {
+  const all = db.sales;
+  const thisMonth = all.filter((x) => month(x.date) === THIS_MONTH);
+  const inP = all.filter(inPeriod);
+  const q = state.q.trim().toLowerCase();
+  const rows = inP.filter((x) => (!state.ch || x.channel === state.ch)
+    && (!state.product || x.items.some(([p]) => p === state.product))
+    && (!q || [x.orderNo, x.note, ...x.items.map(([p]) => product(p).name)].join(" ").toLowerCase().includes(q))).sort(sorter());
+  // 제품별 판매 (기간 안): 판매가 합계 큰 순
+  const byProd = PRODUCTS.map((p) => {
+    const lines = inP.flatMap((s) => s.items.filter(([id]) => id === p.id));
+    return { ...p, q: lines.reduce((a, [, n]) => a + n, 0), amt: lines.reduce((a, [, n, u]) => a + n * u, 0) };
+  }).filter((p) => p.q).sort((a, b) => b.amt - a.amt);
+  const maxP = Math.max(1, ...byProd.map((p) => p.amt));
+  const filtered = state.q || state.ch || state.product || state.period !== "all";
+  const first = all.length ? all.map((x) => x.date).sort()[0].replaceAll("-", ".") : "-";
+
+  $("#view").innerHTML = `
+    <h2 class="page-title">판매</h2>
+    <div class="top-row">
+      <span class="hint">팔린 주문을 기록해요. 한 주문에 제품 여러 개를 넣을 수 있어요.</span>
+      <div class="spacer"></div>
+      <a class="btn" href="store.html" title="스마트스토어에서 주문 가져오기 (STORE)">스마트스토어 가져오기</a>
+      <button type="button" class="btn primary" data-act="add">+ 판매 추가</button>
+    </div>
+    <div class="sum-cards">
+      <div class="sum-card main"><span>이번 달 매출${help(`${THIS_MONTH.replace("-", "년 ")}월 · 판매가 합계 (배송비 · 수수료 빼기 전)`)}</span>
+        <strong>${won(total(thisMonth, gross))}</strong><span class="sub">주문 ${thisMonth.length}건 · ${total(thisMonth, qty)}개</span></div>
+      <div class="sum-card"><span>이번 달 정산 금액${help("판매가 + 받은 배송비 − 수수료 · 통장에 들어오는 돈")}</span>
+        <strong>${won(total(thisMonth, settle))}</strong><span class="sub">수수료 ${won(total(thisMonth, (s) => s.fee))}</span></div>
+      <div class="sum-card"><span>이번 달 주문 이익${help("주문별 이익(정산 금액 − 원가 − 낸 택배비)의 합계. 참고값이에요 — 구독 · 광고 같은 운영비와 실패 출력은 빠져 있어요. 실제 월 이익은 손익 화면에서")}</span>
+        <strong>${won(total(thisMonth, (s) => profit(s) ?? 0))}</strong><span class="sub">판매가의 ${pct(total(thisMonth, (s) => profit(s) ?? 0), total(thisMonth, gross))}${thisMonth.some(costMissing) ? " · 원가 없는 주문 제외" : ""}</span></div>
+      <div class="sum-card"><span>누적 매출${help("전체 기간 판매가 합계")}</span>
+        <strong>${won(total(all, gross))}</strong><span class="sub">주문 ${all.length}건 · ${total(all, qty)}개 · ${first}부터</span></div>
+    </div>
+    <div class="by-cat"><div class="by-cat-head"><h4>제품별 판매</h4><span class="hint">${esc(periodLabel())} · 판매가 합계 순 · 누르면 그 제품이 든 주문만</span></div>
+      <div class="by-cat-grid">${byProd.map((p) => `<button type="button" class="cat-row ${state.product === p.id ? "active" : ""}" data-prod="${p.id}" title="${esc(p.code)} ${esc(p.name)}">
+        <span>${esc(p.name)}</span><span class="bar"><i style="width:${(p.amt / maxP) * 100}%"></i></span><span class="qty">${p.q}개</span><span class="amt">${won(p.amt)}</span></button>`).join("") || '<span class="hint">이 기간에 판매가 없어요.</span>'}</div></div>
+    <div class="section-head"><h3>판매 목록</h3><span class="hint">${rows.length}건</span><span class="total">${won(total(rows, gross))}</span><div class="spacer"></div>
+      <select id="f-period">${PERIODS.map(([k, l]) => `<option value="${k}" ${k === state.period ? "selected" : ""}>기간: ${l}</option>`).join("")}</select>
+      ${state.period === "custom" ? `<span class="range"><input type="date" id="f-from" value="${state.from}" max="${TODAY}" aria-label="시작일">~<input type="date" id="f-to" value="${state.to}" max="${TODAY}" aria-label="종료일"></span>` : ""}
+      <select id="f-ch"><option value="">판매처: 전체</option>${CHANNELS.map((c) => `<option value="${c.key}" ${state.ch === c.key ? "selected" : ""}>${esc(c.label)}</option>`).join("")}</select>
+      <input type="search" id="q" placeholder="제품 · 주문번호 · 메모 검색" value="${esc(state.q)}">
+      ${filtered ? '<button type="button" class="btn small" data-act="clear">필터 지우기</button>' : ""}
+      <button type="button" class="btn small" data-act="csv" title="보이는 목록을 엑셀용 CSV 로">CSV 내보내기</button>
+    </div>
+    <div class="table-wrap">
+      ${rows.length ? `<table>
+        <thead><tr>${COLS.map(th).join("")}</tr></thead>
+        <tbody>${rows.map(row).join("")}</tbody></table>`
+      : `<div class="empty">${all.length ? "조건에 맞는 판매가 없어요." : "아직 기록한 판매가 없어요. <b>+ 판매 추가</b> 로 시작하세요."}</div>`}
+    </div>`;
+  bindView();
+}
+
+function th(c) {
+  const tip = c.tip ? help(c.tip) : "";
+  if (c.nosort) return `<th>${c.label}</th>`;
+  const on = state.sort.key === c.key;
+  return `<th class="sortable ${c.num ? "num" : ""} ${on ? "sorted" : ""}" aria-sort="${on ? (state.sort.dir === "asc" ? "ascending" : "descending") : "none"}"><button type="button" data-sort="${c.key}">${c.label}${tip}<span class="arrow">${on && state.sort.dir === "desc" ? "▼" : "▲"}</span></button></th>`;
+}
+
+function row(x) {
+  const names = x.items.map(([p, q]) => `${product(p).name} × ${q}`).join("\n");
+  const more = x.items.length > 1 ? `<span class="more">외 ${x.items.length - 1}</span>` : "";
+  return `<tr data-id="${x.id}">
+    <td class="date">${x.date.replaceAll("-", ".")}</td>
+    <td>${chBadge(x.channel)}</td>
+    <td class="pname" title="${esc(names)}">${esc(product(x.items[0][0]).name)}${more}</td>
+    <td class="num">${qty(x)}</td>
+    <td class="num">${won(gross(x))}</td>
+    <td class="num ${x.ship ? "" : "minus"}">${x.ship ? won(x.ship) : "-"}</td>
+    <td class="num ${x.fee ? "" : "minus"}">${x.fee ? "−" + won(x.fee) : "-"}</td>
+    <td class="num">${won(settle(x))}</td>
+    <td class="num minus">${costMissing(x) ? '<span class="badge warn">원가 없음</span>' : won(costSum(x))}</td>
+    <td class="num amount ${profit(x) != null && profit(x) < 0 ? "neg" : ""}">${profit(x) == null ? "-" : won(profit(x))}<span class="rate">${profit(x) == null ? "" : pct(profit(x), gross(x))}</span></td>
+    <td class="note" title="${esc(x.note)}">${esc(x.note)}</td></tr>`;
+}
+
+function bindView() {
+  const q = $("#q");
+  q.oninput = () => { state.q = q.value; const pos = q.selectionStart; render(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); };
+  $("#f-ch").onchange = (e) => { state.ch = e.target.value; render(); };
+  $("#f-period").onchange = (e) => { state.period = e.target.value; render(); };
+  if ($("#f-from")) { $("#f-from").onchange = (e) => { state.from = e.target.value; render(); }; $("#f-to").onchange = (e) => { state.to = e.target.value; render(); }; }
+  $("#view").onclick = (e) => {
+    if (e.target.closest(".help")) return;
+    const s = e.target.closest("[data-sort]");
+    if (s) {
+      const k = s.dataset.sort;
+      state.sort = state.sort.key === k ? { key: k, dir: state.sort.dir === "asc" ? "desc" : "asc" } : { key: k, dir: ["product", "channel"].includes(k) ? "asc" : "desc" };
+      return render();
+    }
+    const p = e.target.closest("[data-prod]");
+    if (p) { const id = Number(p.dataset.prod); state.product = state.product === id ? 0 : id; return render(); }
+    const b = e.target.closest("[data-act]");
+    if (b) {
+      return ({
+        add: () => openSale(null),
+        clear: () => { Object.assign(state, { q: "", ch: "", product: 0, period: "all", from: "", to: "" }); render(); },
+        csv: () => toast(`CSV 로 내보냈어요 (목업 · ${$("#view tbody")?.children.length ?? 0}건)`),
+      })[b.dataset.act]();
+    }
+    const tr = e.target.closest("tr[data-id]");
+    if (tr) openSale(byId(db.sales, tr.dataset.id));
+  };
+}
+
+// ---------------------------------------------------------------- 대화상자 공통
+const dlg = { el: $("#dlg"), form: $("#dlg-form") };
+const dlg2 = { el: $("#dlg2"), form: $("#dlg2-form") };
+function show(dl, html, cls = "") {
+  dl.el.className = cls; dl.form.innerHTML = html;
+  dl.form.onclick = dl.form.onchange = dl.form.oninput = dl.form.onsubmit = null;
+  if (!dl.el.open) dl.el.showModal();
+}
+function confirmBox(o) {
+  show(dlg2, `<div class="dlg-head">${esc(o.title)}</div><div class="dlg-body"><p class="lead">${o.lead}</p></div>
+    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>취소</button>
+      <button type="button" class="btn danger-fill" data-ok>${esc(o.okLabel || "삭제")}</button></div>`, "narrow confirm");
+  dlg2.form.querySelector("[data-close]").focus();
+  dlg2.form.onclick = (e) => {
+    if (e.target.closest("[data-close]")) return dlg2.el.close();
+    if (e.target.closest("[data-ok]")) { dlg2.el.close(); o.onOk?.(); }
+  };
+}
+
+// ---------------------------------------------------------------- 판매 추가 / 복제 / 수정 (SALE-02 · 04)
+// 제품은 등록된 제품에서 고르고, 단가는 제품 판매가가 기본값 (고칠 수 있음).
+// 수수료: 스마트스토어면 (판매가 합계 + 배송비) × (주문관리 + 판매 수수료%) 자동. 직접 고치면 그 값으로 고정, "다시 계산" 으로 되돌림
+function productOptions(sel) {
+  const group = (st) => PRODUCTS.filter((p) => p.status === st)
+    .map((p) => `<option value="${p.id}" ${p.id === sel ? "selected" : ""}>${esc(p.code)} ${esc(p.name)}${p.sale ? ` · ${won(p.sale)}` : ""}</option>`).join("");
+  return `<option value="">제품 고르기</option>${Object.entries(STATUS).map(([k, l]) => { const o = group(k); return o ? `<optgroup label="${l}">${o}</optgroup>` : ""; }).join("")}`;
+}
+
+function openSale(x, preset = {}) {
+  const src = preset.copyOf;
+  const base = x ?? src;
+  const st = {
+    date: x ? x.date : TODAY,
+    channel: base?.channel ?? "store",
+    orderNo: x ? x.orderNo : "",
+    // 복제는 새 판매라 원가를 지금 원가 계산표 값으로 다시 가져온다
+    items: x ? x.items.map((r) => [...r]) : src ? src.items.map(([p, q, u]) => [p, q, u, costOf(product(p))]) : [[0, 1, 0, null]],
+    ship: base?.ship ?? 0,
+    shipCost: base ? base.shipCost : SHIP_COST_DEFAULT,
+    note: base ? base.note : "",
+  };
+  // 수수료를 직접 고쳤는지: 저장된 값이 자동 계산과 다르면 고친 것으로
+  let fee = x ? x.fee : null;
+  let feeManual = x ? x.fee !== autoFee(x.channel, x.items, x.ship) : false;
+  const curFee = () => (feeManual ? fee : autoFee(st.channel, st.items.filter(([p]) => p), st.ship));
+
+  const draw = (focus) => {
+    const g = itemsSum(st.items.filter(([p]) => p));
+    const f = curFee();
+    const picked = st.items.filter(([p]) => p);
+    const noCost = picked.some((it) => itemCost(it) == null);
+    const cs = picked.reduce((a, it) => a + it[1] * (itemCost(it) ?? 0), 0);
+    const pf = g + st.ship - f - cs - st.shipCost;
+    const rateTip = `스마트스토어: (판매가 합계 + 배송비) × ${FEE_RATE.order}% (네이버페이 주문관리) + ${FEE_RATE.sales}% (판매). 제품 원가 설정 SET-06 · 07 값. 정산 엑셀과 다르면 직접 고치세요`;
+    show(dlg, `<div class="dlg-head">${x ? "판매 수정" : "판매 추가"}${!x && src ? `<span class="hint" style="font-weight:400">${src.date.replaceAll("-", ".")} 주문에서 복제</span>` : ""}</div>
+      <div class="dlg-body">
+        <div class="form-grid">
+          <label class="field"><span>날짜 *</span><input type="date" name="date" required value="${st.date}" max="${TODAY}"></label>
+          <label class="field"><span>주문번호</span><input name="orderNo" value="${esc(st.orderNo)}" placeholder="스마트스토어 주문번호 (선택)"></label>
+          <div class="field full"><span>판매처 *</span><div class="pick" role="radiogroup" aria-label="판매처">${CHANNELS.map((c) => `<label><input type="radio" name="channel" value="${c.key}" ${c.key === st.channel ? "checked" : ""}><span>${esc(c.label)}</span></label>`).join("")}</div></div>
+        </div>
+        <div class="items">
+          <div class="items-head"><span>제품 *</span><span class="num">수량</span><span class="num">단가</span><span class="num">원가 (개당) ${help("저장할 때 원가 계산표의 개당 원가를 복사해 둬요. 나중에 필라멘트 · 부자재 가격이 바뀌어도 이 판매는 그대로예요. 주문별 이익 참고용")}</span><span class="num">소계</span><span></span></div>
+          ${st.items.map((it, i) => {
+            const [p, q, u] = it, pr = product(p), c = itemCost(it);
+            const diff = pr && pr.sale != null && u !== pr.sale;
+            return `<div class="item-row" data-i="${i}">
+              <select data-f="p" aria-label="제품">${productOptions(p)}</select>
+              <div class="with-suffix"><input type="number" data-f="q" min="1" step="1" value="${q}" aria-label="수량"><em>개</em></div>
+              <div class="with-suffix"><input type="number" data-f="u" min="0" step="100" value="${p ? u : ""}" ${p ? "" : "disabled"} aria-label="단가"><em>원</em></div>
+              <span class="cost-val ${c == null && p ? "missing" : ""}" title="${c == null && p ? "원가 계산표에 입력이 덜 돼 원가가 없어요 — 제품 원가 화면에서 채우세요" : ""}">${!p ? "-" : c == null ? "원가 없음" : won(c)}</span>
+              <span class="sub">${p ? won(q * u) : "-"}</span>
+              <button type="button" class="icon-btn" data-rm="${i}" title="이 줄 빼기" aria-label="이 줄 빼기" ${st.items.length > 1 ? "" : "disabled"}>✕</button>
+              ${diff ? `<span class="changed">제품 판매가 ${won(pr.sale)}와 달라요</span>` : ""}
+            </div>`;
+          }).join("")}
+          <div class="items-foot"><button type="button" class="btn small add" data-add-item>+ 제품 추가</button><div class="spacer"></div>
+            <span class="hint">${st.items.filter(([p]) => p).reduce((a, [, q]) => a + q, 0)}개</span></div>
+        </div>
+        <div class="calc">
+          <span class="lbl">판매가 합계</span><span class="v">${won(g)}</span>
+          <span class="lbl">+ 받은 배송비<small>손님이 낸 배송비</small></span>
+          <span class="with-suffix"><input type="number" name="ship" min="0" step="100" value="${st.ship}"><em>원</em></span>
+          <span class="lbl">− 수수료 ${help(rateTip)}<small>${st.channel === "store" ? (feeManual ? `직접 입력 · <button type="button" class="fee-reset" data-fee-reset>다시 계산 (${won(autoFee(st.channel, st.items.filter(([p]) => p), st.ship))})</button>` : `자동 계산 · ${(STORE_RATE * 100).toFixed(2)}%`) : (feeManual ? `직접 입력 · <button type="button" class="fee-reset" data-fee-reset>0원으로</button>` : "직접 판매 · 기타는 0원 (있으면 입력)")}</small></span>
+          <span class="with-suffix"><input type="number" name="fee" min="0" step="1" value="${f}"><em>원</em></span>
+          <span class="lbl total">= 정산 금액</span><span class="v total">${won(g + st.ship - f)}</span>
+        </div>
+        <div class="calc profit-box">
+          <span class="lbl">정산 금액</span><span class="v">${won(g + st.ship - f)}</span>
+          <span class="lbl">− 원가 합계<small>${noCost ? "원가 없는 제품이 있어요 — 제품 원가 화면에서 채우세요" : "줄마다 개당 원가 × 수량"}</small></span><span class="v">${noCost ? "-" : won(cs)}</span>
+          <span class="lbl">− 낸 택배비<small>판매자가 택배사에 낸 돈. 기본값은 제품 원가 설정 SET-08</small></span>
+          <span class="with-suffix"><input type="number" name="shipCost" min="0" step="100" value="${st.shipCost}"><em>원</em></span>
+          <span class="lbl total">= 이익 ${help("이 주문이 대략 얼마 남았는지 보는 참고값. 구독 · 광고 같은 운영비와 실패 출력은 빠져 있어서, 실제 월 이익은 손익 화면에서 따로 봐요")}</span>
+          <span class="v total">${noCost ? "-" : `${won(pf)}<span class="rate">${pct(pf, g)}</span>`}</span>
+        </div>
+        <label class="field" style="margin-top:14px"><span>메모</span><textarea name="note" rows="2" placeholder="예: 이름 각인 · 현금 · 플리마켓">${esc(st.note)}</textarea></label>
+      </div>
+      <div class="dlg-foot">
+        ${x ? '<button type="button" class="btn danger" data-del>삭제</button><button type="button" class="btn" data-copy>복제</button>' : ""}
+        <div class="spacer"></div>
+        <button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div>`, "wide");
+    if (focus) { const el = dlg.form.querySelector(focus); if (el) { el.focus(); if (el.type === "number") el.select?.(); } }
+    bind();
+  };
+
+  const bind = () => {
+    const form = dlg.form;
+    // 바로 다시 그리지 않아도 되는 값은 st 에만 담기 (입력 중 포커스 유지)
+    form.oninput = (e) => {
+      const n = e.target.name;
+      if (n === "date") st.date = e.target.value;
+      if (n === "orderNo") st.orderNo = e.target.value;
+      if (n === "note") st.note = e.target.value;
+    };
+    form.onchange = (e) => {
+      const t = e.target, rowEl = t.closest("[data-i]");
+      if (rowEl) {
+        const i = Number(rowEl.dataset.i), it = st.items[i];
+        // 제품을 고르면 단가 = 제품 판매가, 원가 = 지금 원가 계산표 값
+        if (t.dataset.f === "p") { it[0] = Number(t.value) || 0; it[2] = product(it[0])?.sale ?? 0; it[3] = costOf(product(it[0])); return draw(`[data-i="${i}"] [data-f="u"]`); }
+        if (t.dataset.f === "q") { it[1] = Math.max(1, Math.round(Number(t.value)) || 1); return draw(); }
+        if (t.dataset.f === "u") { it[2] = Math.max(0, Math.round(Number(t.value)) || 0); return draw(); }
+      }
+      if (t.name === "channel") { st.channel = t.value; feeManual = false; return draw(); }
+      if (t.name === "ship") { st.ship = Math.max(0, Math.round(Number(t.value)) || 0); return draw(); }
+      if (t.name === "shipCost") { st.shipCost = Math.max(0, Math.round(Number(t.value)) || 0); return draw(); }
+      if (t.name === "fee") { fee = Math.max(0, Math.round(Number(t.value)) || 0); feeManual = fee !== autoFee(st.channel, st.items.filter(([p]) => p), st.ship); return draw(); }
+    };
+    form.onclick = (e) => {
+      if (e.target.closest(".help")) return;
+      if (e.target.closest("[data-close]")) return dlg.el.close();
+      if (e.target.closest("[data-add-item]")) { st.items.push([0, 1, 0, null]); return draw(`[data-i="${st.items.length - 1}"] select`); }
+      const rm = e.target.closest("[data-rm]");
+      if (rm) { st.items.splice(Number(rm.dataset.rm), 1); return draw(); }
+      if (e.target.closest("[data-fee-reset]")) { feeManual = false; return draw(); }
+      if (e.target.closest("[data-copy]")) return openSale(null, { copyOf: x });
+      if (e.target.closest("[data-del]")) {
+        confirmBox({ title: "판매 삭제", lead: `<b>${x.date.replaceAll("-", ".")} · ${esc(product(x.items[0][0]).name)}${x.items.length > 1 ? ` 외 ${x.items.length - 1}` : ""}</b> (${won(gross(x))}) 주문을 삭제할까요?`,
+          onOk: () => { db.sales = db.sales.filter((y) => y !== x); dlg.el.close(); render(); toast("삭제했어요"); } });
+      }
+    };
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const items = st.items.filter(([p]) => p);
+      if (!items.length || items.length !== st.items.length) return toast("제품을 고르세요 (빈 줄은 ✕ 로 빼세요)");
+      const d = { date: st.date, channel: st.channel, orderNo: st.orderNo.trim(), items, ship: st.ship, fee: curFee(), shipCost: st.shipCost, note: st.note.trim() };
+      if (x) Object.assign(x, d); else db.sales.push({ ...d, id: nextId(db.sales) });
+      dlg.el.close(); render(); toast("저장했어요");
+    };
+  };
+  draw(x ? null : '[data-i="0"] select');
+}
+
+// ---------------------------------------------------------------- 시작
+const params = new URLSearchParams(location.search);
+document.documentElement.dataset.theme = params.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+function toggleSide(force) {
+  const el = $("#layout");
+  const collapsed = force ?? !el.classList.contains("collapsed");
+  el.classList.toggle("collapsed", collapsed);
+  $("[data-act='toggle-side'] .label").textContent = collapsed ? "펼치기" : "접기";
+  try { localStorage.setItem("pff-side-collapsed", collapsed ? "1" : "0"); } catch { /* 저장 불가 */ }
+}
+let savedSide = null;
+try { savedSide = localStorage.getItem("pff-side-collapsed"); } catch { /* 저장 불가 */ }
+if (params.get("side") === "collapsed" || savedSide === "1") toggleSide(true);
+render();
+({
+  sale: () => openSale(db.sales.find((x) => x.items.length > 1)),
+  "sale-new": () => openSale(null),
+})[params.get("open")]?.();
+</script>
+</body>
+</html>
