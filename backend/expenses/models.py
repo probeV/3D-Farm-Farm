@@ -11,7 +11,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, Sum
 from django.utils import timezone
 
 from filaments.models import MONEY, Color
@@ -176,10 +176,17 @@ def item_key(item):
     return ('color', item.color_id) if item.color_id else ('part', item.part_id)
 
 
-def latest_item(key):
-    """그 색상 · 품목의 최근 구매 항목 (지출 날짜 → 나중에 넣은 지출 → 나중 항목 순). 없으면 None"""
+def latest_buy(key):
+    """그 색상 · 품목의 최근 구매 → (항목 금액 합계, 수량 합계). 없으면 None
+    최근 = 그것이 들어 있는 지출 중 날짜가 가장 늦은 것 (같은 날이면 나중에 넣은 지출).
+    그 지출에 같은 색상 · 품목이 여러 항목이면 합친다 (예: 화이트 9롤 + 할인 1롤 → 10롤 평균, TBD-33)"""
     field, pk = key
-    return ExpenseItem.objects.filter(**{f'{field}_id': pk}).order_by('-expense__date', '-expense_id', '-id').first()
+    items = ExpenseItem.objects.filter(**{f'{field}_id': pk})
+    expense = items.order_by('-expense__date', '-expense_id').values_list('expense_id', flat=True).first()
+    if expense is None:
+        return None
+    total = items.filter(expense_id=expense).aggregate(total=Sum('total'), qty=Sum('qty'))
+    return total['total'], total['qty']
 
 
 def last_buy_annotations(field):
@@ -205,13 +212,15 @@ def won(value):
 
 
 def refresh_buy_prices(keys):
-    """원가 계산표 단가 = 최근 구매가 (TBD-31). 구매 항목이 바뀐 색상 · 품목마다 최근 구매 항목으로 다시 맞춘다
-    — 색상 가격 = 롤당 금액, 품목 묶음 가격 · 묶음 수량 = 항목 금액 · 수량. 남은 구매가 없으면 지금 값 그대로"""
+    """원가 계산표 단가 = 최근 구매가 (TBD-31 · 33). 구매 항목이 바뀐 색상 · 품목마다 최근 구매로 다시 맞춘다
+    — 색상 가격 = 롤당 금액(합계 ÷ 롤 수), 품목 묶음 가격 · 묶음 수량 = 금액 합계 · 수량 합계.
+    남은 구매가 없으면 그대로"""
     for key in keys:
-        item = latest_item(key)
-        if item is None:
+        buy = latest_buy(key)
+        if buy is None:
             continue
+        total, qty = buy
         if key[0] == 'color':
-            Color.objects.filter(pk=key[1]).update(price=won(item.each))
+            Color.objects.filter(pk=key[1]).update(price=won(total / qty))
         else:
-            Part.objects.filter(pk=key[1]).update(price=won(item.total), pack_qty=item.qty)
+            Part.objects.filter(pk=key[1]).update(price=won(total), pack_qty=qty)

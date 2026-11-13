@@ -225,38 +225,19 @@ class PurchaseApiTests(ApiTestCase):
         self.assertEqual({s['price'] for s in res.data}, {20000})
         self.assertEqual({s['status'] for s in res.data}, {'sealed'})
 
-    def test_chosen_numbers_and_price(self):
-        res = self.purchase(quantity=2, code_nos=[100, 7], price=18000)
-        self.assertEqual([s['code'] for s in res.data], ['S00007', 'S00100'])
+    def test_price_and_date(self):
+        res = self.purchase(quantity=2, price=18000)
         self.assertEqual(res.data[0]['price'], 18000)
         self.assertEqual(res.data[0]['purchased_at'], date.today().isoformat())
+        self.assertEqual(res.data[0]['buy'], None)
 
-    def test_reuse_deleted_number_and_fill_the_rest(self):
-        # S00011 을 지워서 비었을 때: 11 을 다시 쓰고 나머지 2개는 다음 번호부터
-        for n in (10, 11, 12, 50):
+    def test_deleted_number_not_reused(self):
+        """번호는 항상 다음 번호부터 — 맨 끝 스풀을 지워도 그 번호는 다시 안 씀 (TBD-33). 보낸 code_nos 는 무시"""
+        for n in (10, 11, 50):
             Spool.objects.create(color=self.color, code_no=n)
-        Spool.objects.get(code_no=11).delete()
-        res = self.purchase(quantity=3, code_nos=[11])
-        self.assertEqual([s['code'] for s in res.data], ['S00011', 'S00051', 'S00052'])
-
-    def test_auto_numbers_skip_chosen_ones(self):
-        Spool.objects.create(color=self.color, code_no=50)
-        res = self.purchase(quantity=3, code_nos=[52])
-        self.assertEqual([s['code'] for s in res.data], ['S00051', 'S00052', 'S00053'])
-
-    def test_taken_number_is_rejected_and_nothing_created(self):
-        Spool.objects.create(color=self.color, code_no=101)
-        res = self.purchase(quantity=3, code_nos=[100, 101])
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.data['code_nos'], ['S00101 는 이미 있습니다.'])
-        self.assertEqual(Spool.objects.count(), 1)
-
-    def test_bad_number_lists(self):
-        res = self.purchase(quantity=1, code_nos=[3, 4])
-        self.assertEqual(res.data['code_nos'], ['지정한 번호가 수량보다 많습니다.'])
-        res = self.purchase(quantity=3, code_nos=[3, 3])
-        self.assertEqual(res.data['code_nos'], ['같은 번호가 두 번 들어 있습니다: S00003'])
-        self.assertEqual(self.purchase(quantity=1, code_nos=[0]).status_code, 400)
+        Spool.objects.get(code_no=50).delete()
+        res = self.purchase(quantity=2, code_nos=[11])
+        self.assertEqual([s['code'] for s in res.data], ['S00051', 'S00052'])
 
     def test_quantity_limits(self):
         self.assertEqual(self.purchase(quantity=0).status_code, 400)

@@ -174,15 +174,27 @@ class SpoolSerializer(BaseModelSerializer):
             'note',
             'buy',
         ]
-        # 주문(지출 구매 줄)은 재고 추가에서만 정한다
-        read_only_fields = ['buy']
         validators = []
+        extra_kwargs = {'buy': {'error_messages': {'does_not_exist': '없는 구매 항목입니다.'}}}
 
     def validate_code_no(self, value):
         if self.instance and value != self.instance.code_no:
             raise serializers.ValidationError('스풀 번호는 바꿀 수 없습니다.')
         if not self.instance and Spool.objects.filter(code_no=value).exists():
             raise serializers.ValidationError(f'{Spool(code_no=value).code} 는 이미 있습니다.')
+        return value
+
+    def validate_buy(self, value):
+        # 주문(지출 구매 항목)은 지출을 저장할 때 정해진다.
+        # 만든 뒤에는 못 바꾸고, 만들 때 보내는 건 되돌리기(지운 스풀 다시 만들기)용
+        if self.instance and value != self.instance.buy:
+            raise serializers.ValidationError('주문은 바꿀 수 없습니다.')
+        return value
+
+    def validate_price(self, value):
+        # 지출로 생긴 스풀의 구매가는 지출에서만 (현금 기준 지출 합계와 손익 기준 스풀 구매가 합계가 같게, TBD-33)
+        if self.instance and self.instance.buy_id and value != self.instance.price:
+            raise serializers.ValidationError('지출로 생긴 스풀은 구매가를 지출에서 고쳐요.')
         return value
 
     def update(self, instance, validated_data):
@@ -201,20 +213,6 @@ class PurchaseSerializer(serializers.Serializer):
     purchased_at = serializers.DateField(default=timezone.localdate)
     # 비우면 색상 가격 (없으면 필라멘트 가격)
     price = NumberField(max_digits=10, decimal_places=0, min_value=0, required=False, allow_null=True)
-    # 쓰고 싶은 스풀 번호 (지운 번호 다시 쓰기 등). 지정한 것 먼저 쓰고 모자란 만큼은 자동. 비우면 전부 자동
-    code_nos = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, default=list)
-    # 주문 (지출 구매 줄 id, TBD-31). 고르면 구매가 · 구매일은 주문에서
-    buy = serializers.IntegerField(required=False, allow_null=True)
-
-    def validate(self, attrs):
-        code_nos = attrs['code_nos']
-        if len(code_nos) > attrs['quantity']:
-            raise serializers.ValidationError({'code_nos': ['지정한 번호가 수량보다 많습니다.']})
-        repeated = sorted({n for n in code_nos if code_nos.count(n) > 1})
-        if repeated:
-            codes = ', '.join(Spool(code_no=n).code for n in repeated)
-            raise serializers.ValidationError({'code_nos': [f'같은 번호가 두 번 들어 있습니다: {codes}']})
-        return attrs
 
 
 class SpoolIdsSerializer(serializers.Serializer):
