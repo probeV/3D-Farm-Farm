@@ -21,7 +21,7 @@ const expense = (p: Partial<Expense>): Expense => ({
   category: 'etc',
   amount: 1000,
   shop: '',
-  lines: [],
+  items: [],
   note: '',
   recurring: null,
   ...p,

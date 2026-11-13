@@ -50,7 +50,7 @@ export interface Part {
   product_count: number // 쓰는 제품 수 (부속품)
   set_count: number // 쓰는 포장 세트 수 (포장재)
   last_used: string | null // 마지막으로 다 쓴 날 (소모품)
-  last_buy: LastBuy | null // 최근 구매 (지출 구매 줄). 있으면 price · pack_qty 는 그 줄 값 (다음 구매 때 다시 바뀜)
+  last_buy: LastBuy | null // 최근 구매 (지출 구매 항목). 있으면 price · pack_qty 는 그 지출의 값 (다음 구매 때 다시 바뀜)
 }
 
 // 포장 세트 (STOCK-06): 제품의 기본 포장 · 판매 주문의 포장 줄을 채운다

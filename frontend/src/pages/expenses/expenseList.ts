@@ -134,8 +134,8 @@ export function expensesCsv(rows: Expense[], recurring: RecurringExpense[]) {
       categoryInfo(x.category).label,
       x.amount,
       x.shop,
-      // 구매 줄: `Bambu Lab › PLA Basic · 화이트 4통, …`
-      x.lines.map((l) => `${l.name} ${l.qty}${l.unit}`).join(', '),
+      // 구매 항목: `Bambu Lab › PLA Basic · 화이트 4롤, …`
+      x.items.map((it) => `${it.name} ${it.qty}${it.unit}`).join(', '),
       x.note,
       x.recurring == null ? '' : (recurring.find((r) => r.id === x.recurring)?.name ?? ''),
     ]),
