@@ -115,6 +115,7 @@ code { padding: 0 4px; border-radius: 4px; background: var(--surface-2); font-si
 .pick-sec .hint { font-weight: 400; font-size: 12px; margin-left: 6px; }
 .pick-row { display: grid; grid-template-columns: 20px 70px 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 13px; cursor: pointer; }
 .pick-row:last-child { border-bottom: 0; }
+.pick-row.head { position: sticky; top: 0; z-index: 1; background: var(--surface-2); font-size: 12px; font-weight: 600; color: var(--muted); }
 .pick-row:hover { background: var(--surface-2); }
 .pick-row .pc { font-family: ui-monospace, Consolas, monospace; }
 .pick-row .sw { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
@@ -234,50 +235,41 @@ const numOf = (c) => Number(String(c).replace(/\D/g, ""));
 let toastTimer;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2400); }
 
+// v2 TBD-18 (2026-11-13 다시 정함): 스풀은 등록할 때(필라멘트 지출 저장 · 재고 추가) 코드가 이미 붙는다.
+// PC 는 그 스풀의 라벨을 뽑고, 폰은 라벨을 찍어 상태만 바꾼다 (등록 · 새 라벨 · 번호 예약 없음)
 // ---------------------------------------------------------------- 더미 데이터
 // QR 안의 주소 앞부분: backend/.env 의 PUBLIC_URL (폰이 PC 에 접속하는 주소, 같은 와이파이)
 const PUBLIC_URL = "http://192.168.0.10:8000";
-// 필라멘트 · 색상 (filaments.html 일부). price = 1kg 스풀 가격 (색상 가격 → 필라멘트 가격)
+// 필라멘트 · 색상 (filaments.html 일부)
 const FILS = [
-  { id: 1, name: "Bambu Lab › PLA Basic", price: 14400, colors: [{ id: 1, name: "화이트", hex: "#F5F5F5" }, { id: 2, name: "블랙", hex: "#1A1A1A", price: 15000 }, { id: 3, name: "그레이", hex: "#8E9196" }] },
-  { id: 2, name: "Bambu Lab › PLA Matte", price: 16000, colors: [{ id: 4, name: "아이보리", hex: "#EDE6D6" }, { id: 5, name: "차콜", hex: "#3B3B3B" }] },
-  { id: 4, name: "Esun › PLA", price: 8000, colors: [{ id: 7, name: "화이트", hex: "#FFFFFF" }, { id: 8, name: "레드", hex: "#D32F2F" }] },
-  { id: 6, name: "Coobean › PLA", price: 9000, colors: [{ id: 10, name: "블루", hex: "#1E5BB8" }, { id: 11, name: "옐로우", hex: "#F2C230" }] },
+  { id: 1, name: "Bambu Lab › PLA Basic", colors: [{ id: 1, name: "화이트", hex: "#F5F5F5" }, { id: 2, name: "블랙", hex: "#1A1A1A" }, { id: 3, name: "그레이", hex: "#8E9196" }] },
+  { id: 2, name: "Bambu Lab › PLA Matte", colors: [{ id: 4, name: "아이보리", hex: "#EDE6D6" }, { id: 5, name: "차콜", hex: "#3B3B3B" }] },
+  { id: 4, name: "Esun › PLA", colors: [{ id: 7, name: "화이트", hex: "#FFFFFF" }, { id: 8, name: "레드", hex: "#D32F2F" }] },
+  { id: 6, name: "Coobean › PLA", colors: [{ id: 10, name: "블루", hex: "#1E5BB8" }, { id: 11, name: "옐로우", hex: "#F2C230" }] },
 ];
 const colorById = (id) => { for (const f of FILS) { const c = f.colors.find((x) => x.id === Number(id)); if (c) return { f, c }; } return null; };
-const priceOf = (f, c) => c.price ?? f.price;
 const STATUS = { sealed: ["재고", "sealed"], open: ["사용 중", "open"], empty: ["사용 완료", "empty"] };
-// 등록된 스풀 (코드 → 상태). 가장 큰 코드는 S00100. STATUS 는 아래 폰 쪽과 같음
+// 지출 주문 (expenses.html). 필라멘트 지출을 저장하면 롤 수만큼 스풀이 생긴다 (TBD-33)
+const ORDERS = { 31: { date: "2026-10-27", name: "PLA Basic 10롤" }, 23: { date: "2026-09-22", name: "PLA 필라멘트 6롤" } };
+// 등록된 스풀 (코드 → 상태). label = 라벨을 뽑았는지 (정할 것: 스풀마다 기억할지)
+// S00101 ~ S00110 은 방금 지출(PLA Basic 10롤)을 저장해서 생긴 스풀 — 아직 라벨 안 뽑음
 const SPOOLS = {
-  S00012: { color: 8, status: "empty", price: 8000, bought: "2026-08-03", opened: "2026-09-02", finished: "2026-10-05" },
-  S00031: { color: 10, status: "open", price: 9000, bought: "2026-09-10", opened: "2026-10-14", finished: null },
-  S00042: { color: 4, status: "sealed", price: 16000, bought: "2026-09-22", opened: null, finished: null },
-  S00100: { color: 1, status: "sealed", price: 14400, bought: "2026-10-20", opened: null, finished: null },
+  S00012: { color: 8, status: "empty", price: 8000, bought: "2026-08-03", opened: "2026-09-02", finished: "2026-10-05", label: true },
+  S00031: { color: 10, status: "open", price: 9000, bought: "2026-09-10", opened: "2026-10-14", finished: null, label: true },
+  S00042: { color: 4, status: "sealed", price: 16000, bought: "2026-09-22", opened: null, finished: null, label: true, order: 23 },
 };
-// 나머지 S00001 ~ S00099 도 등록돼 있음 (S00057 · S00088 은 라벨을 잃어버려 등록 안 된 번호)
-(() => { const ids = [1, 2, 3, 4, 5, 7, 8, 10, 11]; for (let n = 1; n < 100; n++) { const code = codeOf(n); if (SPOOLS[code] || n === 57 || n === 88) continue;
-  const color = ids[n % ids.length], { f, c } = colorById(color), status = n < 40 ? "empty" : n < 75 ? (n % 3 ? "empty" : "open") : n % 4 ? "sealed" : "open";
-  SPOOLS[code] = { color, status, price: priceOf(f, c), bought: `2026-${String(5 + Math.floor(n / 20)).padStart(2, "0")}-${String(1 + (n * 7) % 27).padStart(2, "0")}`, opened: status === "sealed" ? null : "2026-10-01", finished: status === "empty" ? "2026-10-10" : null }; } })();
-// 번호 예약은 하지 않고, '마지막으로 인쇄한 번호' 하나만 기억한다 (같은 번호를 두 번 뽑지 않게)
-// S00101 ~ S00110 은 인쇄해서 붙여 두었지만 아직 등록 안 함
-const printState = { lastPrinted: 110, log: [{ at: "2026-10-27 16:20", from: 101, to: 110 }, { at: "2026-10-20 14:02", from: 91, to: 100 }, { at: "2026-09-22 10:31", from: 71, to: 90 }] };
-const maxSpool = () => Math.max(...Object.keys(SPOOLS).map(numOf));
-const nextNo = () => Math.max(printState.lastPrinted, maxSpool()) + 1;
-// 폰에서 '지난번과 같게' (폰 브라우저에 기억)
-// v2 TBD-31: 지출 장부의 필라멘트 주문 (expenses.html 의 '산 것'). lines: [색상 id, 통 수, 통당 구매가(배송비 나눠 넣음)]
-// used = 이 주문에 연결해 이미 등록한 스풀 수 (색상별)
-const ORDERS = [
-  { id: 31, date: "2026-10-27", name: "PLA Basic 10롤", lines: [[1, 6, 14000], [3, 4, 14000]], used: { 1: 0, 3: 0 } },
-  { id: 23, date: "2026-09-22", name: "PLA 필라멘트 6롤", lines: [[1, 4, 18000], [2, 2, 18000]], used: { 1: 3, 2: 0 } },
-];
-const orderOf = (id) => ORDERS.find((o) => o.id === Number(id));
-const leftOf = (o, color) => { const l = o.lines.find(([c]) => c === color); return l ? l[1] - (o.used[color] || 0) : 0; };
-const lineOf = (o, color) => o.lines.find(([c]) => c === color);
-// 그 색상이 남은 주문 (최근 것부터) — 등록할 때 기본으로 고름
-const ordersFor = (color) => ORDERS.filter((o) => leftOf(o, color) > 0).sort((a, b) => b.date.localeCompare(a.date));
-// 주문을 고르면 구매가 = 그 주문의 통당 구매가, 구매일 = 주문일
-const fromOrder = (st) => { const o = orderOf(st.order); if (!o) return; st.price = lineOf(o, st.color)[2]; st.bought = o.date; };
-let lastReg = { color: 1, order: 31, price: 14000, bought: "2026-10-27" };
+(() => {
+  const ids = [1, 2, 3, 4, 5, 7, 8, 10, 11];
+  for (let n = 1; n <= 100; n++) {
+    const code = codeOf(n); if (SPOOLS[code] || n === 57 || n === 88) continue; // 57 · 88 은 지운 스풀 (번호는 다시 안 씀)
+    const color = ids[n % ids.length], status = n < 40 ? "empty" : n < 75 ? (n % 3 ? "empty" : "open") : n % 4 ? "sealed" : "open";
+    SPOOLS[code] = { color, status, price: 14400, bought: `2026-${String(5 + Math.floor(n / 20)).padStart(2, "0")}-${String(1 + (n * 7) % 27).padStart(2, "0")}`,
+      opened: status === "sealed" ? null : "2026-10-01", finished: status === "empty" ? "2026-10-10" : null, label: n < 96 };
+  }
+  for (let n = 101; n <= 110; n++) SPOOLS[codeOf(n)] = { color: n <= 106 ? 1 : 3, status: "sealed", price: 14000, bought: "2026-10-27", opened: null, finished: null, label: false, order: 31 };
+})();
+const codes = () => Object.keys(SPOOLS).sort((a, b) => numOf(b) - numOf(a));
+const noLabel = () => codes().filter((c) => !SPOOLS[c].label && SPOOLS[c].status !== "empty");
 
 // ---------------------------------------------------------------- 가짜 QR (모양만)
 function qrSvg(text) {
@@ -289,152 +281,95 @@ function qrSvg(text) {
   return `<svg viewBox="-1 -1 ${N + 2} ${N + 2}" shape-rendering="crispEdges"><rect x="-1" y="-1" width="${N + 2}" height="${N + 2}" fill="#fff"/><g fill="#111">${r}</g></svg>`;
 }
 
-// ---------------------------------------------------------------- PC: 라벨 인쇄
-// mode: new 새 라벨 (다음 번호부터) · again 다시 인쇄 (등록된 스풀 · 등록 안 된 번호를 골라서)
-const pr = { mode: "new", from: nextNo(), count: 10, size: "40x30", q: "", only: "all", picked: new Set() };
-// 인쇄했지만 등록 안 된 번호 (번호를 미리 예약하지 않으므로 비어 있어도 괜찮음)
-const unregistered = () => { const out = []; for (let n = 1; n <= printState.lastPrinted; n++) if (!SPOOLS[codeOf(n)]) out.push(codeOf(n)); return out; };
-const recentFrom = () => printState.log[0]?.from ?? Infinity;
-const sizeSelect = () => `<label class="field"><span>라벨 크기</span><select id="p-size">
+// ---------------------------------------------------------------- PC: 라벨 인쇄 (등록된 스풀만)
+// only: nolabel 라벨 안 뽑은 스풀(기본) · all 전체(다시 인쇄). 지출 저장 · 재고 추가 뒤 `라벨 인쇄` 로 오면 그 스풀이 골라진 채로 열림 (?pick=)
+const pr = { size: "40x30", q: "", only: "nolabel", picked: new Set(), from: "" };
+const sizeSelect = () => `<select id="p-size" aria-label="라벨 크기">
     <option value="40x30" ${pr.size === "40x30" ? "selected" : ""}>40 × 30 mm (라벨 프린터)</option>
     <option value="50x30" ${pr.size === "50x30" ? "selected" : ""}>50 × 30 mm (라벨 프린터)</option>
-    <option value="a4" ${pr.size === "a4" ? "selected" : ""}>A4 라벨지 24칸 (일반 프린터)</option></select></label>`;
-// 라벨 한 장: 등록된 스풀이면 색상 · 필라멘트도 찍음
-function labelCard(code, cls = "") {
-  const sp = SPOOLS[code], cb = sp ? colorById(sp.color) : null;
-  return `<div class="lbl-card ${cls}">${qrSvg(code)}<div><div class="code">${code}</div>
-    <div class="brand">${cb ? `${esc(cb.c.name)} · ${esc(cb.f.name.split(" › ")[1] ?? cb.f.name)}` : "3D Farm Farm"}</div></div></div>`;
+    <option value="a4" ${pr.size === "a4" ? "selected" : ""}>A4 라벨지 24칸 (일반 프린터)</option></select>`;
+// 라벨 한 장: QR + 코드 + 색상 · 필라멘트 (같은 색 스풀은 아무 라벨이나 붙여도 됨)
+function labelCard(code) {
+  const { f, c } = colorById(SPOOLS[code].color);
+  return `<div class="lbl-card">${qrSvg(code)}<div><div class="code">${code}</div><div class="brand">${esc(c.name)} · ${esc(f.name.split(" › ")[1] ?? f.name)}</div></div></div>`;
 }
 
 function renderPrint() {
-  const un = unregistered();
-  $("#print").innerHTML = `
-    <div class="panel-head"><span class="where">PC</span><h3>라벨 인쇄</h3>${help("번호만 들어간 QR 라벨을 뽑아 스풀에 붙여요. 등록은 폰으로 라벨을 찍어서 해요. 번호는 미리 예약하지 않고, 마지막으로 인쇄한 번호만 기억해서 다음 번호부터 이어서 뽑아요")}
-      <div class="seg" role="tablist"><button type="button" class="${pr.mode === "new" ? "on" : ""}" data-mode="new">새 라벨</button><button type="button" class="${pr.mode === "again" ? "on" : ""}" data-mode="again">다시 인쇄</button></div>
-      <div class="spacer"></div><button type="button" class="btn small" data-log>인쇄 기록</button></div>
-    ${pr.mode === "new" ? newBody(un) : againBody(un)}`;
-  bindPrint();
-}
-
-function newBody(un) {
-  const from = pr.from, to = pr.from + pr.count - 1, shown = Math.min(pr.count, 11);
-  return `<div class="panel-body">
-      <div class="form-row">
-        <label class="field"><span>시작 번호</span><input class="num" value="${codeOf(from)}" readonly aria-label="시작 번호" title="새 라벨은 항상 다음 번호부터예요. 이미 뽑은 번호는 '다시 인쇄'에서"></label>
-        <label class="field"><span>장수</span><div class="with-suffix"><input type="number" id="p-count" min="1" max="200" value="${pr.count}"><em>장</em></div></label>
-        ${sizeSelect()}
-      </div>
-      <div class="url-line">QR 안의 주소 <b>${PUBLIC_URL}/s/${codeOf(from)}</b>${help("폰 기본 카메라로 찍으면 이 주소가 열려요. 앞부분은 backend/.env 의 PUBLIC_URL. 폰과 PC 가 같은 와이파이여야 하고, PC 주소가 바뀌면 붙인 라벨이 안 열려요 — 공유기에서 PC 주소를 고정(DHCP 예약)해 두세요")}</div>
-      ${un.length ? `<div class="url-line unreg-line">인쇄했지만 등록 안 된 번호 <b>${un.length}개</b>${help("번호는 예약하지 않아서 비어 있어도 괜찮아요. 라벨을 잃어버렸으면 그 번호는 그냥 건너뛰거나 '다시 인쇄'로 같은 번호를 뽑으면 돼요. 나중에 찾은 라벨을 찍어도 정상으로 등록돼요")}
-        <button type="button" class="btn small" data-show-unreg>보기</button></div>` : ""}
-      <div class="labels">${Array.from({ length: shown }, (_, i) => labelCard(codeOf(from + i))).join("")}
-        ${pr.count > shown ? `<div class="more">외 ${pr.count - shown}장</div>` : ""}</div>
-    </div>
-    <div class="panel-foot"><div class="spacer"></div>
-      <button type="button" class="btn primary" id="p-go">${pr.count}장 인쇄</button></div>`;
-}
-
-function againBody(un) {
   const q = pr.q.trim().toLowerCase();
-  const reg = Object.keys(SPOOLS).sort((a, b) => numOf(b) - numOf(a)).filter((code) => {
-    const { f, c } = colorById(SPOOLS[code].color);
-    return !q || [code, c.name, f.name].join(" ").toLowerCase().includes(q);
-  });
-  const unq = un.filter((code) => !q || code.toLowerCase().includes(q));
-  const showReg = pr.only !== "unreg", showUn = pr.only !== "reg";
+  const pool = pr.only === "nolabel" ? noLabel() : codes();
+  const list = pool.filter((code) => { const { f, c } = colorById(SPOOLS[code].color); return !q || [code, c.name, f.name].join(" ").toLowerCase().includes(q); });
   const picked = [...pr.picked].sort((a, b) => numOf(a) - numOf(b));
+  // 맨 위 전체 선택: 보이는 것(검색 결과)이 다 골라졌으면 체크, 일부면 반쯤
+  const onCount = list.filter((c) => pr.picked.has(c)).length, allOn = list.length > 0 && onCount === list.length;
   const row = (code) => {
-    const sp = SPOOLS[code];
-    const right = sp ? (() => { const { f, c } = colorById(sp.color); const [sl, sc] = STATUS[sp.status];
-      return `<span class="sw" style="background:${c.hex}"></span><span class="nm">${esc(c.name)} <span class="hint">${esc(f.name)}</span></span><span class="st ${sc}">${sl}</span>`; })()
-      : `<span class="sw empty"></span><span class="nm muted">등록 안 됨${numOf(code) >= recentFrom() ? " · 최근 인쇄" : " · 라벨 분실?"}</span><span></span>`;
-    return `<label class="pick-row"><input type="checkbox" data-pick="${code}" ${pr.picked.has(code) ? "checked" : ""}><b class="pc">${code}</b>${right}</label>`;
+    const sp = SPOOLS[code], { f, c } = colorById(sp.color), [sl, sc] = STATUS[sp.status];
+    return `<label class="pick-row"><input type="checkbox" data-pick="${code}" ${pr.picked.has(code) ? "checked" : ""}><b class="pc">${code}</b>
+      <span class="sw" style="background:${c.hex}"></span><span class="nm">${esc(c.name)} <span class="hint">${esc(f.name)}${sp.order ? ` · 주문 ${dot(ORDERS[sp.order].date)}` : ""}</span></span>
+      <span>${sp.label ? "" : '<span class="st new">라벨 없음</span> '}<span class="st ${sc}">${sl}</span></span></label>`;
   };
-  return `<div class="panel-body">
+  $("#print").innerHTML = `
+    <div class="panel-head"><span class="where">PC</span><h3>라벨 인쇄</h3>
+      <div class="seg" role="tablist"><button type="button" class="${pr.only === "nolabel" ? "on" : ""}" data-only="nolabel">라벨 없음 ${noLabel().length}</button><button type="button" class="${pr.only === "all" ? "on" : ""}" data-only="all">전체 · 다시 인쇄</button></div></div>
+    <div class="panel-body">
+      ${pr.from ? `<div class="url-line">${esc(pr.from)} · <b>${picked.length}개</b> 골라 뒀어요</div>` : ""}
       <div class="again-top">
         <input type="search" id="p-q" placeholder="코드 · 색상 · 필라멘트 검색" value="${esc(pr.q)}">
-        <select id="p-only"><option value="all" ${pr.only === "all" ? "selected" : ""}>전체</option><option value="reg" ${pr.only === "reg" ? "selected" : ""}>등록된 스풀 ${Object.keys(SPOOLS).length}</option><option value="unreg" ${pr.only === "unreg" ? "selected" : ""}>등록 안 된 번호 ${un.length}</option></select>
-        ${sizeSelect().replace('<label class="field"><span>라벨 크기</span>', '<label class="field" style="min-width:200px">')}
+        ${sizeSelect()}
       </div>
-      <div class="pick-list">
-        ${showReg ? `<div class="pick-sec">등록된 스풀 <span class="hint">라벨에 색상 · 필라멘트도 찍혀요</span></div>${reg.slice(0, 8).map(row).join("") || '<p class="hint">없음</p>'}${reg.length > 8 ? `<div class="hint" style="padding:6px 4px">외 ${reg.length - 8}개 · 검색으로 좁히세요</div>` : ""}` : ""}
-        ${showUn ? `<div class="pick-sec">인쇄했지만 등록 안 된 번호 <span class="hint">비어 있어도 괜찮아요 · 라벨을 잃어버렸으면 같은 번호로 다시 뽑기</span></div>${unq.map(row).join("") || '<p class="hint">없음</p>'}` : ""}
-      </div>
-      ${picked.length ? `<div class="labels">${picked.slice(0, 11).map((c) => labelCard(c, "again")).join("")}${picked.length > 11 ? `<div class="more">외 ${picked.length - 11}장</div>` : ""}</div>` : ""}
+      <div class="pick-list">${list.length ? `<label class="pick-row head"><input type="checkbox" data-all aria-label="보이는 것 모두 고르기" ${allOn ? "checked" : ""}><span>코드</span><span></span><span>색상</span><span>상태</span></label>` : ""}${list.slice(0, 12).map(row).join("") || `<p class="hint" style="padding:10px">${pr.only === "nolabel" ? "라벨을 안 뽑은 스풀이 없어요" : "없음"}</p>`}
+        ${list.length > 12 ? `<div class="hint" style="padding:6px 10px">외 ${list.length - 12}개 · 검색으로 좁히세요</div>` : ""}</div>
+      ${picked.length ? `<div class="labels">${picked.slice(0, 11).map(labelCard).join("")}${picked.length > 11 ? `<div class="more">외 ${picked.length - 11}장</div>` : ""}</div>` : ""}
+      <div class="url-line">QR 안의 주소 <b>${PUBLIC_URL}/s/${picked[0] ?? "S00101"}</b>${help("폰 기본 카메라로 찍으면 이 주소가 열려요. 앞부분은 backend/.env 의 PUBLIC_URL. 폰과 PC 가 같은 와이파이여야 하고, PC 주소가 바뀌면 붙인 라벨이 안 열려요 — 공유기에서 PC 주소를 고정(DHCP 예약)해 두세요")}</div>
     </div>
-    <div class="panel-foot"><span class="hint">${picked.length ? `${picked.length}장 고름` : "다시 뽑을 라벨을 고르세요"}</span>${picked.length ? '<button type="button" class="btn small" data-clear>모두 풀기</button>' : ""}<div class="spacer"></div>
-      <button type="button" class="btn primary" id="p-again" ${picked.length ? "" : "disabled"}>${picked.length}장 다시 인쇄</button></div>`;
+    <div class="panel-foot"><span class="hint">${picked.length ? `${picked.length}장 고름` : "뽑을 스풀을 고르세요"}</span>${picked.length ? '<button type="button" class="btn small" data-clear>모두 풀기</button>' : ""}<div class="spacer"></div>
+      <button type="button" class="btn primary" id="p-go" ${picked.length ? "" : "disabled"}>${picked.length}장 인쇄</button></div>`;
+  const all = $("#print [data-all]"); if (all) all.indeterminate = onCount > 0 && !allOn;
+  bindPrint(list);
 }
 
-// 인쇄 기록: 버튼을 누르면 창으로
-function openLog() {
-  const d = $("#dlg");
-  $("#dlg-form").innerHTML = `<div class="dlg-head">인쇄 기록<span class="hint" style="font-weight:400">마지막으로 인쇄한 번호 ${codeOf(printState.lastPrinted)}</span></div>
-    <div class="dlg-body">${printState.log.map((l) => `<div class="log-row"><span class="when">${esc(l.at.replace(/-/g, "."))}</span>
-      <span>${l.again ? `<span class="tag">다시 인쇄</span> ${esc(l.again)}` : `<span class="tag new">새 라벨</span> ${codeOf(l.from)} ~ ${codeOf(l.to)}`}</span>
-      <span class="hint">${l.again ? "" : `${l.to - l.from + 1}장`}</span></div>`).join("")}</div>
-    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>닫기</button></div>`;
-  d.showModal();
-  $("#dlg-form").onclick = (e) => { if (e.target.closest("[data-close]")) d.close(); };
-}
-
-function bindPrint() {
+function bindPrint(list) {
   const P = $("#print");
   P.onclick = (e) => {
     if (e.target.closest(".help")) return;
-    const m = e.target.closest("[data-mode]"); if (m) { pr.mode = m.dataset.mode; return renderPrint(); }
-    if (e.target.closest("[data-show-unreg]")) { Object.assign(pr, { mode: "again", only: "unreg", q: "" }); return renderPrint(); }
-    if (e.target.closest("[data-clear]")) { pr.picked.clear(); return renderPrint(); }
-    if (e.target.closest("[data-log]")) return openLog();
+    const o = e.target.closest("[data-only]"); if (o) { pr.only = o.dataset.only; return renderPrint(); }
+    if (e.target.closest("[data-clear]")) { pr.picked.clear(); pr.from = ""; return renderPrint(); }
     if (e.target.closest("#p-go")) {
-      const from = pr.from, to = pr.from + pr.count - 1;
-      printState.log.unshift({ at: `${TODAY} ${new Date().toTimeString().slice(0, 5)}`, from, to });
-      printState.lastPrinted = Math.max(printState.lastPrinted, to);
-      pr.from = nextNo(); renderPrint(); renderPhone();
-      return toast(`${codeOf(from)} ~ ${codeOf(to)} 인쇄 창을 열었어요 (목업)`);
-    }
-    if (e.target.closest("#p-again")) {
-      const list = [...pr.picked].sort((a, b) => numOf(a) - numOf(b));
-      printState.log.unshift({ at: `${TODAY} ${new Date().toTimeString().slice(0, 5)}`, again: list.length > 1 ? `${list[0]} 외 ${list.length - 1}장` : list[0] });
-      pr.picked.clear(); renderPrint();
-      return toast(`${list.length}장 다시 인쇄 창을 열었어요 (목업) · 번호는 그대로`);
+      const done = [...pr.picked].sort((a, b) => numOf(a) - numOf(b));
+      done.forEach((c) => (SPOOLS[c].label = true));
+      pr.picked.clear(); pr.from = ""; renderPrint();
+      return toast(`${done[0]}${done.length > 1 ? ` ~ ${done.at(-1)}` : ""} ${done.length}장 인쇄 창을 열었어요 (목업)`);
     }
   };
   P.onchange = (e) => {
     const t = e.target;
+    if (t.matches("[data-all]")) { list.forEach((c) => (t.checked ? pr.picked.add(c) : pr.picked.delete(c))); return renderPrint(); }
     if (t.dataset.pick) { t.checked ? pr.picked.add(t.dataset.pick) : pr.picked.delete(t.dataset.pick); return renderPrint(); }
-    if (t.id === "p-count") { pr.count = Math.max(1, Math.min(200, Math.round(Number(t.value)) || 1)); return renderPrint(); }
     if (t.id === "p-size") { pr.size = t.value; return renderPrint(); }
-    if (t.id === "p-only") { pr.only = t.value; return renderPrint(); }
   };
   const q = $("#p-q");
   if (q) q.oninput = () => { pr.q = q.value; const pos = q.selectionStart; renderPrint(); const n = $("#p-q"); n.focus(); n.setSelectionRange(pos, pos); };
 }
 
-// ---------------------------------------------------------------- 폰: 라벨을 찍으면 열리는 화면
-const ph = { code: "S00101", step: null };
-const SCANS = [["S00101", "새 라벨"], ["S00042", "재고"], ["S00031", "사용 중"], ["S00012", "사용 완료"], ["S00999", "인쇄 안 한 번호"]];
+// ---------------------------------------------------------------- 폰: 라벨을 찍으면 열리는 화면 (상태 바꾸기만)
+const ph = { code: "S00101" };
+const SCANS = [["S00101", "재고"], ["S00031", "사용 중"], ["S00012", "사용 완료"], ["S00057", "지운 스풀"]];
 
 function renderPhone() {
   const code = ph.code, sp = SPOOLS[code];
-  let body;
-  if (!sp && numOf(code) > printState.lastPrinted) body = `<div class="ph-code">${code}</div>
-      <div class="ph-err">인쇄한 적 없는 번호예요.<br><span style="font-weight:400;font-size:13px">다른 라벨이거나 잘못 찍혔을 수 있어요.</span></div>`;
-  else if (!sp) body = registerView(code);
-  else body = spoolView(code, sp);
+  const body = sp ? spoolView(code, sp) : `<div class="ph-code">${code}</div>
+      <div class="ph-err">등록된 스풀이 아니에요.<br><span style="font-weight:400;font-size:13px">지운 스풀의 라벨이거나 잘못 찍혔을 수 있어요. 라벨은 떼서 버려도 돼요.</span></div>`;
   $("#phone-col").innerHTML = `
-    <div class="panel" style="margin-bottom:12px"><div class="panel-head"><span class="where">폰</span><h3>라벨을 찍으면</h3>${help("폰 기본 카메라로 라벨을 찍으면 그 스풀 화면이 열려요. 앱 설치 없이 브라우저로. 상태는 자동으로 넘기지 않고, 화면의 버튼을 눌러야 바뀌어요")}</div>
+    <div class="panel" style="margin-bottom:12px"><div class="panel-head"><span class="where">폰</span><h3>라벨을 찍으면</h3>${help("폰 기본 카메라로 라벨을 찍으면 그 스풀 화면이 열려요. 앱 설치 없이 브라우저로. 상태는 자동으로 넘기지 않고, 화면의 버튼을 눌러야 바뀌어요. 스풀 등록 · 정보 수정은 PC 에서")}</div>
       <div class="panel-body"><div class="hint" style="margin-bottom:6px">찍는 흉내</div>
         <div class="scan-bar">${SCANS.map(([c, l]) => `<button type="button" class="btn ${c === code ? "on" : ""}" data-scan="${c}">${c} · ${l}</button>`).join("")}</div></div></div>
     <div class="phone"><div class="bar">9:41</div><div class="addr">${PUBLIC_URL.replace("http://", "")}/s/${code}</div>
       <div class="scr" id="scr"><div class="ph-top"><span class="mark">3D</span>3D Farm Farm · 스풀</div>${ph.done ? `<div class="ph-done">✓ ${esc(ph.done)}</div>` : ""}${body}</div></div>`;
   $("#phone-col").onclick = onPhoneClick;
-  $("#phone-col").onchange = onPhoneChange;
 }
 
-function colorLine(colorId, sub) {
+function colorLine(colorId) {
   const { f, c } = colorById(colorId);
-  return `<div class="ph-color"><span class="sw" style="background:${c.hex}"></span><div><div class="nm">${esc(c.name)}</div><div class="sub">${esc(f.name)}${sub ? ` · ${sub}` : ""}</div></div></div>`;
+  return `<div class="ph-color"><span class="sw" style="background:${c.hex}"></span><div><div class="nm">${esc(c.name)}</div><div class="sub">${esc(f.name)}</div></div></div>`;
 }
 
 function spoolView(code, sp) {
@@ -443,75 +378,26 @@ function spoolView(code, sp) {
   const back = { sealed: null, open: ["sealed", "재고로 되돌리기"], empty: ["open", "사용 중으로 되돌리기"] }[sp.status];
   return `<div style="display:flex;align-items:center;gap:10px"><div class="ph-code">${code}</div><span class="st ${sc}">${sl}</span></div>
     <div class="ph-card">${colorLine(sp.color)}
-      <div class="ph-meta"><span>구매가</span><span>${won(sp.price)}${sp.order ? ` <span class="hint">· 주문 ${dot(orderOf(sp.order).date)}</span>` : ""}</span><span>구매일</span><span>${dot(sp.bought)}</span>
+      <div class="ph-meta"><span>구매가</span><span>${won(sp.price)}</span><span>구매일</span><span>${dot(sp.bought)}${sp.order ? ` <span class="hint">· ${esc(ORDERS[sp.order].name)}</span>` : ""}</span>
         ${sp.opened ? `<span>사용 시작</span><span>${dot(sp.opened)}</span>` : ""}${sp.finished ? `<span>사용 완료</span><span>${dot(sp.finished)}</span>` : ""}</div></div>
     ${action ? `<button type="button" class="btn primary big" data-to="${action[0]}">${action[1]}</button><div class="hint" style="text-align:center;margin-top:-6px">오늘(${dot(TODAY)}) 날짜로 기록돼요</div>` : '<div class="hint" style="text-align:center">다 쓴 스풀이에요. 라벨은 떼서 버려도 돼요.</div>'}
-    <div class="ph-links">${back ? `<button type="button" data-to="${back[0]}">${back[1]}</button>` : ""}<button type="button" data-edit>정보 고치기</button></div>`;
-}
-
-function registerView(code) {
-  const st = ph.reg ?? { ...lastReg, fil: colorById(lastReg.color).f.id };
-  ph.reg = st;
-  const f = FILS.find((x) => x.id === st.fil);
-  const os = ordersFor(st.color);
-  // 지난번과 같게: 같은 주문에 남은 통이 있어야
-  const L = colorById(lastReg.color), lo = orderOf(lastReg.order), lleft = lo ? leftOf(lo, lastReg.color) : null;
-  const sameOk = !lo || lleft > 0;
-  return `<div style="display:flex;align-items:center;gap:10px"><div class="ph-code">${code}</div><span class="st new">새 라벨</span></div>
-    <div class="same ${sameOk ? "" : "off"}"><div class="t">지난번과 같게</div>
-      <div class="v"><span class="sw" style="background:${L.c.hex}"></span>${esc(L.f.name.split(" › ")[1] ?? L.f.name)} · ${esc(L.c.name)} · ${won(lastReg.price)}</div>
-      <div class="ord-line">${lo ? `주문 ${dot(lo.date)} ${esc(lo.name)} · <b>${lleft}통 남음</b>` : "주문 연결 없음"}</div>
-      <button type="button" class="btn primary big" data-reg-same ${sameOk ? "" : "disabled"}>${sameOk ? "이 값으로 등록" : "이 주문은 다 등록했어요"}</button></div>
-    <div class="divider">다른 색 · 다른 주문이면</div>
-    <div class="ph-form">
-      <select data-r="fil" aria-label="필라멘트">${FILS.map((x) => `<option value="${x.id}" ${x.id === st.fil ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
-      <select data-r="color" aria-label="색상">${f.colors.map((c) => `<option value="${c.id}" ${c.id === st.color ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
-      <label class="ph-lbl">주문 (지출 장부)</label>
-      <select data-r="order" aria-label="주문">${os.map((o) => `<option value="${o.id}" ${o.id === Number(st.order) ? "selected" : ""}>${dot(o.date)} ${esc(o.name)} · ${leftOf(o, st.color)}통 남음 · ${won(lineOf(o, st.color)[2])}</option>`).join("")}
-        <option value="" ${st.order ? "" : "selected"}>주문 없이 (구매가 직접 입력)</option></select>
-      ${st.order ? `<div class="ord-info">구매가 <b>${won(st.price)}</b> · 구매일 ${dot(st.bought)} <span class="hint">주문에서 (배송비 나눠 넣음)</span></div>`
-        : `<div class="row2"><input type="number" data-r="price" value="${st.price ?? ""}" placeholder="구매가" aria-label="구매가"><input type="date" data-r="bought" value="${st.bought}" max="${TODAY}" aria-label="구매일"></div>`}
-      <button type="button" class="btn big" data-reg>등록</button>
-    </div>`;
+    ${back ? `<div class="ph-links"><button type="button" data-to="${back[0]}">${back[1]}</button></div>` : ""}`;
 }
 
 function onPhoneClick(e) {
   if (e.target.closest(".help")) return;
   const s = e.target.closest("[data-scan]");
-  if (s) { ph.code = s.dataset.scan; ph.reg = null; ph.done = null; return renderPhone(); }
-  const code = ph.code;
+  if (s) { ph.code = s.dataset.scan; ph.done = null; return renderPhone(); }
   const to = e.target.closest("[data-to]");
   if (to) {
-    const sp = SPOOLS[code], t = to.dataset.to;
+    const sp = SPOOLS[ph.code], t = to.dataset.to;
     if (t === "open") { sp.opened = TODAY; if (sp.status === "empty") sp.finished = null; }
     if (t === "empty") sp.finished = TODAY;
     if (t === "sealed") sp.opened = null;
     sp.status = t;
     ph.done = { open: "사용 시작으로 바꿨어요", empty: "사용 완료로 바꿨어요", sealed: "재고로 되돌렸어요" }[t];
-    return renderPhone();
-  }
-  if (e.target.closest("[data-edit]")) return toast("정보 고치기: 색상 · 구매가 · 날짜 (목업)");
-  const same = e.target.closest("[data-reg-same]"), reg = e.target.closest("[data-reg]");
-  if (same || reg) {
-    const v = same ? { ...lastReg } : { color: ph.reg.color, order: ph.reg.order ? Number(ph.reg.order) : null, price: Number(ph.reg.price) || null, bought: ph.reg.bought };
-    if (v.order) orderOf(v.order).used[v.color] = (orderOf(v.order).used[v.color] || 0) + 1;
-    SPOOLS[code] = { color: v.color, status: "sealed", price: v.price, bought: v.bought, opened: null, finished: null, order: v.order };
-    lastReg = { ...v };
-    const { c } = colorById(v.color);
-    ph.reg = null; ph.done = `${code} · ${c.name} 재고로 등록했어요. 다음 라벨을 찍으세요`;
     renderPhone(); renderPrint();
   }
-}
-function onPhoneChange(e) {
-  const k = e.target.dataset.r; if (!k) return;
-  // 색상이 바뀌면 그 색상이 남은 최근 주문을 고름 (없으면 직접 입력, 기본값은 원가 계산표 단가)
-  const pickOrder = () => { const o = ordersFor(ph.reg.color)[0]; ph.reg.order = o ? o.id : null; if (o) fromOrder(ph.reg); else { const { f, c } = colorById(ph.reg.color); ph.reg.price = priceOf(f, c); ph.reg.bought = TODAY; } };
-  if (k === "fil") { ph.reg.fil = Number(e.target.value); const f = FILS.find((x) => x.id === ph.reg.fil); ph.reg.color = f.colors[0].id; pickOrder(); }
-  if (k === "color") { ph.reg.color = Number(e.target.value); pickOrder(); }
-  if (k === "order") { ph.reg.order = e.target.value ? Number(e.target.value) : null; if (ph.reg.order) fromOrder(ph.reg); else { const { f, c } = colorById(ph.reg.color); ph.reg.price = priceOf(f, c); ph.reg.bought = TODAY; } }
-  if (k === "price") ph.reg.price = e.target.value;
-  if (k === "bought") ph.reg.bought = e.target.value;
-  renderPhone();
 }
 
 // ---------------------------------------------------------------- 시작
@@ -528,6 +414,11 @@ let savedSide = null;
 try { savedSide = localStorage.getItem("pff-side-collapsed"); } catch { /* 저장 불가 */ }
 if (params.get("side") === "collapsed" || savedSide === "1") toggleSide(true);
 if (SCANS.some(([c]) => c === params.get("scan"))) ph.code = params.get("scan");
+// 지출 저장 · 재고 추가 뒤 `라벨 인쇄` 로 들어오면 (?pick=S00101-S00110&from=지출 PLA Basic 10롤) 그 스풀을 골라 둔 채로
+const pick = params.get("pick") ?? "S00101-S00110";
+const [a, b] = pick.split("-").map(numOf);
+for (let n = a; n <= (b || a); n++) if (SPOOLS[codeOf(n)]) pr.picked.add(codeOf(n));
+pr.from = params.get("from") ?? "방금 저장한 지출 PLA Basic 10롤의 스풀";
 renderPrint();
 renderPhone();
 </script>
