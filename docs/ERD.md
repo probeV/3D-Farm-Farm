@@ -29,6 +29,11 @@ erDiagram
     SALE ||--o{ SALE_PACK : "포장 줄"
     PART |o--o{ SALE_PACK : "쓴 포장재"
     SALE |o--o{ STOCK_HISTORY : "판매로 빠진 수량"
+    EXPENSE ||--o{ EXPENSE_LINE : "구매 줄"
+    COLOR |o--o{ EXPENSE_LINE : "산 색상"
+    PART |o--o{ EXPENSE_LINE : "산 품목"
+    EXPENSE_LINE |o--o{ SPOOL : "주문으로 등록한 스풀"
+    EXPENSE |o--o{ STOCK_HISTORY : "구매로 늘어난 수량"
 
     BRAND {
         bigint id PK
@@ -64,6 +69,7 @@ erDiagram
         datetime opened_at "사용 시작일"
         datetime finished_at "사용 완료일"
         text note
+        bigint buy_id FK "주문(지출 구매 줄), NULL=주문 없이"
     }
     PART_CATEGORY {
         bigint id PK
@@ -94,6 +100,7 @@ erDiagram
         decimal after "그 뒤 남은 수량"
         varchar note "설명 (조정 사유 · 판매 요약)"
         bigint sale_id FK "판매로 빠진 기록, NULL=그 밖"
+        bigint expense_id FK "지출 구매로 늘어난 기록, NULL=그 밖"
         datetime created_at
     }
     PACK_SET {
@@ -147,18 +154,26 @@ erDiagram
         bigint id PK
         date date "지출 날짜 (오늘 이후 불가)"
         varchar name "항목"
-        varchar category "invest / filament / part / supply / sub / sell / etc"
-        decimal amount "금액 (1원 이상)"
+        varchar category "invest / filament / part / pack / supply / sub / sell / etc"
+        decimal amount "금액 (1원 이상, 배송비 포함)"
         varchar shop "구매처, 빈 값 허용"
-        varchar url "주문 링크, 빈 값 허용"
         text note
         bigint recurring_id FK "반복 지출에서 넣은 줄, NULL=직접 입력"
         datetime created_at
     }
+    EXPENSE_LINE {
+        bigint id PK
+        bigint expense_id FK
+        bigint color_id FK "필라멘트 지출: 색상 (part 와 둘 중 하나)"
+        bigint part_id FK "부속품 · 포장재 · 소모품 지출: 그 탭의 품목"
+        decimal qty "수량 (필라멘트는 통 수, 정수)"
+        decimal amount "직접 적은 금액, NULL=총액에서 나눠 넣음"
+        decimal total "줄 금액 (적은 금액 또는 나눈 금액, 저장 때 계산)"
+    }
     RECURRING_EXPENSE {
         bigint id PK
         varchar name
-        varchar category "EXPENSE.category 와 같은 7개"
+        varchar category "EXPENSE.category 와 같은 8개"
         decimal amount "금액 (1원 이상)"
         smallint day "결제일 1~31"
         date start "시작 달 (항상 1일)"
@@ -209,7 +224,7 @@ erDiagram
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` |
 | `stock` | `PartCategory`, `Part`, `StockHistory`, `PackSet`, `PackSetLine` |
 | `products` | `Category`, `Subcategory`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
-| `expenses` | `Expense`, `RecurringExpense` |
+| `expenses` | `Expense`, `ExpenseLine`, `RecurringExpense` |
 | `sales` | `Sale`, `SaleItem`, `SalePack` |
 
 ## 모델 설명
@@ -220,7 +235,7 @@ erDiagram
 | `Material` | 재질 종류. 회사와 상관없는 공통 목록 (PLA, PETG, PETG-CF …) |
 | `Filament` | 회사 + 재질 + 시리즈 단위의 필라멘트 제품. 기본 스풀 가격·무게 |
 | `Color` | 필라멘트 안의 색상. 색상 코드(hex)를 가지며, 가격을 비우면 필라멘트 가격을 따름. 재고는 색상 단위로 셈 |
-| `Spool` | 스풀 1개 = 1행. 스풀 번호, 상태, 날짜, 실제 구매가 |
+| `Spool` | 스풀 1개 = 1행. 스풀 번호, 상태, 날짜, 실제 구매가, 주문(지출 구매 줄, 선택) |
 | `PartCategory` | 품목 카테고리. 탭(`kind`)마다 따로 (부속품: 부품 · 키링 / 포장재: 박스 · 봉투 / 소모품: 접착 · 마감 …) |
 | `Part` | 재고 품목 (v2 STOCK). `kind` 로 재고 관리 탭을 나눈다 — 부속품(제품 1개당 수량 → 원가) · 포장재(포장 세트 → 포장비) · 소모품(원가에 안 넣음). `price ÷ pack_qty` 가 개당 단가. 남은 수량 · 부족 알림 기준 · 사진 |
 | `StockHistory` | 입출고 기록 한 줄 (STOCK-05). 지출 구매 · 판매 · 다 씀 · 조정. 남은 수량을 바꿀 때 항상 함께 만든다 (`stock/services.py`) |
@@ -232,7 +247,8 @@ erDiagram
 | `ProductFilament` | 제품 ↔ 필라멘트 (다대다) + 사용량 + 색상(선택). 같은 필라멘트를 색상별로 여러 줄 둘 수 있음 |
 | `ProductPart` | 제품 ↔ 부속품 (다대다) + 수량. 포장재는 `Product.default_pack` 으로 따로 |
 | `CostSetting` | 원가 계산 설정값. 항상 1개 행만 존재 (기본값은 PRD 3.8) |
-| `Expense` | 지출 한 줄 (PRD 3.10). 분류는 고정 7개 (`ExpenseCategory`) |
+| `Expense` | 지출 한 줄 = 주문 하나 (PRD 3.10). 분류는 고정 8개 (`ExpenseCategory`) |
+| `ExpenseLine` | 지출의 구매 줄 (PRD EXP-08, v2 TBD-31). 필라멘트 지출은 색상 · 통 수, 부속품 · 포장재 · 소모품 지출은 그 탭의 품목 · 수량 + 금액(비우면 나눠 넣음) |
 | `RecurringExpense` | 반복 지출 (구독 · 월정액). 지출을 저절로 만들지 않고, 화면에서 확인하고 넣는다 |
 | `Sale` | 판매 한 건 = 주문 하나 (v2 SALE). 판매처는 고정 3개 (`SaleChannel`). 배송비 · 수수료는 주문 단위 |
 | `SaleItem` | 판매 안의 제품 한 줄. 단가 · 수량 · 팔 때 복사한 개당 원가(포장 빼고) · 제품명 |
@@ -257,6 +273,16 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 반복 지출 결제일 (PRD EXP-04) = 그 달의 RecurringExpense.day, 그 달 말일보다 크면 말일 (RecurringExpense.pay_date)
 이번 달에 넣을 반복 지출 = 시작 달 ≤ 이번 달 이고, 이번 달 결제일 ≤ 오늘 이고, 이번 달에 그 반복에서 넣은 지출이 없는 것
 누적 투자금 (PRD EXP-05) = category 가 invest 인 Expense.amount 합계 (전체 기간)
+
+구매 줄 금액 (PRD EXP-08, expenses.models.split_totals)
+  ExpenseLine.total = amount 가 있으면 그 값,
+                      없으면 (Expense.amount − 금액 적은 줄 합계) × 무게 ÷ 비운 줄 무게 합 (무게: 필라멘트는 qty, 그 밖은 1)
+  1개(통)당 금액 = total ÷ qty
+최근 구매 줄 = 그 색상 · 품목의 ExpenseLine 중 Expense.date → Expense.id → id 가 가장 큰 것 (expenses.models.latest_line)
+최근 구매가 (원가 계산표 단가) — 구매 줄이 바뀔 때 최근 구매 줄로 다시 맞춤 (refresh_buy_prices)
+  Color.price = 최근 구매 줄의 통당 금액 (원 단위 반올림)
+  Part.price · Part.pack_qty = 최근 구매 줄의 total(원 단위) · qty
+재고 추가에서 주문을 고르면 Spool.price = 통당 금액, Spool.purchased_at = Expense.date, 남은 통 = qty − 그 줄의 스풀 수
 
 판매가 합계 (v2 SALE-01) = Σ SaleItem.unit_price × qty
 스마트스토어 수수료 (SALE-03) = (판매가 합계 + Sale.shipping_received) × (CostSetting.fee_order + fee_sales)%, 원 단위 반올림 (Sale.store_fee)
@@ -284,6 +310,10 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Part.category` → `PartCategory` | SET_NULL | 카테고리를 지우면 그 품목은 미분류 (원가는 그대로). 품목이 있으면 화면에서 2차 확인 |
 | `StockHistory.part` → `Part` | CASCADE | 품목을 지우면 그 입출고 기록도 함께 삭제 |
 | `StockHistory.sale` → `Sale` | SET_NULL | 판매를 지우면 되돌리는 기록을 남긴 뒤 연결만 끊김 |
+| `StockHistory.expense` → `Expense` | SET_NULL | 지출을 지우면 되돌리는 기록(`지출 삭제`)을 남긴 뒤 연결만 끊김 |
+| `ExpenseLine.expense` → `Expense` | CASCADE | 지출을 지우면 구매 줄도 함께 삭제 |
+| `ExpenseLine.color` → `Color` · `ExpenseLine.part` → `Part` | CASCADE | 색상 · 품목을 지우면 그 구매 줄도 함께 삭제 (지출 금액은 그대로) |
+| `Spool.buy` → `ExpenseLine` | SET_NULL | 지출 · 구매 줄을 지워도 스풀은 남고 구매가도 그대로 (연결만 끊김) |
 | `PackSetLine.pack_set` → `PackSet` | CASCADE | 세트를 지우면 구성도 함께 삭제 |
 | `PackSetLine.part` → `Part` | PROTECT | 세트에서 쓰면 포장재 삭제 불가 |
 | `Product.default_pack` → `PackSet` | PROTECT | 기본 포장으로 쓰는 제품이 있으면 세트 삭제 불가 |
@@ -321,7 +351,9 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Product.no` | UNIQUE | 제품 No. 중복 방지 |
 | `Product.subcategory` | 검사 | 세부 분류는 그 제품의 카테고리에 속해야 함 (`Product.clean`) |
 | `ProductFilament.color` | 검사 | 색상은 그 줄의 필라멘트에 속해야 함 (`ProductFilament.clean`) |
-| `Expense.category` · `RecurringExpense.category` | CHOICES | 고정 7개 (PRD EXP-03) |
+| `Expense.category` · `RecurringExpense.category` | CHOICES | 고정 8개 (PRD EXP-03). 키는 v1.2.0 그대로 (`invest` = 장비, `part` = 부속품 — 기존 `부자재` 지출) + `pack`(포장재) |
+| `ExpenseLine (color, part)` | CHECK | 둘 중 하나만 (`expense_line_color_or_part`) |
+| `ExpenseLine` | 검사 | 분류가 필라멘트면 색상 · 정수 통 수, 부속품 · 포장재 · 소모품이면 같은 탭의 품목. 한 지출에 같은 것 두 줄 불가. 필라멘트가 아니면 금액 비운 줄은 하나까지. 금액 적은 줄 합계 ≤ 지출 금액. 스풀을 등록한 줄은 색상 변경 · 등록 수 아래로 줄이기 불가 (`ExpenseSerializer._check_lines`) |
 | `Expense (recurring, 연 · 월)` | 검사 | 같은 반복 지출은 한 달에 한 줄만 (`ExpenseSerializer.validate`) |
 | `Sale.channel` | CHOICES | `store`(스마트스토어) / `direct`(직접 판매) / `etc`(기타) |
 | `Sale.order_no` | UNIQUE (빈 값 제외) | 같은 주문을 두 번 넣지 않게 (스마트스토어 가져오기). 빈 주문번호는 여러 개 가능 |
