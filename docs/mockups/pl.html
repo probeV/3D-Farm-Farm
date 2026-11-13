@@ -159,10 +159,8 @@ select { border: 1px solid var(--border); background: var(--surface); border-rad
     <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
     <a class="nav-item" href="products.html" title="제품 원가">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
-    <a class="nav-item" href="filaments.html" title="필라멘트">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
-    <a class="nav-item" href="parts.html" title="부자재">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></a>
+    <a class="nav-item" href="filaments.html" title="재고 관리 (필라멘트 · 부속품 · 포장 · 소모품)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span class="label">재고 관리</span></a>
     <a class="nav-item" href="sales.html" title="판매">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
     <a class="nav-item" href="expenses.html" title="지출">
@@ -199,18 +197,18 @@ const SALES = [
 ].map(([date, ch, gross, ship]) => ({ date, gross, ship, fee: ch === "store" ? Math.round((gross + ship) * 0.0471) : 0 }));
 
 // 지출 (expenses.html): [날짜, 항목, 분류, 금액]
-const CATS = { invest: "투자(장비)", filament: "필라멘트", part: "부자재", supply: "소모품 · 유지", sub: "구독 · 운영", sell: "판매비", etc: "기타" };
+const CATS = { invest: "장비", filament: "필라멘트", part: "부속품", pack: "포장재", supply: "소모품", sub: "구독 · 운영", sell: "판매비", etc: "기타" };
 const EXPENSES = [
   ["2026-05-11", "3D 프린터 (콤보)", "invest", 1090000], ["2026-05-11", "PLA 필라멘트 4롤", "filament", 76000],
   ["2026-05-20", "필라멘트 건조기", "invest", 89000], ["2026-05-20", "클라우드 저장소", "sub", 2900],
   ["2026-06-03", "네오디뮴 자석 200개", "part", 12000], ["2026-06-05", "AI 구독", "sub", 29000],
   ["2026-06-14", "노즐 0.4mm 5개", "supply", 15000], ["2026-06-20", "클라우드 저장소", "sub", 2900],
-  ["2026-07-02", "OPP 봉투 500장", "part", 8900], ["2026-07-05", "AI 구독", "sub", 29000],
+  ["2026-07-02", "OPP 봉투 500장", "pack", 8900], ["2026-07-05", "AI 구독", "sub", 29000],
   ["2026-07-12", "3D 모델링 툴 구독", "sub", 15000], ["2026-07-18", "PETG 필라멘트 2롤", "filament", 42000],
   ["2026-07-20", "클라우드 저장소", "sub", 2900], ["2026-08-05", "AI 구독", "sub", 29000],
   ["2026-08-09", "라벨 프린터", "invest", 59000], ["2026-08-12", "3D 모델링 툴 구독", "sub", 15000],
   ["2026-08-20", "클라우드 저장소", "sub", 2900], ["2026-08-25", "PEI 베드 시트", "supply", 32000],
-  ["2026-09-05", "AI 구독", "sub", 29000], ["2026-09-08", "소형 박스 50개", "part", 22000],
+  ["2026-09-05", "AI 구독", "sub", 29000], ["2026-09-08", "소형 박스 50개", "pack", 22000],
   ["2026-09-12", "3D 모델링 툴 구독", "sub", 15000], ["2026-09-15", "검색 광고 충전", "sell", 50000],
   ["2026-09-22", "PLA 필라멘트 6롤", "filament", 108000], ["2026-09-30", "택배비 (9월)", "sell", 31500],
   ["2026-10-05", "AI 구독", "sub", 29000], ["2026-10-10", "전기요금 (9월분)", "sub", 18400],
@@ -251,7 +249,7 @@ function calc(from, to) {
   const settle = gross + ship - fee;
   // 손익 기준
   const revenue = gross + ship;
-  const spool = sum(opened, (s) => s.price), part = byCat("part");
+  const spool = sum(opened, (s) => s.price), part = byCat("part") + byCat("pack");
   const material = spool + part;
   const grossProfit = revenue - material;
   const ops = { fee, sell: byCat("sell"), sub: byCat("sub"), supply: byCat("supply"), etc: byCat("etc") };
@@ -322,7 +320,7 @@ function render() {
       <div class="sum-card"><span>${isPL ? "순이익" : "들어온 돈 − 나간 돈"} · ${esc(periodLabel())}${help(isPL ? "매출 − 재료비 − 운영비 − 세금. 장비는 빠져 있어요" : "판매 정산 금액 − 지출 전부 (장비 포함)")}</span>
         <strong class="${sign(main)}">${won(main)}</strong>
         <span class="sub">${isPL ? `매출 ${won(r.revenue)} · 이익률 ${pct(r.net, r.revenue)}` : `들어온 돈 ${won(r.settle)} · 나간 돈 ${won(r.outAll)}`}</span></div>
-      <div class="sum-card"><span>투자 회수${help("처음부터 지금까지 손익 기준 순이익 ÷ 누적 투자금(지출의 투자(장비) 합계). 기간 선택과 상관없이 전체로 계산해요")}</span>
+      <div class="sum-card"><span>투자 회수${help("처음부터 지금까지 손익 기준 순이익 ÷ 누적 투자금(지출의 장비 합계). 기간 선택과 상관없이 전체로 계산해요")}</span>
         <strong>${Math.round(rec * 100)}%</strong>
         <div class="meter"><i style="width:${Math.min(100, Math.max(0, rec * 100))}%"></i></div>
         <span class="sub">${won(Math.max(0, all.net))} / ${won(all.invest)}</span></div>
@@ -367,16 +365,16 @@ function plTable(r) {
     ${line("판매가", r.gross, { cls: "sub" })}
     ${line("받은 배송비", r.ship, { cls: "sub" })}
     ${gap}
-    ${line("재료비", r.material, { op: "−", tip: "사용 시작한 스풀의 구매가 + 부자재 지출(산 날). 필라멘트 지출은 여기 안 들어가요 — 대신 뜯은 스풀로" })}
+    ${line("재료비", r.material, { op: "−", tip: "사용 시작한 스풀의 구매가 + 부속품 · 포장재 지출(산 날). 필라멘트 지출은 여기 안 들어가요 — 대신 뜯은 스풀로" })}
     ${line(`스풀 ${r.opened.length}개 사용 시작`, r.spool, { cls: "sub" })}
-    ${line("부자재 지출", r.part, { cls: "sub" })}
+    ${line("부속품 · 포장재 지출", r.part, { cls: "sub" })}
     ${line("매출총이익", r.grossProfit, { cls: "total", pct: pct(r.grossProfit, r.revenue), signed: true })}
     ${gap}
-    ${line("운영비", r.opsSum, { op: "−", tip: "판매 수수료 + 지출 장부의 판매비 · 구독 · 소모품 · 기타. 투자(장비)는 빼요" })}
+    ${line("운영비", r.opsSum, { op: "−", tip: "판매 수수료 + 지출 장부의 판매비 · 구독 · 소모품 · 기타. 장비는 빼요" })}
     ${line("판매 수수료", r.ops.fee, { cls: "sub" })}
     ${line("판매비 (택배 · 광고)", r.ops.sell, { cls: "sub" })}
     ${line("구독 · 운영", r.ops.sub, { cls: "sub" })}
-    ${line("소모품 · 유지", r.ops.supply, { cls: "sub" })}
+    ${line("소모품", r.ops.supply, { cls: "sub" })}
     ${line("기타", r.ops.etc, { cls: "sub" })}
     ${line("영업이익", r.operating, { cls: "total", pct: pct(r.operating, r.revenue), signed: true })}
     ${gap}
