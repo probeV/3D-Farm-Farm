@@ -172,6 +172,26 @@ dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 
 .items-foot { display: flex; align-items: center; gap: 8px; padding: 8px 0 0; }
 .items-foot .spacer { flex: 1; }
 
+/* v2 주문 포장 줄: 포장 세트 · 수량 · 금액 (주문 단위, 제품 줄과 따로) */
+.packs { margin-top: 16px; }
+.packs-head, .pack-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 20px 90px 32px; gap: 8px; align-items: center; }
+/* 모자라는 포장재: 수량과 금액 사이 경고 아이콘 (마우스를 올리면 남은 수량) */
+.pack-row .help.short-ico { width: 18px; height: 18px; margin: 0; font-size: 11px; border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.pack-row .help.short-ico::after { white-space: nowrap; }
+.packs-head { font-size: 12px; color: var(--muted); font-weight: 600; padding: 0 0 4px; border-bottom: 1px solid var(--border); }
+.packs-head .num, .pack-row .amt { text-align: right; }
+.pack-row { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.pack-row select, .pack-row input { width: 100%; }
+.pack-row .amt { font-variant-numeric: tabular-nums; font-weight: 600; }
+.pack-row .what { grid-column: 1 / -1; margin-top: -2px; font-size: 12px; color: var(--muted); }
+.pack-row .what .short { color: var(--warn); font-weight: 600; }
+.packs-foot { display: flex; align-items: center; gap: 8px; padding: 8px 0 0; flex-wrap: wrap; }
+.packs-foot select { width: auto; min-width: 200px; }
+.packs-foot .spacer { flex: 1; }
+.packs-note { font-size: 12px; color: var(--muted); }
+.packs-note.auto { color: var(--accent); }
+.packs-empty { padding: 10px 0 4px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--border); }
+
 /* 정산 계산 상자: 판매가 합계 + 받은 배송비 − 수수료 = 정산 금액 */
 .calc { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 8px 14px; align-items: center; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px; }
 .calc .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -207,6 +227,7 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
   .item-row { grid-template-columns: 1fr 1fr 32px; }
   .item-row select { grid-column: 1 / -1; }
   .item-row .cost-val { grid-column: 1; text-align: left; } .item-row .sub { grid-column: 2; } .item-row [data-rm] { grid-column: 3; }
+  .packs-head { display: none; } .pack-row { grid-template-columns: 1fr 20px 1fr 32px; } .pack-row select { grid-column: 1 / -1; }
   .calc { grid-template-columns: 1fr 130px; }
 }
 </style>
@@ -217,14 +238,14 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
     <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
     <a class="nav-item" href="products.html" title="제품 원가">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
-    <a class="nav-item" href="filaments.html" title="필라멘트">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
-    <a class="nav-item" href="parts.html" title="부자재">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></a>
+    <a class="nav-item" href="filaments.html" title="재고 관리 (필라멘트 · 부속품 · 포장 · 소모품)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span class="label">재고 관리</span></a>
     <a class="nav-item active" href="sales.html" title="판매">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
     <a class="nav-item" href="expenses.html" title="지출">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
+    <a class="nav-item" href="pl.html" title="손익">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="label">손익</span></a>
     <div class="side-bottom">
       <span class="mock-tag">목업 · 더미 데이터</span>
       <a class="nav-item" href="settings.html" title="설정">
@@ -265,8 +286,32 @@ const PRODUCTS = [
   { id: 7, code: "007", name: "하노이 탑", status: "discontinued", sale: 4500 },
   { id: 8, code: "008", name: "도형 칠교", status: "developing", sale: 8900 },
 ];
-// 지금 원가 계산표의 개당 원가 (products.html calc 결과: 필라멘트 + 부자재 + 전기료, 원 단위 반올림). null = 입력이 덜 돼 원가를 못 냄
-const COSTS = { 1: 3227, 2: 3868, 3: 1291, 4: 191, 5: 7284, 6: null, 7: 4787, 8: null };
+// 지금 원가 계산표의 개당 원가 — 포장은 빼고 (products.html calc 의 필라멘트 + 부속품 + 전기료, 원 단위 반올림). null = 입력이 덜 돼 원가를 못 냄
+// v2: 포장은 주문마다 따로 고르므로(묶음 포장) 제품 원가에서 빼고 아래 포장 줄로 더한다
+const COSTS = { 1: 3194, 2: 3413, 3: 1273, 4: 233, 5: 7011, 6: null, 7: 4347, 8: null };
+// 포장재 (packaging.html 과 같음). cost = 개당 단가(가격 미입력은 0원), stock = 지금 남은 수량
+const PACK_ITEMS = [
+  { id: 3, name: "OPP 봉투 15×20", unit: "장", cost: 17.8, stock: 312 },
+  { id: 12, name: "뽁뽁이 봉투 20×25", unit: "장", cost: 0, stock: 40, noPrice: true },
+  { id: 4, name: "소형 박스", unit: "개", cost: 440, stock: 8 },
+  { id: 10, name: "중형 박스", unit: "개", cost: 750, stock: 23 },
+  { id: 6, name: "에어캡 완충재", unit: "회", cost: 450, stock: 0 },
+  { id: 7, name: "제품 스티커", unit: "장", cost: 15, stock: 640 },
+  { id: 11, name: "박스 테이프", unit: "회", cost: 50, stock: 41 },
+];
+const packItem = (id) => PACK_ITEMS.find((x) => x.id === Number(id));
+// 포장 세트 = 포장재 묶음 (packaging.html 과 같음). 고르면 구성 포장재가 한 줄씩 들어간다
+const PACKS = [
+  { id: 1, name: "봉투 포장", lines: [[3, 1], [7, 1]] },
+  { id: 2, name: "작은 박스", lines: [[4, 1], [6, 1], [7, 1], [11, 1]] },
+  { id: 3, name: "큰 박스 (묶음)", lines: [[10, 1], [6, 2], [7, 1], [11, 1]] },
+];
+const pack = (id) => PACKS.find((x) => x.id === Number(id));
+const packCost = (k) => k.lines.reduce((a, [id, q]) => a + q * packItem(id).cost, 0);
+// 세트 → 주문 포장 줄 [포장재 id, 수량, 개당 단가]
+const linesOf = (k) => k.lines.map(([id, q]) => [id, q, packItem(id).cost]);
+// 제품의 기본 포장 (products.html 제품 창 `기본 포장`). 없으면 null
+const DEFAULT_PACK = { 1: 1, 2: 2, 3: 1, 4: 1, 5: 2, 6: null, 7: 2, 8: null };
 const costOf = (p) => (p ? COSTS[p.id] ?? null : null);
 // 설정 › 스마트스토어 SET-08 건당 판매자 부담 배송비 (settings.html 저장값 0원) → 새 주문의 '낸 택배비' 기본값
 const SHIP_COST_DEFAULT = 0;
@@ -276,6 +321,9 @@ const product = (id) => PRODUCTS.find((p) => p.id === Number(id));
 // 주문 (SALE-01 · 04). items: [제품 id, 수량, 단가, 개당 원가]. ship: 손님이 낸 배송비. fee: 수수료 (스마트스토어는 자동 계산 후 고칠 수 있음)
 // 개당 원가: 판매를 저장할 때 원가 계산표 값을 복사해 둔다 (나중에 필라멘트 · 부자재 가격을 바꿔도 지난 판매는 그대로). 고칠 수 있음
 // shipCost: 판매자가 낸 택배비 — 주문별 이익 참고용. 손익 계산에는 지출 장부(판매비)의 택배비를 쓴다
+// v2 packs: 주문에 쓴 포장재 [포장재 id, 수량, 개당 단가] — 포장재 하나하나. 포장 세트를 고르면 그 구성을 지금 줄에 더함 (같은 포장재는 수량 합침)
+//   새 주문은 첫 제품의 기본 포장(세트) 구성으로 채움 · 묶음이면 다른 세트로 바꾸거나 줄을 고침 · 직접 전달은 비움
+//   단가도 저장할 때 복사 (나중에 포장재 가격이 바뀌어도 지난 판매는 그대로). 저장하면 포장재 남은 수량에서 줄마다 빠짐
 const raw = [
   ["2026-06-18", "direct", [[7, 3, 4500]], 0, "", "학교 방과후 선생님 · 현금"],
   ["2026-07-04", "store", [[1, 1, 18900]], 3000, "2026070412345", ""],
@@ -302,10 +350,18 @@ const raw = [
   ["2026-10-27", "store", [[2, 1, 24000]], 3000, "2026102790123", ""],
 ];
 const itemsSum = (items) => items.reduce((a, [, q, u]) => a + q * u, 0);
+// 더미 주문의 포장: 직접 판매 · 기타는 손으로 전달(포장 없음), 제품이 여러 개면 큰 박스 구성, 아니면 첫 제품의 기본 포장 구성
+function dummyPacks(ch, items) {
+  if (ch !== "store") return [];
+  const n = items.reduce((a, [, q]) => a + q, 0);
+  if (n > 1 && items.some(([p]) => DEFAULT_PACK[p] !== 1)) return linesOf(pack(3));
+  const d = DEFAULT_PACK[items[0][0]];
+  return d ? linesOf(pack(d)) : [];
+}
 const autoFee = (ch, items, ship) => (ch === "store" ? Math.round((itemsSum(items) + ship) * STORE_RATE) : 0);
 const db = {
   sales: raw.map(([date, ch, items, ship, orderNo, note], i) => ({ id: i + 1, date, channel: ch, items: items.map(([p, q, u]) => [p, q, u, costOf(product(p))]),
-    ship, fee: autoFee(ch, items, ship), shipCost: ch === "store" ? 3300 : 0, orderNo, note })),
+    packs: dummyPacks(ch, items), ship, fee: autoFee(ch, items, ship), shipCost: ch === "store" ? 3300 : 0, orderNo, note })),
 };
 
 // ---------------------------------------------------------------- 유틸
@@ -325,7 +381,8 @@ const settle = (s) => gross(s) + s.ship - s.fee;         // 정산 금액 (통�
 const itemCost = (it) => it[3];
 const costMissing = (s) => s.items.some((it) => itemCost(it) == null);
 const costSum = (s) => s.items.reduce((a, it) => a + it[1] * (itemCost(it) ?? 0), 0);
-const profit = (s) => (costMissing(s) ? null : settle(s) - costSum(s) - s.shipCost); // 주문별 이익 (참고용)
+const packSum = (s) => (s.packs || []).reduce((a, [, q, c]) => a + q * c, 0);
+const profit = (s) => (costMissing(s) ? null : settle(s) - costSum(s) - packSum(s) - s.shipCost); // 주문별 이익 (참고용)
 const pct = (n, d) => (d ? `${Math.round((n / d) * 100)}%` : "-");
 const total = (list, f) => list.reduce((a, s) => a + f(s), 0);
 const chBadge = (k) => `<span class="ch ${k === "store" ? "store" : ""}">${esc(channel(k).label)}</span>`;
@@ -355,8 +412,8 @@ const COLS = [
   { key: "ship", label: "배송비", get: (x) => x.ship, num: true, tip: "손님이 낸 배송비 (받은 돈). 판매자가 낸 택배비는 지출 장부의 판매비로 따로 적어요" },
   { key: "fee", label: "수수료", get: (x) => x.fee, num: true },
   { key: "settle", label: "정산 금액", get: settle, num: true, tip: "판매가 + 배송비 − 수수료. 통장에 들어오는 돈 (손익의 현금 기준)" },
-  { key: "cost", label: "원가", get: costSum, num: true, tip: "판매를 저장할 때 원가 계산표에서 복사해 둔 개당 원가 × 수량. 나중에 가격이 바뀌어도 지난 판매는 그대로예요" },
-  { key: "profit", label: "이익", get: (x) => profit(x) ?? -Infinity, num: true, tip: "정산 금액 − 원가 − 낸 택배비. 주문 하나가 대략 얼마 남았는지 보는 참고값이에요. 월 손익은 실제 지출 · 스풀 구매가로 따로 계산해요" },
+  { key: "cost", label: "원가", get: (x) => costSum(x) + packSum(x), num: true, tip: "제품 원가(개당 원가 × 수량) + 포장비. 판매를 저장할 때 복사해 둔 값이라 나중에 가격이 바뀌어도 지난 판매는 그대로예요" },
+  { key: "profit", label: "이익", get: (x) => profit(x) ?? -Infinity, num: true, tip: "정산 금액 − 원가(제품 + 포장) − 낸 택배비. 주문 하나가 대략 얼마 남았는지 보는 참고값이에요. 월 손익은 실제 지출 · 스풀 구매가로 따로 계산해요" },
   { key: "note", label: "메모", get: (x) => x.note, nosort: true },
 ];
 function sorter() {
@@ -396,7 +453,7 @@ function render() {
         <strong>${won(total(thisMonth, gross))}</strong><span class="sub">주문 ${thisMonth.length}건 · ${total(thisMonth, qty)}개</span></div>
       <div class="sum-card"><span>이번 달 정산 금액${help("판매가 + 받은 배송비 − 수수료 · 통장에 들어오는 돈")}</span>
         <strong>${won(total(thisMonth, settle))}</strong><span class="sub">수수료 ${won(total(thisMonth, (s) => s.fee))}</span></div>
-      <div class="sum-card"><span>이번 달 주문 이익${help("주문별 이익(정산 금액 − 원가 − 낸 택배비)의 합계. 참고값이에요 — 구독 · 광고 같은 운영비와 실패 출력은 빠져 있어요. 실제 월 이익은 손익 화면에서")}</span>
+      <div class="sum-card"><span>이번 달 주문 이익${help("주문별 이익(정산 금액 − 원가 − 포장비 − 낸 택배비)의 합계. 참고값이에요 — 구독 · 광고 같은 운영비와 실패 출력은 빠져 있어요. 실제 월 이익은 손익 화면에서")}</span>
         <strong>${won(total(thisMonth, (s) => profit(s) ?? 0))}</strong><span class="sub">판매가의 ${pct(total(thisMonth, (s) => profit(s) ?? 0), total(thisMonth, gross))}${thisMonth.some(costMissing) ? " · 원가 없는 주문 제외" : ""}</span></div>
       <div class="sum-card"><span>누적 매출${help("전체 기간 판매가 합계")}</span>
         <strong>${won(total(all, gross))}</strong><span class="sub">주문 ${all.length}건 · ${total(all, qty)}개 · ${first}부터</span></div>
@@ -440,7 +497,7 @@ function row(x) {
     <td class="num ${x.ship ? "" : "minus"}">${x.ship ? won(x.ship) : "-"}</td>
     <td class="num ${x.fee ? "" : "minus"}">${x.fee ? "−" + won(x.fee) : "-"}</td>
     <td class="num">${won(settle(x))}</td>
-    <td class="num minus">${costMissing(x) ? '<span class="badge warn">원가 없음</span>' : won(costSum(x))}</td>
+    <td class="num minus" title="${costMissing(x) ? "" : `제품 ${won(costSum(x))} + 포장 ${won(packSum(x))}${(x.packs || []).length ? ` (${x.packs.map(([id, q]) => `${packItem(id).name} ${q}`).join(", ")})` : " (포장 없음)"}`}">${costMissing(x) ? '<span class="badge warn">원가 없음</span>' : won(costSum(x) + packSum(x))}</td>
     <td class="num amount ${profit(x) != null && profit(x) < 0 ? "neg" : ""}">${profit(x) == null ? "-" : won(profit(x))}<span class="rate">${profit(x) == null ? "" : pct(profit(x), gross(x))}</span></td>
     <td class="note" title="${esc(x.note)}">${esc(x.note)}</td></tr>`;
 }
@@ -514,6 +571,17 @@ function openSale(x, preset = {}) {
     ship: base?.ship ?? 0,
     shipCost: base ? base.shipCost : SHIP_COST_DEFAULT,
     note: base ? base.note : "",
+    // 포장: 수정은 저장된 값, 복제는 지금 세트 원가로 다시
+    packs: x ? (x.packs || []).map((r) => [...r]) : src ? (src.packs || []).map(([id, q]) => [id, q, packItem(id).cost]) : [],
+  };
+  let packFrom = null; // 마지막으로 채운 세트 이름 (안내 문구용)
+  // 포장을 직접 바꾸기 전까지는 첫 제품의 기본 포장 1개로 따라감 (새 주문만)
+  let packAuto = !x && !src;
+  const fillPack = () => {
+    if (!packAuto) return;
+    const d = DEFAULT_PACK[st.items.find(([p]) => p)?.[0]];
+    st.packs = d ? linesOf(pack(d)) : [];
+    packFrom = d ? pack(d).name : null;
   };
   // 수수료를 직접 고쳤는지: 저장된 값이 자동 계산과 다르면 고친 것으로
   let fee = x ? x.fee : null;
@@ -526,7 +594,8 @@ function openSale(x, preset = {}) {
     const picked = st.items.filter(([p]) => p);
     const noCost = picked.some((it) => itemCost(it) == null);
     const cs = picked.reduce((a, it) => a + it[1] * (itemCost(it) ?? 0), 0);
-    const pf = g + st.ship - f - cs - st.shipCost;
+    const ps = st.packs.reduce((a, [, q, c]) => a + q * c, 0);
+    const pf = g + st.ship - f - cs - ps - st.shipCost;
     const rateTip = `스마트스토어: (판매가 합계 + 배송비) × ${FEE_RATE.order}% (네이버페이 주문관리) + ${FEE_RATE.sales}% (판매). 설정 › 스마트스토어 SET-06 · 07 값. 정산 엑셀과 다르면 직접 고치세요`;
     show(dlg, `<div class="dlg-head">${x ? "판매 수정" : "판매 추가"}${!x && src ? `<span class="hint" style="font-weight:400">${src.date.replaceAll("-", ".")} 주문에서 복제</span>` : ""}</div>
       <div class="dlg-body">
@@ -536,7 +605,7 @@ function openSale(x, preset = {}) {
           <div class="field full"><span>판매처 *</span><div class="pick" role="radiogroup" aria-label="판매처">${CHANNELS.map((c) => `<label><input type="radio" name="channel" value="${c.key}" ${c.key === st.channel ? "checked" : ""}><span>${esc(c.label)}</span></label>`).join("")}</div></div>
         </div>
         <div class="items">
-          <div class="items-head"><span>제품 *</span><span class="num">수량</span><span class="num">단가</span><span class="num">원가 (개당) ${help("저장할 때 원가 계산표의 개당 원가를 복사해 둬요. 나중에 필라멘트 · 부자재 가격이 바뀌어도 이 판매는 그대로예요. 주문별 이익 참고용")}</span><span class="num">소계</span><span></span></div>
+          <div class="items-head"><span>제품 *</span><span class="num">수량</span><span class="num">단가</span><span class="num">원가 (개당) ${help("저장할 때 원가 계산표의 개당 원가(포장 빼고)를 복사해 둬요. 포장은 아래 포장 줄로 주문마다. 나중에 필라멘트 · 부속품 가격이 바뀌어도 이 판매는 그대로예요. 주문별 이익 참고용")}</span><span class="num">소계</span><span></span></div>
           ${st.items.map((it, i) => {
             const [p, q, u] = it, pr = product(p), c = itemCost(it);
             const diff = pr && pr.sale != null && u !== pr.sale;
@@ -553,6 +622,21 @@ function openSale(x, preset = {}) {
           <div class="items-foot"><button type="button" class="btn small add" data-add-item>+ 제품 추가</button><div class="spacer"></div>
             <span class="hint">${st.items.filter(([p]) => p).reduce((a, [, q]) => a + q, 0)}개</span></div>
         </div>
+        <div class="packs">
+          <div class="packs-head"><span>포장 ${help("주문 하나에 쓴 포장재. 포장 세트를 고르면 그 구성이 지금 줄에 더해지고(같은 포장재는 수량 합침), 줄마다 바꾸거나 뺄 수 있어요. 저장하면 줄마다 포장재 남은 수량에서 빠져요 (재고 관리 › 포장)")}</span><span class="num">수량</span><span></span><span class="num">금액</span><span></span></div>
+          ${st.packs.length ? st.packs.map(([id, q, c], i) => { const k = packItem(id), left = k.stock - q; return `<div class="pack-row" data-pi="${i}">
+            <select data-f="pk" aria-label="포장재">${PACK_ITEMS.map((y) => `<option value="${y.id}" ${y.id === id ? "selected" : ""}>${esc(y.name)} · ${y.noPrice ? "가격 미입력" : `${won(y.cost)}/${esc(y.unit)}`}</option>`).join("")}</select>
+            <div class="with-suffix"><input type="number" data-f="pq" min="1" step="1" value="${q}" aria-label="수량"><em>${esc(k.unit)}</em></div>
+            <span>${left < 0 ? `<span class="help short-ico" tabindex="0" data-tip="${k.stock}${esc(k.unit)} 남음" aria-label="${k.stock}${esc(k.unit)} 남음">!</span>` : ""}</span>
+            <span class="amt">${won(q * c)}</span>
+            <button type="button" class="icon-btn" data-prm="${i}" title="이 포장재 빼기" aria-label="이 포장재 빼기">✕</button>
+          </div>`; }).join("") : `<div class="packs-empty">포장 없음 · 직접 전달 등 포장하지 않은 주문</div>`}
+          <div class="packs-foot">
+            <select data-f="set" aria-label="포장 세트 더하기"><option value="">+ 포장 세트 더하기…</option>${PACKS.map((k) => `<option value="${k.id}">${esc(k.name)} · ${won(packCost(k))}</option>`).join("")}</select>
+            <button type="button" class="btn small add" data-add-pack>+ 포장재 추가</button>
+            <span class="packs-note ${packFrom ? "auto" : ""}">${packFrom ? `첫 제품의 기본 포장(${esc(packFrom)})으로 채웠어요 · 묶음 포장이면 줄을 빼거나 세트를 더하세요` : packAuto && st.items.some(([p]) => p) ? "첫 제품에 기본 포장이 없어요 — 세트를 고르거나 포장재를 추가하세요" : packAuto ? "제품을 고르면 기본 포장이 채워져요" : ""}</span>
+            <div class="spacer"></div><span class="hint">포장비 ${won(st.packs.reduce((a, [, q, c]) => a + q * c, 0))}</span><a class="btn small" href="packaging.html" title="재고 관리 › 포장">포장 세트 관리</a></div>
+        </div>
         <div class="calc">
           <span class="lbl">판매가 합계</span><span class="v">${won(g)}</span>
           <span class="lbl">+ 받은 배송비<small>손님이 낸 배송비</small></span>
@@ -563,7 +647,8 @@ function openSale(x, preset = {}) {
         </div>
         <div class="calc profit-box">
           <span class="lbl">정산 금액</span><span class="v">${won(g + st.ship - f)}</span>
-          <span class="lbl">− 원가 합계<small>${noCost ? "원가 없는 제품이 있어요 — 제품 원가 화면에서 채우세요" : "줄마다 개당 원가 × 수량"}</small></span><span class="v">${noCost ? "-" : won(cs)}</span>
+          <span class="lbl">− 제품 원가<small>${noCost ? "원가 없는 제품이 있어요 — 제품 원가 화면에서 채우세요" : "줄마다 개당 원가 × 수량 (포장 빼고)"}</small></span><span class="v">${noCost ? "-" : won(cs)}</span>
+          <span class="lbl">− 포장비<small>${st.packs.length ? `포장재 ${st.packs.length}가지${packFrom ? ` · ${esc(packFrom)} 구성` : ""}` : "포장 없음"}</small></span><span class="v">${won(ps)}</span>
           <span class="lbl">− 낸 택배비<small>판매자가 택배사에 낸 돈. 기본값은 설정 › 스마트스토어 SET-08</small></span>
           <span class="with-suffix"><input type="number" name="shipCost" min="0" step="100" value="${st.shipCost}"><em>원</em></span>
           <span class="lbl total">= 이익 ${help("이 주문이 대략 얼마 남았는지 보는 참고값. 구독 · 광고 같은 운영비와 실패 출력은 빠져 있어서, 실제 월 이익은 손익 화면에서 따로 봐요")}</span>
@@ -593,9 +678,23 @@ function openSale(x, preset = {}) {
       if (rowEl) {
         const i = Number(rowEl.dataset.i), it = st.items[i];
         // 제품을 고르면 단가 = 제품 판매가, 원가 = 지금 원가 계산표 값
-        if (t.dataset.f === "p") { it[0] = Number(t.value) || 0; it[2] = product(it[0])?.sale ?? 0; it[3] = costOf(product(it[0])); return draw(`[data-i="${i}"] [data-f="u"]`); }
+        if (t.dataset.f === "p") { it[0] = Number(t.value) || 0; it[2] = product(it[0])?.sale ?? 0; it[3] = costOf(product(it[0])); if (i === 0 || !st.items[0][0]) fillPack(); return draw(`[data-i="${i}"] [data-f="u"]`); }
         if (t.dataset.f === "q") { it[1] = Math.max(1, Math.round(Number(t.value)) || 1); return draw(); }
         if (t.dataset.f === "u") { it[2] = Math.max(0, Math.round(Number(t.value)) || 0); return draw(); }
+      }
+      const pr = t.closest("[data-pi]");
+      if (pr) {
+        const r = st.packs[Number(pr.dataset.pi)]; packAuto = false;
+        if (t.dataset.f === "pk") { r[0] = Number(t.value); r[2] = packItem(r[0]).cost; }
+        if (t.dataset.f === "pq") r[1] = Math.max(1, Math.round(Number(t.value)) || 1);
+        return draw();
+      }
+      // 포장 세트 더하기: 세트 구성을 지금 포장 줄에 더함 (같은 포장재는 수량을 합침). 필요 없는 줄은 ✕
+      if (t.dataset.f === "set") {
+        const k = pack(t.value); if (!k) return;
+        packAuto = false; packFrom = null;
+        k.lines.forEach(([id, q]) => { const r = st.packs.find(([x]) => x === id); if (r) r[1] += q; else st.packs.push([id, q, packItem(id).cost]); });
+        toast(`${k.name} 구성을 더했어요 · 필요 없는 줄은 ✕ 로 빼세요`); return draw();
       }
       if (t.name === "channel") { st.channel = t.value; feeManual = false; return draw(); }
       if (t.name === "ship") { st.ship = Math.max(0, Math.round(Number(t.value)) || 0); return draw(); }
@@ -607,7 +706,10 @@ function openSale(x, preset = {}) {
       if (e.target.closest("[data-close]")) return dlg.el.close();
       if (e.target.closest("[data-add-item]")) { st.items.push([0, 1, 0, null]); return draw(`[data-i="${st.items.length - 1}"] select`); }
       const rm = e.target.closest("[data-rm]");
-      if (rm) { st.items.splice(Number(rm.dataset.rm), 1); return draw(); }
+      if (rm) { st.items.splice(Number(rm.dataset.rm), 1); fillPack(); return draw(); }
+      if (e.target.closest("[data-add-pack]")) { packAuto = false; const y = PACK_ITEMS.find((z) => !st.packs.some(([id]) => id === z.id)) ?? PACK_ITEMS[0]; st.packs.push([y.id, 1, y.cost]); return draw(`[data-pi="${st.packs.length - 1}"] select`); }
+      const prm = e.target.closest("[data-prm]");
+      if (prm) { packAuto = false; st.packs.splice(Number(prm.dataset.prm), 1); return draw(); }
       if (e.target.closest("[data-fee-reset]")) { feeManual = false; return draw(); }
       if (e.target.closest("[data-copy]")) return openSale(null, { copyOf: x });
       if (e.target.closest("[data-del]")) {
@@ -619,9 +721,11 @@ function openSale(x, preset = {}) {
       e.preventDefault();
       const items = st.items.filter(([p]) => p);
       if (!items.length || items.length !== st.items.length) return toast("제품을 고르세요 (빈 줄은 ✕ 로 빼세요)");
-      const d = { date: st.date, channel: st.channel, orderNo: st.orderNo.trim(), items, ship: st.ship, fee: curFee(), shipCost: st.shipCost, note: st.note.trim() };
+      const d = { date: st.date, channel: st.channel, orderNo: st.orderNo.trim(), items, packs: st.packs, ship: st.ship, fee: curFee(), shipCost: st.shipCost, note: st.note.trim() };
       if (x) Object.assign(x, d); else db.sales.push({ ...d, id: nextId(db.sales) });
-      dlg.el.close(); render(); toast("저장했어요");
+      dlg.el.close(); render();
+      // 포장재 · 부속품 남은 수량에서 빠짐 (수정이면 차이만, 삭제하면 되돌림 — 재고 관리 입출고 기록에 `판매` 로)
+      toast(st.packs.length ? `저장했어요 · 포장재 재고에서 ${st.packs.map(([id, q]) => `${packItem(id).name} ${q}`).join(", ")} 빠졌어요` : "저장했어요");
     };
   };
   draw(x ? null : '[data-i="0"] select');
