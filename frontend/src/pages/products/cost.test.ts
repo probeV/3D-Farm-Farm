@@ -30,6 +30,7 @@ const color = (
   spool_price,
   price_per_g: null,
   counts,
+  last_buy: null,
 })
 const filament = (id: number, display_name: string, price: number | null, colors: Color[]): Filament => ({
   id,
@@ -62,6 +63,7 @@ const part = (id: number, name: string, unit_price: number | null): Part => ({
   alert: 0,
   set_count: 0,
   last_used: null,
+  last_buy: null,
 })
 
 // 화이트: 색상 가격 없음(필라멘트 가격 14,400) / 블랙: 색상 가격 15,000 / PETG: 가격 미입력

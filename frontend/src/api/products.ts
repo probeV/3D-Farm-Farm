@@ -3,6 +3,7 @@
 // 원가 · 순마진율은 서버가 주지 않는다. 화면이 pages/products/cost.ts 로 계산한다
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, send } from './client'
+import type { LastBuy } from './filaments'
 
 export type ProductStatus = 'on_sale' | 'developing' | 'discontinued'
 
@@ -49,6 +50,7 @@ export interface Part {
   product_count: number // 쓰는 제품 수 (부속품)
   set_count: number // 쓰는 포장 세트 수 (포장재)
   last_used: string | null // 마지막으로 다 쓴 날 (소모품)
+  last_buy: LastBuy | null // 최근 구매 (지출 구매 줄). 있으면 price · pack_qty 는 그 줄 값 (다음 구매 때 다시 바뀜)
 }
 
 // 포장 세트 (STOCK-06): 제품의 기본 포장 · 판매 주문의 포장 줄을 채운다

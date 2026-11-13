@@ -46,7 +46,6 @@ export default function DueDialog({ due, onClose }: Props) {
           category: r.category,
           amount: parsed[r.id].data as number,
           shop: '',
-          url: '',
           note: '',
           recurring: r.id,
         })),

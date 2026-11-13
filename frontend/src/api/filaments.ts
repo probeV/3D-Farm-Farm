@@ -1,6 +1,7 @@
 // 필라멘트 화면 API — 회사 · 재질 · 필라멘트 · 색상 · 스풀 (docs/api.md)
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, send } from './client'
+import { keys as expenseKeys } from './expenses'
 
 export type SpoolStatus = 'sealed' | 'open' | 'empty'
 
@@ -20,6 +21,13 @@ export interface Material {
   filament_count: number
 }
 
+// 최근 구매 (지출 장부의 구매 줄, v2 TBD-31). 가격 옆 `최근 구매가 · 날짜 주문명 (지출)`
+export interface LastBuy {
+  expense: number
+  date: string
+  name: string
+}
+
 export interface Color {
   id: number
   filament: number
@@ -29,6 +37,7 @@ export interface Color {
   spool_price: number | null
   price_per_g: number | null
   counts: ByStatus
+  last_buy: LastBuy | null // 있으면 price 는 그 주문의 통당 금액 (다음 구매 때 다시 바뀜)
 }
 
 export interface Filament {
@@ -56,6 +65,7 @@ export interface Spool {
   opened_at: string | null
   finished_at: string | null
   note: string
+  buy: number | null // 주문(지출 구매 줄) id — 재고 추가에서만 정함
 }
 
 export const keys = {
@@ -73,13 +83,29 @@ export const useMaterials = () => useQuery({ queryKey: keys.materials, queryFn: 
 export const useFilaments = () => useQuery({ queryKey: keys.filaments, queryFn: () => api<Filament[]>('/filaments/') })
 
 // 저장한 뒤 다시 불러오기. 이름 · 개수 · 가격이 여러 목록(회사 카드, 관리 창, 타일, 스풀 창)에 함께 나오므로
-// 필라멘트 쪽 목록을 모두 무효화한다 (@CacheEvict(allEntries))
+// 필라멘트 쪽 목록을 모두 무효화한다 (@CacheEvict(allEntries)). 지출 목록도 — 구매 줄의 `등록 N` 이 스풀 수라서 (TBD-31)
 export function useRefreshFilaments() {
   const queryClient = useQueryClient()
-  return () => Promise.all(Object.values(keys).map((queryKey) => queryClient.invalidateQueries({ queryKey })))
+  return () =>
+    Promise.all(
+      [...Object.values(keys), expenseKeys.expenses].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    )
 }
 
 // 한 색상의 스풀 목록 (번호 순서). status 를 주면 그 상태만 — 스풀 선택 · 조정 창
+// 재고 추가 창의 `주문` 고르기: 이 색상을 산 지출 구매 줄 중 등록할 통이 남은 것, 최근 주문 먼저 (TBD-31)
+export interface ColorBuy {
+  id: number // 구매 줄 id → PurchaseInput.buy
+  expense: number
+  date: string
+  name: string // 지출 항목
+  qty: number // 산 통 수
+  spools: number // 이미 등록한 통 수
+  each: number // 통당 금액 (배송비 나눠 넣음)
+}
+export const useColorBuys = (color: number) =>
+  useQuery({ queryKey: [...keys.spools, 'buys', color], queryFn: () => api<ColorBuy[]>(`/colors/${color}/buys/`) })
+
 export const useSpools = (color: number, status?: SpoolStatus) =>
   useQuery({
     queryKey: [...keys.spools, { color, status }],
@@ -128,6 +154,7 @@ export interface PurchaseInput {
   purchased_at: string
   price?: number // 비우면 색상의 spool_price
   code_nos?: number[] // 쓰고 싶은 스풀 번호. 모자란 만큼은 자동
+  buy?: number // 주문(지출 구매 줄). 고르면 구매가 · 구매일은 주문에서, 수량은 남은 통까지
 }
 
 // 재고 추가 → 만든 스풀 목록 (번호 순서)
@@ -139,7 +166,7 @@ export const updateSpool = (id: number, patch: Partial<Omit<Spool, 'id' | 'code'
   send<Spool>('PATCH', `/spools/${id}/`, patch)
 
 // 지운 스풀 되살리기: 내용(code_no 포함)을 그대로 보내면 같은 코드로 다시 생김
-export const createSpool = (spool: Omit<Spool, 'id' | 'code'>) => send<Spool>('POST', '/spools/', spool)
+export const createSpool = (spool: Omit<Spool, 'id' | 'code' | 'buy'>) => send<Spool>('POST', '/spools/', spool)
 
 export const deleteSpool = (id: number) => send<null>('DELETE', `/spools/${id}/`)
 
