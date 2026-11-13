@@ -62,12 +62,45 @@ def shrink_image(file, max_px=LOGO_MAX_PX):
     return ContentFile(buffer.getvalue())
 
 
-class Brand(models.Model):
-    """필라멘트 회사 (Bambu Lab, Esun …)
+class ShrinkImageMixin(models.Model):
+    """이미지 칸 하나(`image_field`)를 올릴 때 `image_max_px` 이내로 줄여 저장하고,
+    바꾸거나 지우거나 행을 삭제하면 이전 파일도 지운다.
+    관리자 화면 · API 어디서 올려도 같게 동작하도록 모델에서 처리한다."""
 
-    대표 이미지(로고)는 올릴 때 256×256 이내로 줄여 저장하고, 바꾸거나 지우거나 회사를 삭제하면 이전 파일도 지운다.
-    관리자 화면 · API 어디서 올려도 같게 동작하도록 모델에서 처리한다.
-    """
+    image_field = ''
+    image_max_px = LOGO_MAX_PX
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        field = getattr(self, self.image_field)
+        old = None
+        if self.pk:
+            old = type(self).objects.filter(pk=self.pk).values_list(self.image_field, flat=True).first()
+        # 새로 올린 파일 (아직 저장소에 쓰이지 않음) 이면 줄여서 바꿔 넣는다
+        if field and not field._committed:
+            field.save(os.path.basename(field.name), shrink_image(field, self.image_max_px), save=False)
+        super().save(*args, **kwargs)
+        if old and old != field.name:
+            self._delete_file_after_commit(old)
+
+    def delete(self, *args, **kwargs):
+        name = getattr(self, self.image_field).name
+        result = super().delete(*args, **kwargs)  # 다른 데이터가 쓰고 있으면 여기서 ProtectedError → 파일은 그대로
+        if name:
+            self._delete_file_after_commit(name)
+        return result
+
+    def _delete_file_after_commit(self, name):
+        # DB 저장이 확정된 뒤에 지운다 (중간에 실패해서 되돌려지면 파일은 남아 있어야 하므로)
+        transaction.on_commit(partial(getattr(self, self.image_field).storage.delete, name))
+
+
+class Brand(ShrinkImageMixin):
+    """필라멘트 회사 (Bambu Lab, Esun …). 대표 이미지(로고)는 256×256 이내로 줄여 저장 (ShrinkImageMixin)"""
+
+    image_field = 'logo'
 
     name = models.CharField('이름', max_length=50, unique=True)
     logo = models.ImageField('대표 이미지', upload_to='brands/', blank=True, validators=LOGO_VALIDATORS)
@@ -79,26 +112,6 @@ class Brand(models.Model):
 
     def __str__(self):
         return self.name
-
-    def save(self, *args, **kwargs):
-        old_logo = Brand.objects.filter(pk=self.pk).values_list('logo', flat=True).first() if self.pk else None
-        # 새로 올린 파일 (아직 저장소에 쓰이지 않음) 이면 줄여서 바꿔 넣는다
-        if self.logo and not self.logo._committed:
-            self.logo.save(os.path.basename(self.logo.name), shrink_image(self.logo), save=False)
-        super().save(*args, **kwargs)
-        if old_logo and old_logo != self.logo.name:
-            self._delete_file_after_commit(old_logo)
-
-    def delete(self, *args, **kwargs):
-        logo = self.logo.name
-        result = super().delete(*args, **kwargs)  # 필라멘트가 있으면 여기서 ProtectedError → 파일은 그대로
-        if logo:
-            self._delete_file_after_commit(logo)
-        return result
-
-    def _delete_file_after_commit(self, name):
-        # DB 저장이 확정된 뒤에 지운다 (중간에 실패해서 되돌려지면 파일은 남아 있어야 하므로)
-        transaction.on_commit(partial(self.logo.storage.delete, name))
 
 
 class Material(models.Model):

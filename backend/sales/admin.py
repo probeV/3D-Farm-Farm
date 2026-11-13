@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Sale, SaleItem
+from .models import Sale, SaleItem, SalePack
 
 
 class SaleItemInline(admin.TabularInline):
@@ -9,10 +9,16 @@ class SaleItemInline(admin.TabularInline):
     autocomplete_fields = ['product']
 
 
+class SalePackInline(admin.TabularInline):
+    model = SalePack
+    extra = 0
+    autocomplete_fields = ['part']
+
+
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
     list_display = ['date', 'channel', 'order_no', 'shipping_received', 'fee']
     list_filter = ['channel']
     search_fields = ['order_no', 'note', 'items__product_name']
     date_hierarchy = 'date'
-    inlines = [SaleItemInline]
+    inlines = [SaleItemInline, SalePackInline]

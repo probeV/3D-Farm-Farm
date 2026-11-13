@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { CostSetting } from '../../api/products'
+import { usePackSets, useParts, useRefreshProducts, type CostSetting } from '../../api/products'
 import { createSale, deleteSale, updateSale, useRefreshSales, type Sale, type SaleChannel } from '../../api/sales'
 import Dialog from '../../components/Dialog'
 import Field from '../../components/Field'
@@ -12,6 +12,8 @@ import type { ProductRow } from '../products/list/productList'
 import { STATUS_LABEL, STATUSES } from '../products/status'
 import { CHANNELS } from './channels'
 import { autoFee, snapshotCost } from './saleList'
+import { addSet, packAmount, packInputs, packLine, savedPackLine, type PackLine } from './packLines'
+import SalePacks from './SalePacks'
 import { saleSchema } from './schemas'
 
 interface Props {
@@ -48,7 +50,12 @@ const n = (v: string) => Number(v.replace(/,/g, '')) || 0
 // 판매 추가 · 복제 · 수정 (SALE-02 · 03 · 04 · 05, docs/screens.md 판매)
 export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClose }: Props) {
   const refresh = useRefreshSales()
+  const refreshStock = useRefreshProducts() // 저장하면 부속품 · 포장재 남은 수량이 바뀜
   const toast = useToast()
+  const allParts = useParts().data ?? []
+  const packs = allParts.filter((p) => p.kind === 'pack')
+  const sets = usePackSets().data ?? []
+  const partById = new Map(allParts.map((p) => [p.id, p]))
   const confirm = useConfirm()
   const src = sale ?? copyOf
   const rowOf = (id: string) => rows.find((r) => String(r.product.id) === id)
@@ -78,6 +85,25 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
   })
   const lines = values.items as Line[]
 
+  // 포장 줄 (SALE-06): 수정은 저장된 줄 그대로, 복제는 지금 단가로, 새 판매는 첫 제품을 고르면 그 제품의 기본 포장으로 채움
+  const [packLines, setPackLines] = useState<PackLine[]>(() =>
+    sale
+      ? sale.packs.map(savedPackLine)
+      : (copyOf?.packs ?? []).map((p) => {
+          const x = p.part == null ? undefined : partById.get(p.part)
+          return x ? packLine(x, p.qty) : savedPackLine(p)
+        }),
+  )
+  // 포장 줄을 직접 고쳤거나 이미 채웠으면 자동으로 채우지 않는다
+  const [packAuto, setPackAuto] = useState(!src)
+  const [packFrom, setPackFrom] = useState('')
+  const changePacks = (next: PackLine[]) => {
+    setPackAuto(false)
+    setPackFrom('')
+    setPackLines(next)
+  }
+  const packCost = Math.round(packLines.reduce((a, l) => a + packAmount(l), 0))
+
   // 미리보기 계산 (저장 전)
   const picked = lines.filter((l) => l.product || l.product_name)
   const gross = picked.reduce((a, l) => a + n(l.qty) * n(l.unit_price), 0)
@@ -90,7 +116,7 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
   const fee = feeManual ? n(values.fee) : auto
   const settle = gross + shipping - fee
   const noCost = picked.some((l) => l.unit_cost == null)
-  const cost = picked.reduce((a, l) => a + n(l.qty) * (l.unit_cost ?? 0), 0)
+  const cost = picked.reduce((a, l) => a + n(l.qty) * (l.unit_cost ?? 0), 0) + packCost
   const profit = settle - cost - n(values.shipping_cost)
 
   const setLine = (i: number, patch: Partial<Line>) =>
@@ -107,14 +133,20 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
       unit_price: r?.product.sale_price != null ? String(r.product.sale_price) : '',
       unit_cost: r ? snapshotCost(r.cost) : null,
     })
+    // 새 판매에서 처음 고른 제품이면 그 제품의 기본 포장 세트로 포장 줄을 채운다
+    const set = r?.product.default_pack == null ? undefined : sets.find((x) => x.id === r.product.default_pack)
+    if (packAuto && i === 0) {
+      setPackLines(set ? addSet([], set, partById) : [])
+      setPackFrom(set ? set.name : r ? '없음' : '')
+    }
   }
 
   const save = () =>
     submit(async (data) => {
-      const body = { ...data, fee: feeManual ? data.fee : auto }
+      const body = { ...data, fee: feeManual ? data.fee : auto, packs: packInputs(packLines) }
       if (sale) await updateSale(sale.id, body)
       else await createSale(body)
-      await refresh()
+      await Promise.all([refresh(), refreshStock()])
       toast('저장했어요')
       onClose()
     })
@@ -207,7 +239,7 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
           <span className="num">단가</span>
           <span className="num">
             원가 (개당)
-            <Help tip="저장할 때 원가 계산표의 개당 원가를 복사해 둬요. 나중에 필라멘트 · 부자재 가격이 바뀌어도 이 판매는 그대로예요. 주문별 이익 참고용" />
+            <Help tip="저장할 때 원가 계산표의 개당 원가(포장 빼고)를 복사해 둬요. 나중에 필라멘트 · 부속품 가격이 바뀌어도 이 판매는 그대로예요. 주문별 이익 참고용" />
           </span>
           <span className="num">소계</span>
           <span />
@@ -304,6 +336,21 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
         </div>
       </div>
 
+      <SalePacks
+        lines={packLines}
+        packs={packs}
+        sets={sets}
+        note={
+          packFrom && packFrom !== '없음'
+            ? `첫 제품의 기본 포장(${packFrom})으로 채웠어요 · 묶음 포장이면 줄을 빼거나 세트를 더하세요`
+            : packFrom === '없음'
+              ? '첫 제품에 기본 포장이 없어요 — 세트를 고르거나 포장재를 추가하세요'
+              : packAuto
+                ? '제품을 고르면 기본 포장이 채워져요'
+                : ''
+        }
+        onChange={changePacks}
+      />
       <div className="sale-calc">
         <span>판매가 합계</span>
         <span className="v">{won(gross)}</span>
@@ -360,7 +407,11 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
         <span className="v">{won(settle)}</span>
         <span>
           − 원가 합계
-          <small>{noCost ? '원가 없는 제품이 있어요 — 제품 원가 화면에서 채우세요' : '줄마다 개당 원가 × 수량'}</small>
+          <small>
+            {noCost
+              ? '원가 없는 제품이 있어요 — 제품 원가 화면에서 채우세요'
+              : `제품 개당 원가 × 수량 + 포장비 ${won(packCost)}`}
+          </small>
         </span>
         <span className="v">{noCost ? '-' : won(cost)}</span>
         <span>

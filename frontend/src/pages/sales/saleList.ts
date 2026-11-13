@@ -162,5 +162,7 @@ export function salesCsv(rows: Sale[]) {
 // 판매할 때 복사하는 개당 원가: 원가 계산표 값을 원 단위로. 원가에 필요한 입력(가격 · 사용량 · 출력 시간)이
 // 덜 됐으면 null (원가 없음). 판매가 미입력은 원가와 상관없어서 따지지 않는다
 export function snapshotCost(cost: Cost) {
-  return cost.warnings.some((w) => w !== '판매가 미입력') ? null : Math.round(cost.cost)
+  // 포장은 주문의 포장 줄로 따로 (SALE-06) → 포장비 · 포장 경고는 빼고
+  const missing = cost.warnings.filter((w) => w !== '판매가 미입력' && !cost.packWarnings.includes(w))
+  return missing.length ? null : Math.round(cost.cost - cost.pack)
 }

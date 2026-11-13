@@ -10,6 +10,7 @@ const cost = (c: Partial<Cost> = {}): Cost => ({
   filament: 100,
   electricity: 0,
   parts: 0,
+  pack: 0,
   cost: 100,
   feeRate: 0,
   fee: 0,
@@ -17,6 +18,7 @@ const cost = (c: Partial<Cost> = {}): Cost => ({
   margin: 0.9,
   recommended: 200,
   warnings: [],
+  packWarnings: [],
   ...c,
 })
 
@@ -29,6 +31,7 @@ const product = (p: Partial<Product>): Product => ({
   status: 'on_sale',
   print_minutes: 60,
   sale_price: 1000,
+  default_pack: null,
   note: '',
   filaments: [],
   parts: [],

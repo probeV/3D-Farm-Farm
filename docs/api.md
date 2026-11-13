@@ -3,7 +3,7 @@
 > 요구사항: [PRD.md](PRD.md) · 데이터 구조: [ERD.md](ERD.md) · 코드 구조: [architecture.md](architecture.md)
 
 화면(React)과 서버(Django REST Framework)가 주고받는 JSON API.
-개발 중에는 Vite 개발 서버가 `/api` 요청을 Django 로 넘긴다. 브라우저로 `http://127.0.0.1:8000/api/v0/` 를 열면 목록을 직접 볼 수 있다 (제품 쪽 주소는 이 목록에 안 나오므로 `/api/v0/products/` 처럼 직접 연다).
+개발 중에는 Vite 개발 서버가 `/api` 요청을 Django 로 넘긴다. 브라우저로 `http://127.0.0.1:8000/api/v0/` 를 열면 목록을 직접 볼 수 있다 (재고 · 제품 · 지출 · 판매 쪽 주소는 이 목록에 안 나오므로 `/api/v0/parts/` 처럼 직접 연다).
 
 ## 공통 규칙
 | 항목 | 규칙 |
@@ -52,11 +52,16 @@
 | GET · PATCH · DELETE | `/api/v0/categories/{id}/` | 카테고리 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/subcategories/` | 세부 분류 목록 / 추가 |
 | GET · PATCH · DELETE | `/api/v0/subcategories/{id}/` | 세부 분류 하나 / 수정 / 삭제 |
-| GET · POST | `/api/v0/part-categories/` | 부자재 카테고리 목록 / 추가 |
-| GET · PATCH · DELETE | `/api/v0/part-categories/{id}/` | 부자재 카테고리 하나 / 수정 / 삭제 |
-| GET · POST | `/api/v0/parts/` | 부자재 목록 / 추가 |
-| GET · PATCH · DELETE | `/api/v0/parts/{id}/` | 부자재 하나 / 수정 / 삭제 |
-| POST | `/api/v0/parts/{id}/replace/` | 제품의 부자재 바꾸기 (이 부자재 → 다른 부자재) |
+| GET · POST | `/api/v0/part-categories/` | 품목 카테고리 목록(`?kind=`) / 추가 |
+| GET · PATCH · DELETE | `/api/v0/part-categories/{id}/` | 품목 카테고리 하나 / 수정 / 삭제 |
+| GET · POST | `/api/v0/parts/` | **재고 품목 전부** (부속품 · 포장재 · 소모품, `?kind=`) / 추가 |
+| GET · PATCH · DELETE | `/api/v0/parts/{id}/` | 품목 하나 / 수정 / 삭제 |
+| POST | `/api/v0/parts/{id}/adjust/` | 남은 수량 조정 (맞추기 · 빼기 · 더하기) |
+| POST | `/api/v0/parts/{id}/use/` | 소모품 1개 다 씀 |
+| GET | `/api/v0/parts/{id}/history/` | 입출고 기록 |
+| POST | `/api/v0/parts/{id}/replace/` | 제품의 부속품 바꾸기 (이 부속품 → 다른 부속품) |
+| GET · POST | `/api/v0/pack-sets/` | 포장 세트 목록 / 추가 |
+| GET · PATCH · DELETE | `/api/v0/pack-sets/{id}/` | 포장 세트 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/products/` | **제품 원가 화면의 제품 데이터 전부** / 제품 추가 |
 | GET · PATCH · DELETE | `/api/v0/products/{id}/` | 제품 하나 / 수정 / 삭제 |
 | GET · PATCH | `/api/v0/cost-setting/` | 원가 설정 (항상 1개) |
@@ -64,7 +69,7 @@
 | GET · PATCH · DELETE | `/api/v0/expenses/{id}/` | 지출 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/recurring-expenses/` | 반복 지출 목록 / 추가 |
 | GET · PATCH · DELETE | `/api/v0/recurring-expenses/{id}/` | 반복 지출 하나 / 수정 / 삭제 |
-| GET · POST | `/api/v0/sales/` | **판매 화면 데이터 전부** (제품 줄 · 합계 포함) / 판매 추가 |
+| GET · POST | `/api/v0/sales/` | **판매 화면 데이터 전부** (제품 줄 · 포장 줄 · 합계 포함) / 판매 추가 |
 | GET · PATCH · DELETE | `/api/v0/sales/{id}/` | 판매 하나 / 수정 / 삭제 |
 
 ---
@@ -219,9 +224,120 @@
 
 ---
 
+# 재고 관리 (v2 STOCK)
+
+재고 관리 화면의 부속품 · 포장 · 소모품 탭은 **품목 목록(`/parts/`) + 카테고리 + 포장 세트 + 제품 목록** 으로 그린다 (필라멘트 탭은 위 필라멘트 API).
+탭별 카드 · 표 · 부족 알림 · 남은 금액 · 세트 원가 · 바로 쌀 수 있는 수는 화면에서 계산한다.
+남은 수량은 **처음 등록 · 조정 · 다 씀 · 판매 저장**(그리고 TBD-31 의 지출 구매)에서만 바뀌고, 바뀔 때마다 입출고 기록이 한 줄 남는다.
+
+## 재고 품목 `parts`
+```json
+{
+  "id": 1, "kind": "part", "name": "네오디뮴 자석 6×3mm", "category": 1,
+  "photo": "/media/parts/magnet.png", "shop": "알리", "buy_url": "https://…",
+  "price": 12000, "pack_qty": 200, "unit": "개", "unit_price": 60.0,
+  "stock": 1240, "alert": 200, "note": "N52",
+  "product_count": 2, "set_count": 0, "last_used": null
+}
+```
+| 칸 | 쓰기 | 설명 |
+|---|---|---|
+| `kind` | 추가할 때만 | 탭 `part`(부속품, 기본) · `pack`(포장재) · `supply`(소모품). 수정에서 바꾸면 400 `종류는 바꿀 수 없습니다.` |
+| `name` | ✅ 필수 | 품목. 탭이 달라도 중복 불가 → 400 `이미 있는 품목입니다.` |
+| `category` | 선택 | 같은 탭의 카테고리 id. 다른 탭 것이면 400 `같은 탭의 카테고리를 고르세요.` `null` = 미분류 |
+| `photo` | 선택 | 사진. 회사 로고와 같은 방식 — multipart 로 파일, JSON `null` 로 지우기. 512×512 안으로 줄여 저장 |
+| `shop` · `note` | 선택 | 회사/구매처, 메모 |
+| `buy_url` | 선택 | 구매 링크 (최대 500자). 주소 형식이 아니면 400 `https:// 로 시작하는 주소로 입력하세요.` |
+| `price` | 선택 | 묶음 구매가. `null` = 미입력 (원가에서 0원 + 경고). 소모품은 참고용 (원가에 안 씀) |
+| `pack_qty` | 선택 | 묶음 수량, 기본 1. 0 보다 커야 함 |
+| `unit` | 선택 | 단위, 기본 `개` |
+| `stock` | 추가할 때만 | 지금 남은 수량, 기본 0 (소수 2자리). 0 이 아니면 입출고 기록 `조정 · 처음 수량`. 그 뒤로는 조정 · 다 씀으로만 — 수정에서 보내면 400 `남은 수량은 조정으로 바꾸세요.` 0 아래도 될 수 있다 (판매를 먼저 넣었을 때) |
+| `alert` | 선택 | 부족 알림 기준, 기본 0. 남은 수량 ≤ 이 값이면 `부족`, ≤ 0 이면 `없음` (화면에서 계산) |
+| `unit_price` | — | 개당 단가 = `price ÷ pack_qty` (소수 2자리). 가격이 없으면 `null` |
+| `product_count` · `set_count` | — | 이 품목을 쓰는 제품 수 (부속품) · 포장 세트 수 (포장재) |
+| `last_used` | — | 마지막으로 `다 씀` 한 날 (소모품). 없으면 `null` |
+
+- 목록: `?kind=part` 처럼 탭 하나만 (없는 값이면 400). 없으면 전부. 순서: 품목 이름순
+- 삭제: 제품에서 쓰면 409 `제품에서 쓰고 있어서 삭제할 수 없습니다.` · 포장 세트에서 쓰면 409 `포장 세트에서 쓰고 있어서 삭제할 수 없습니다.`
+  입출고 기록은 함께 삭제. 지난 판매의 포장 줄은 남는다 (팔 때 이름 · 단가)
+
+### 조정 `POST /api/v0/parts/{id}/adjust/`
+```json
+{ "mode": "set", "qty": 64, "note": "재고 실사" }
+```
+- `mode`: `set` 실제 수량으로 맞추기 · `sub` 빼기 · `add` 더하기. 그 밖이면 400 `맞추기 · 빼기 · 더하기 중에서 고르세요.`
+- `qty`: 0 이상 (빼기 · 더하기는 0 보다 커야 함 → 400 `0 보다 큰 수량을 넣으세요.`). `note`: 사유 (선택, 180자)
+- 응답 200: 바뀐 품목 (위와 같은 모양). 맞추기로 같은 수량이면 기록을 남기지 않는다
+
+### 다 씀 `POST /api/v0/parts/{id}/use/`
+```json
+{ "note": "막힘" }
+```
+- 소모품만 (아니면 400 `소모품만 다 씀으로 뺄 수 있습니다.`). 남은 수량 −1, 기록 `다 씀` (사유가 있으면 `다 씀 (막힘)`)
+- 응답 200: 바뀐 품목 (`last_used` 가 오늘)
+
+### 입출고 기록 `GET /api/v0/parts/{id}/history/`
+```json
+[
+  { "id": 9, "date": "2026-11-10", "kind": "sale", "qty": -1, "after": 8, "note": "판매 · USB 무드등", "sale": 31, "created_at": "…" },
+  { "id": 4, "date": "2026-11-02", "kind": "adjust", "qty": -3, "after": 9, "note": "찌그러져서 버림", "sale": null, "created_at": "…" }
+]
+```
+- `kind`: `buy`(지출, TBD-31) · `sale`(판매) · `use`(다 씀) · `adjust`(조정 · 처음 수량). `qty` 는 늘면 +, 줄면 −. `after` = 그 뒤 남은 수량
+- 순서: 날짜 최근순 (같은 날이면 나중에 넣은 것 먼저). 판매를 지우면 그 판매의 기록은 `sale: null` 이 되고 되돌리는 기록 `판매 삭제 · …` 이 더해진다
+
+### 제품의 부속품 바꾸기 `POST /api/v0/parts/{id}/replace/`
+```json
+{ "to": 9, "products": [1, 3] }
+```
+- 제품에서 쓰는 이 부속품 줄을 `to` 로 바꾼다. `products` 를 빼면 이 부속품을 쓰는 제품 전부.
+  주소는 `/parts/` 아래지만 제품의 줄을 바꾸는 동작이라 `products` 앱의 뷰
+- 수량은 그대로. 그 제품에 이미 `to` 줄이 있으면 수량을 더해 한 줄로
+- 한 번에 처리 (하나라도 실패하면 아무것도 바꾸지 않음). 부속품 자체는 지우거나 바꾸지 않는다
+- 응답 200 `{"replaced": 2}` (바꾼 제품 수)
+- 400: `to` 가 자기 자신 `다른 부자재를 고르세요.` · 없는 id `없는 부자재입니다.` · 부속품이 아님 `부속품만 고를 수 있습니다.` / `products` 에 이 부자재를 안 쓰는 제품 `이 부자재를 쓰는 제품을 고르세요.`
+
+## 품목 카테고리 `part-categories`
+```json
+{ "id": 1, "kind": "part", "name": "부품", "part_count": 4 }
+```
+- `kind` 추가할 때만 (기본 `part`, 바꾸면 400 `종류는 바꿀 수 없습니다.`). `name` 필수, 같은 탭 안에서 중복 → 400 `이미 있는 카테고리 이름입니다.` (다른 탭엔 같은 이름 가능)
+- `part_count` 는 이 카테고리의 품목 수. 목록: `?kind=` 로 탭 하나만. 순서: 탭 · 이름순
+- 삭제: 막는 것 없음 (204). 그 품목은 `category: null`(미분류)
+- 처음에는 부속품 `부품` · `기타`, 포장재 `포장재` (v1.1 마이그레이션이 만들고 v2 에서 `포장재` 를 포장 탭으로 옮김)
+
+## 포장 세트 `pack-sets`
+```json
+{
+  "id": 1, "name": "봉투 포장", "note": "키링 · 작은 소품",
+  "lines": [{ "id": 1, "part": 3, "qty": 1 }, { "id": 2, "part": 7, "qty": 1 }],
+  "product_count": 3
+}
+```
+| 칸 | 쓰기 | 설명 |
+|---|---|---|
+| `name` | ✅ 필수 | 세트 이름. 중복 → 400 `이미 있는 세트 이름입니다.` |
+| `note` | 선택 | 비고 |
+| `lines` | ✅ 필수 | 들어가는 포장재 `{part, qty}`. 비어 있으면 400 `포장재를 한 개 이상 넣으세요.` 포장재가 아니면 `포장재만 고를 수 있습니다.` `qty` 0 보다 큼 (소수 2자리). 같은 포장재 줄은 수량을 합쳐 한 줄로 |
+| `product_count` | — | 이 세트를 기본 포장으로 쓰는 제품 수 |
+
+- 줄 저장은 제품 줄과 같다 — 보내면 통째로 바꾸고(줄 `id` 가 바뀜), 안 보내면 그대로
+- 삭제: 기본 포장으로 쓰는 제품이 있으면 409 `기본 포장으로 쓰는 제품이 있어서 삭제할 수 없습니다.` 지난 판매의 포장 줄은 세트와 상관없음 (줄마다 복사)
+- 세트를 고치면 기본 포장인 제품의 원가가 바로 바뀐다 (원가는 화면이 계산). 목록 순서: 이름순
+
+### 화면에서 계산하는 값 (참고)
+```
+세트 원가           = Σ lines.qty × 품목.unit_price           (가격 없는 포장재는 0 + 경고)
+바로 쌀 수 있는 수   = min( ⌊max(0, 품목.stock) ÷ lines.qty⌋ )   (가장 모자란 포장재 기준)
+남은 금액           = Σ max(0, stock) × unit_price
+상태               = stock ≤ 0 → 없음, stock ≤ alert → 부족
+```
+
+---
+
 # 제품 원가
 
-제품 원가 화면은 **제품 목록 + 필라멘트 목록(`/filaments/`) + 부자재 목록 + 원가 설정** 으로 그린다.
+제품 원가 화면은 **제품 목록 + 필라멘트 목록(`/filaments/`) + 재고 품목 목록(`/parts/`) + 포장 세트(`/pack-sets/`) + 원가 설정** 으로 그린다.
 원가 · 순이익 · 순마진율 · 권장 판매가 · 입력 필요 · 요약 · 정렬 · CSV 는 화면에서 계산한다 (PRD 3.6 원가 계산 규칙).
 입력 중 미리보기(PRD-07)도 같은 계산을 쓰므로 서버에 따로 두지 않는다.
 
@@ -253,55 +369,13 @@
 
 - 삭제: 제품이 있으면 409 `제품이 있어서 삭제할 수 없습니다.`
 
-## 부자재 `parts`
-```json
-{
-  "id": 1, "name": "네오디뮴 자석 6×3mm", "category": 1, "shop": "", "buy_url": "https://…",
-  "price": 12000, "pack_qty": 200, "unit": "개",
-  "unit_price": 60.0, "note": "", "product_count": 2
-}
-```
-| 칸 | 쓰기 | 설명 |
-|---|---|---|
-| `name` | ✅ 필수 | 품목. 중복 불가 → 400 `이미 있는 품목입니다.` |
-| `category` | 선택 | 부자재 카테고리 id. `null` = 미분류 |
-| `shop` · `note` | 선택 | 회사/구매처, 메모 |
-| `buy_url` | 선택 | 구매 링크 (최대 500자). 주소 형식이 아니면 400 `https:// 로 시작하는 주소로 입력하세요.` |
-| `price` | 선택 | 묶음 구매가. `null` = 미입력 (원가에서 0원 + 경고) |
-| `pack_qty` | 선택 | 묶음 수량, 기본 1. 0 보다 커야 함 |
-| `unit` | 선택 | 단위, 기본 `개` |
-| `unit_price` | — | 개당 단가 = `price ÷ pack_qty` (소수 2자리). 가격이 없으면 `null` |
-| `product_count` | — | 이 부자재를 쓰는 제품 수 |
-
-- 삭제: 제품에서 쓰면 409 `제품에서 쓰고 있어서 삭제할 수 없습니다.`
-- 목록 순서: 품목 이름순
-- 부자재 화면의 사용하는 제품 목록 · 제품당 평균 부자재비는 제품 목록(`/products/`)의 `parts` 줄로 화면에서 계산한다
-
-### 제품의 부자재 바꾸기 `POST /api/v0/parts/{id}/replace/`
-```json
-{ "to": 9, "products": [1, 3] }
-```
-- 제품에서 쓰는 이 부자재 줄을 `to` 로 바꾼다. `products` 를 빼면 이 부자재를 쓰는 제품 전부
-- 수량은 그대로. 그 제품에 이미 `to` 줄이 있으면 수량을 더해 한 줄로
-- 한 번에 처리 (하나라도 실패하면 아무것도 바꾸지 않음). 부자재 자체는 지우거나 바꾸지 않는다
-- 응답 200 `{"replaced": 2}` (바꾼 제품 수)
-- 400: `to` 가 자기 자신 `다른 부자재를 고르세요.` · 없는 id `없는 부자재입니다.` / `products` 에 이 부자재를 안 쓰는 제품 `이 부자재를 쓰는 제품을 고르세요.`
-
-## 부자재 카테고리 `part-categories`
-```json
-{ "id": 1, "name": "부품", "part_count": 4 }
-```
-- `name` 필수, 중복 → 400 `이미 있는 카테고리 이름입니다.`. `part_count` 는 이 카테고리의 부자재 수
-- 삭제: 막는 것 없음 (204). 그 부자재는 `category: null`(미분류)
-- 처음에는 `부품` · `포장재` · `기타` (마이그레이션이 만든다). 목록 순서: 이름순
-
 ## 제품 `products`
 ```json
 {
   "id": 1, "no": 1,
   "category": 1, "subcategory": 1,
   "name": "분수 원판 세트", "status": "on_sale",
-  "print_minutes": 200, "sale_price": 18900, "note": "",
+  "print_minutes": 200, "sale_price": 18900, "default_pack": 1, "note": "",
   "filaments": [
     { "id": 1, "filament": 1, "color": 101, "grams": 24.37 },
     { "id": 2, "filament": 4, "color": null, "grams": 60 }
@@ -320,7 +394,8 @@
 | `sale_price` | 선택 | 판매가. `null` = 미입력 |
 | `note` | 선택 | 메모 |
 | `filaments` | 선택 | 사용 필라멘트 줄 `{filament, color, grams}`. `color` 는 선택(`null`), 그 필라멘트의 색상만 → 400 (`filaments[i].color`). `grams` 0 이상, 소수 2자리까지 |
-| `parts` | 선택 | 사용 부자재 줄 `{part, qty}`. `qty` 0 이상 |
+| `default_pack` | 선택 | 기본 포장 세트 id (1개 보낼 때, STOCK-06). `null` = 입력 필요. 없는 id → 400 `없는 포장 세트입니다.` |
+| `parts` | 선택 | 사용 부속품 줄 `{part, qty}`. `qty` 0 이상. 부속품(`kind: part`)만 → 아니면 400 `부속품만 고를 수 있습니다.` (포장은 `default_pack`) |
 
 - **줄 저장**: `filaments` · `parts` 를 보내면 그 목록으로 통째로 바꾼다 (기존 줄을 지우고 새로 만들어서 줄 `id` 가 바뀐다).
   보내지 않으면 줄은 그대로 (`PATCH {"status": "discontinued"}` 처럼). 하나라도 틀리면 400, 아무것도 바뀌지 않음
@@ -332,7 +407,8 @@
 ```
 줄의 g당 가격 = (색상.price ?? 필라멘트.price) ÷ 필라멘트.spool_g      ← color 가 null 이면 필라멘트.price
              (색상.spool_price · price_per_g 가 이미 이 값. /filaments/ 의 colors 에 있음)
-부자재비      = Σ qty × 부자재.unit_price
+부속품비      = Σ qty × 품목.unit_price
+포장비        = default_pack 세트 원가 (위 "포장 세트")
 그 밖 원가 · 순이익 · 순마진율 · 권장 판매가 = PRD 3.6 원가 계산 규칙 (설정값은 cost-setting)
 목록 색상     = filaments[].color 를 중복 없이 → 색상의 hex 로 동그라미
 ```
@@ -407,8 +483,9 @@
     { "id": 41, "product": 1, "product_name": "분수 원판 세트", "qty": 2, "unit_price": 18900, "unit_cost": 3227, "amount": 37800 },
     { "id": 42, "product": 4, "product_name": "이름 키링", "qty": 1, "unit_price": 4900, "unit_cost": 191, "amount": 4900 }
   ],
+  "packs": [{ "id": 7, "part": 3, "part_name": "OPP 봉투 15×20", "qty": 1, "unit_price": 17.8, "amount": 17.8 }],
   "shipping_received": 0, "fee": 2011, "shipping_cost": 3300, "note": "",
-  "gross": 42700, "settle": 40689, "cost": 6645, "profit": 30744,
+  "gross": 42700, "settle": 40689, "pack_cost": 18, "cost": 6663, "profit": 30726,
   "created_at": "2026-10-23T05:12:00Z"
 }
 ```
@@ -422,17 +499,23 @@
 | `items[].product_name` | 선택 | 팔 때의 제품명. 비우면 제품 이름을 복사. 수정할 때는 받은 이름을 그대로 보내면 팔 때 이름이 유지된다 |
 | `items[].qty` | ✅ 필수 | 수량, 1 이상 정수 |
 | `items[].unit_price` | ✅ 필수 | 단가 (0 이상 정수). 화면이 제품 판매가를 기본값으로 |
-| `items[].unit_cost` | 선택 | 개당 원가 (SALE-05). 화면이 저장할 때 원가 계산표 값을 원 단위로 반올림해서 보낸다. `null` = 원가 없음 |
+| `items[].unit_cost` | 선택 | 개당 원가 (SALE-05, **포장 빼고**). 화면이 저장할 때 원가 계산표 값을 원 단위로 반올림해서 보낸다. `null` = 원가 없음 |
+| `packs` | 선택 | 주문의 포장 줄 `{part, part_name, qty, unit_price}` (SALE-06). 추가할 때 안 보내면 포장 없음 (직접 전달) |
+| `packs[].part` | 선택 | 포장재 id (`kind: pack` 만 → 아니면 400 `포장재만 고를 수 있습니다.`). 포장재를 지운 줄이면 `null` + `part_name` (둘 다 없으면 400 `포장재를 고르세요.`) |
+| `packs[].qty` | ✅ 필수 | 수량, 0 보다 큼 (소수 2자리) |
+| `packs[].unit_price` | 선택 | 개당 단가 (소수 2자리). **보내지 않으면 포장재의 지금 단가를 복사**. 수정할 때는 받은 값을 그대로 보내면 팔 때 단가 유지. `null` = 구매가 없음 (0원으로 계산) |
 | `shipping_received` | 선택 | 손님이 낸 배송비, 기본 0 |
 | `fee` | 선택 | 수수료. **추가할 때 보내지 않으면** 스마트스토어는 자동 계산(아래), 직접 판매 · 기타는 0. 보내면 그 값 그대로 (고친 수수료) |
 | `shipping_cost` | 선택 | 판매자가 낸 택배비 (주문별 이익 참고용), 기본 0. 화면이 설정의 SET-08 을 기본값으로 |
 | `note` | 선택 | 메모 |
-| `items[].amount` · `gross` · `settle` · `cost` · `profit` | — | 판매가(단가 × 수량) · 판매가 합계 · 정산 금액 · 원가 합계 · 주문별 이익. 원가 없는 줄이 있으면 `cost` · `profit` 은 `null` |
+| `items[].amount` · `packs[].amount` · `gross` · `settle` · `pack_cost` · `cost` · `profit` | — | 판매가(단가 × 수량) · 포장 금액 · 판매가 합계 · 정산 금액 · 포장비 · 원가 합계(제품 + 포장) · 주문별 이익. 원가 없는 제품 줄이 있으면 `cost` · `profit` 은 `null` |
 
-- **줄 저장**: `items` 를 보내면 그 목록으로 통째로 바꾼다 (줄 `id` 가 바뀐다). 보내지 않으면 줄은 그대로 (`PATCH {"note": "..."}`).
+- **줄 저장**: `items` · `packs` 를 보내면 그 목록으로 통째로 바꾼다 (줄 `id` 가 바뀐다). 보내지 않으면 줄은 그대로 (`PATCH {"note": "..."}`).
   하나라도 틀리면 400, 아무것도 바뀌지 않음
+- **재고 빼기** (STOCK-04): 추가하거나 `items` · `packs` 를 보내면 부속품(제품의 사용 부속품 × 수량)과 포장재(포장 줄)를 남은 수량에서 뺀다.
+  이미 이 판매로 뺀 만큼과 비교해 **차이만** 기록한다 (입출고 기록 `판매 · 이름 키링 외 1`, 날짜는 판매 날짜). 남은 수량이 모자라도 막지 않는다
 - **수수료는 수정할 때 다시 계산하지 않는다** — 화면이 판매가 · 배송비를 바꾸면 새 수수료를 함께 보낸다 (`다시 계산`)
-- 삭제: 줄도 함께 삭제 (204)
+- 삭제: 줄도 함께 삭제 (204). 이 판매로 뺀 부속품 · 포장재는 되돌린다 (기록 `판매 삭제 · …`)
 - 목록 순서: 날짜 최근순 (같은 날이면 나중에 넣은 것 먼저)
 
 ### 계산 (참고)
@@ -440,5 +523,7 @@
 판매가 합계 gross   = Σ items.unit_price × qty
 수수료 (자동)       = (gross + shipping_received) × (원가 설정 fee_order + fee_sales)%, 원 단위 반올림
 정산 금액 settle    = gross + shipping_received − fee
-주문별 이익 profit  = settle − Σ items.unit_cost × qty − shipping_cost   (원가 없는 줄이 있으면 null)
+포장비 pack_cost    = Σ packs.unit_price × qty, 원 단위 반올림   (단가 없는 줄은 0)
+원가 cost           = Σ items.unit_cost × qty + pack_cost         (원가 없는 제품 줄이 있으면 null)
+주문별 이익 profit  = settle − cost − shipping_cost
 ```

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Part, PartCategory } from '../../api/products'
+import type { Part, PartCategory, PartKind } from '../../api/products'
 import Dialog from '../../components/Dialog'
 import ManageColumn from '../../components/ManageColumn'
 import { unitWon } from '../../format'
@@ -7,6 +7,7 @@ import BuyLink from './BuyLink'
 import PartCategoryDialog from './PartCategoryDialog'
 import PartDialog from './PartDialog'
 import { inCategory, inShop, shopsOf, type CategorySel, type ShopSel } from './partList'
+import { KIND_LABEL } from './kinds'
 import { usePartsData } from './usePartsData'
 import EditButton, { CopyButton } from '../../components/EditButton'
 
@@ -17,8 +18,9 @@ type View = 'shop' | 'category'
 // 부자재 관리 (PART-02 · PART-02a, docs/screens.md 3.4)
 // 제목 줄 오른쪽에서 구매처별 / 카테고리별. 왼쪽: 구매처(+ 구매처 없음) 또는 카테고리(+ 미분류, 추가 · 수정)
 // 오른쪽: 고른 것의 부자재 (처음엔 전체). 고른 것을 다시 누르면 전체로 (제품 관리 창과 같음). 부자재 추가 · 복제는 여기서
-export default function ManageDialog({ onClose }: { onClose: () => void }) {
-  const data = usePartsData().data
+export default function ManageDialog({ kind, onClose }: { kind: PartKind; onClose: () => void }) {
+  const data = usePartsData(kind).data
+  const L = KIND_LABEL[kind]
 
   const [view, setView] = useState<View>('shop')
   const [picked, setPicked] = useState<ShopSel>('')
@@ -66,7 +68,9 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
     >
       <div className="grow">
         <strong>{label}</strong>
-        <small>부자재 {parts.filter((p) => inCategory(p, s)).length}개</small>
+        <small>
+          {L} {parts.filter((p) => inCategory(p, s)).length}개
+        </small>
       </div>
       {category && (
         <EditButton
@@ -78,6 +82,14 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
       )}
     </div>
   )
+
+  // 품목 줄 아래 설명: 부속품은 쓰는 제품 수, 포장재는 쓰는 세트 수, 소모품은 남은 수량
+  const usedText = (p: Part) =>
+    kind === 'part'
+      ? `제품 ${p.product_count}개에서 사용`
+      : kind === 'pack'
+        ? `세트 ${p.set_count}개에서 사용`
+        : `남은 수량 ${p.stock.toLocaleString('ko-KR')}${p.unit}`
 
   const tabs = (
     <div className="view-tabs">
@@ -97,14 +109,16 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
     >
       <div className="grow">
         <strong>{label}</strong>
-        <small>부자재 {parts.filter((p) => inShop(p, s)).length}개</small>
+        <small>
+          {L} {parts.filter((p) => inShop(p, s)).length}개
+        </small>
       </div>
     </div>
   )
 
   return (
     <>
-      <Dialog size="wide" fixed title="부자재 관리" headExtra={tabs} onClose={onClose}>
+      <Dialog size="wide" fixed title={`${L} 관리`} headExtra={tabs} onClose={onClose}>
         <div className="manage parts-manage">
           {view === 'shop' ? (
             <ManageColumn title="구매처" count={shops.length}>
@@ -128,9 +142,9 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
           )}
           <ManageColumn
             className="manage-right"
-            title={selName ? `${selName} 의 부자재` : '전체 부자재'}
+            title={selName ? `${selName} 의 ${L}` : `전체 ${L}`}
             count={list.length}
-            addLabel="+ 부자재 추가"
+            addLabel={`+ ${L} 추가`}
             onAdd={() => setSub({ kind: 'part', part: null })}
           >
             {list.length ? (
@@ -141,7 +155,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                     <BuyLink part={p} />
                     <div className="hint">
                       {view === 'shop' ? `${categoryName(p.category) ?? '미분류'} · ` : `${p.shop || '구매처 없음'} · `}
-                      제품 {p.product_count}개에서 사용
+                      {usedText(p)}
                     </div>
                   </div>
                   <div className="price">
@@ -161,7 +175,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
                 </div>
               ))
             ) : (
-              <p className="hint">등록된 부자재가 없어요.</p>
+              <p className="hint">{L} 없음</p>
             )}
           </ManageColumn>
         </div>
@@ -170,6 +184,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
       {/* 겹쳐 여는 창은 관리 창 안이 아니라 옆에 그린다 (form 안에 form 이 들어가지 않도록) */}
       {sub?.kind === 'part' && (
         <PartDialog
+          kind={kind}
           part={sub.part}
           copyOf={sub.copyOf}
           shop={view === 'shop' && sel.startsWith('s:') ? sel.slice(2) : undefined}
@@ -182,6 +197,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
       )}
       {sub?.kind === 'category' && (
         <PartCategoryDialog
+          kind={kind}
           category={sub.category}
           parts={parts}
           onClose={closeSub}

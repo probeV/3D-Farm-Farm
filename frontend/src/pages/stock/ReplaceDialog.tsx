@@ -37,14 +37,14 @@ export default function ReplaceDialog({ parts, usagesOf, onClose }: Props) {
     if (!from || !to) return
     const targets = all ? users : picked
     const ok = await confirm({
-      title: '부자재 바꾸기',
+      title: '부속품 바꾸기',
       message: `${from.name} → ${to.name} 로 바꿀까요?`,
       twice: true,
       okLabel: '바꾸기',
       againLabel: '정말 바꾸기',
       effects: [
         {
-          title: `제품 ${targets.length}개의 부자재가 바뀌어요`,
+          title: `제품 ${targets.length}개의 부속품이 바뀌어요`,
           details: [targets.map((u) => u.name).join(' · '), '원가가 바로 다시 계산돼요.'],
         },
       ],
@@ -68,7 +68,7 @@ export default function ReplaceDialog({ parts, usagesOf, onClose }: Props) {
   return (
     <Dialog
       size="wide"
-      title="제품의 부자재 바꾸기"
+      title="제품의 부속품 바꾸기"
       onClose={onClose}
       submitLabel={`전부 바꾸기${from ? ` (${users.length}개)` : ''}`}
       onSubmit={() => run(true)}
@@ -86,11 +86,11 @@ export default function ReplaceDialog({ parts, usagesOf, onClose }: Props) {
       }
     >
       <p className="hint" style={{ margin: '0 0 12px' }}>
-        제품에서 쓰는 부자재를 다른 부자재로 한 번에 바꿔요. 부자재 자체는 지워지거나 바뀌지 않아요.
+        제품에서 쓰는 부속품을 다른 부속품으로 한 번에 바꿔요. 부속품 자체는 지워지거나 바뀌지 않아요.
       </p>
       <div className="form-grid">
         <label className="field">
-          <span>지금 쓰는 부자재 *</span>
+          <span>지금 쓰는 부속품 *</span>
           <select
             value={fromId}
             data-autofocus
@@ -111,7 +111,7 @@ export default function ReplaceDialog({ parts, usagesOf, onClose }: Props) {
           </select>
         </label>
         <label className="field">
-          <span>바꿀 부자재 *</span>
+          <span>바꿀 부속품 *</span>
           <select value={to ? toId : ''} disabled={!from} onChange={(e) => setToId(e.target.value)}>
             <option value="">고르세요</option>
             {parts

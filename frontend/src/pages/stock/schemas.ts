@@ -17,8 +17,20 @@ export const partSchema = z.object({
   price: money,
   pack_qty: decimal(0.01, 99_999_999.99, 2),
   unit: text(10, false).transform((v) => v || '개'), // 비우면 기본 단위
+  // v2 STOCK: 부족 알림 기준 · 처음 수량 (추가할 때만 보냄). 소수 2자리, 0 이상
+  alert: decimal(0, 9_999_999_999.99, 2),
+  stock: decimal(0, 9_999_999_999.99, 2),
   note: z.string().trim(),
 })
+
+// 남은 수량 조정 (STOCK-04). 빼기 · 더하기는 0 보다 커야 함 (서버도 같은 검사)
+export const adjustSchema = z
+  .object({
+    mode: z.enum(['set', 'sub', 'add']),
+    qty: decimal(0, 9_999_999_999.99, 2),
+    note: text(180, false),
+  })
+  .refine((v) => v.mode === 'set' || v.qty > 0, { path: ['qty'], message: '0 보다 큰 수량을 넣으세요' })
 
 // 입력 중인 구매가 · 묶음 수량 → 개당 단가 미리보기. 구매가가 없거나 칸이 틀리면 null
 export function previewUnitPrice(price: string, packQty: string) {

@@ -211,3 +211,98 @@
     grid-template-columns: 1fr 130px;
   }
 }
+
+/* v2 주문 포장 줄 (SALE-06): 포장재 · 수량 · (모자라면 !) · 금액 · ✕ — 주문 단위, 제품 줄과 따로 */
+.packs {
+  margin-top: 16px;
+}
+.packs-head,
+.pack-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 20px 90px 32px;
+  gap: 8px;
+  align-items: center;
+}
+.pack-row .help.short-ico {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  font-size: 11px;
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.pack-row .help.short-ico::after {
+  white-space: nowrap;
+}
+.packs-head {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+.packs-head .num,
+.pack-row .amt {
+  text-align: right;
+}
+.pack-row {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pack-row select,
+.pack-row input {
+  width: 100%;
+}
+.pack-row .amt {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.pack-row .what {
+  grid-column: 1 / -1;
+  margin-top: -2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pack-row .what .short {
+  color: var(--warn);
+  font-weight: 600;
+}
+.packs-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 0;
+  flex-wrap: wrap;
+}
+.packs-foot select {
+  width: auto;
+  min-width: 200px;
+}
+.packs-foot .spacer {
+  flex: 1;
+}
+.packs-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+.packs-note.auto {
+  color: var(--accent);
+}
+.packs-empty {
+  padding: 10px 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+@media (max-width: 760px) {
+  .packs-head {
+    display: none;
+  }
+  .pack-row {
+    grid-template-columns: 1fr 20px 1fr 32px;
+  }
+  .pack-row select {
+    grid-column: 1 / -1;
+  }
+}

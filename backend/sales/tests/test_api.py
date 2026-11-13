@@ -5,9 +5,10 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase
 
-from products.models import Product
+from products.models import Product, ProductPart
+from stock.models import Part, PartKind, StockHistory
 
-from ..models import Sale, SaleItem
+from ..models import Sale, SaleItem, SalePack
 
 API = '/api/v0'
 TODAY = datetime.date(2026, 10, 28)
@@ -114,10 +115,79 @@ class SaleApiTests(APITestCase):
         with CaptureQueriesContext(connection) as q:
             res = self.client.get(f'{API}/sales/')
         self.assertEqual([s['order_no'] for s in res.data], ['b', 'c', 'a'])
-        self.assertLessEqual(len(q), 2)  # 판매 + 줄 (판매 수와 상관없이)
+        self.assertLessEqual(len(q), 3)  # 판매 + 제품 줄 + 포장 줄 (판매 수와 상관없이)
 
     def test_delete(self, _):
         pk = self.client.post(f'{API}/sales/', self.body(), format='json').data['id']
         self.assertEqual(self.client.delete(f'{API}/sales/{pk}/').status_code, 204)
         self.assertFalse(Sale.objects.exists())
         self.assertFalse(SaleItem.objects.exists())
+
+
+@mock.patch('django.utils.timezone.localdate', return_value=TODAY)
+class SalePackStockApiTests(APITestCase):
+    """판매 포장 줄 (SALE-06) · 판매 저장 때 재고 빼기 (STOCK-04)"""
+
+    def setUp(self):
+        self.ring_part = Part.objects.create(name='키링 고리', stock=100)
+        self.bag = Part.objects.create(kind=PartKind.PACK, name='OPP 봉투', price=8900, pack_qty=500, stock=50)
+        self.box = Part.objects.create(kind=PartKind.PACK, name='소형 박스', stock=10)  # 구매가 없음
+        self.ring = Product.objects.create(name='이름 키링', sale_price=4900)
+        ProductPart.objects.create(product=self.ring, part=self.ring_part, qty=1)
+
+    def body(self, **kwargs):
+        return {
+            'date': '2026-10-23',
+            'channel': 'direct',
+            'items': [{'product': self.ring.pk, 'qty': 3, 'unit_price': 4900, 'unit_cost': 191}],
+            'packs': [{'part': self.bag.pk, 'qty': 1}],
+            'shipping_cost': 0,
+            **kwargs,
+        }
+
+    def stocks(self):
+        return [Part.objects.get(pk=p.pk).stock for p in (self.ring_part, self.bag, self.box)]
+
+    def test_create_copies_pack_price_and_takes_stock(self, _):
+        res = self.client.post(f'{API}/sales/', self.body(), format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        pack = res.data['packs'][0]
+        self.assertEqual((pack['part_name'], pack['unit_price'], pack['amount']), ('OPP 봉투', 17.8, 17.8))
+        # 원가 = 191 × 3 + 포장비 18 (17.8 반올림) → 이익 = 14,700 − 591
+        self.assertEqual((res.data['pack_cost'], res.data['cost'], res.data['profit']), (18, 591, 14109))
+        self.assertEqual(self.stocks(), [97, 49, 10])
+        row = StockHistory.objects.filter(part=self.ring_part).get()
+        self.assertEqual((row.kind, row.qty, row.note, str(row.date)), ('sale', -3, '판매 · 이름 키링', '2026-10-23'))
+
+    def test_pack_without_price_counts_zero(self, _):
+        res = self.client.post(f'{API}/sales/', self.body(packs=[{'part': self.box.pk, 'qty': 1}]), format='json')
+        self.assertEqual((res.data['packs'][0]['unit_price'], res.data['pack_cost']), (None, 0))
+
+    def test_sent_unit_price_is_kept(self, _):
+        packs = [{'part': self.bag.pk, 'qty': 2, 'unit_price': 20}]
+        res = self.client.post(f'{API}/sales/', self.body(packs=packs), format='json')
+        self.assertEqual(res.data['packs'][0]['amount'], 40)
+
+    def test_edit_takes_only_difference(self, _):
+        pk = self.client.post(f'{API}/sales/', self.body(), format='json').data['id']
+        items = [{'product': self.ring.pk, 'qty': 1, 'unit_price': 4900, 'unit_cost': 191}]
+        packs = [{'part': self.box.pk, 'qty': 1}]
+        self.client.patch(f'{API}/sales/{pk}/', {'items': items, 'packs': packs}, format='json')
+        self.assertEqual(self.stocks(), [99, 50, 9])
+        # 메모만 고치면 재고는 그대로
+        self.client.patch(f'{API}/sales/{pk}/', {'note': '포장 바꿈'}, format='json')
+        self.assertEqual(self.stocks(), [99, 50, 9])
+
+    def test_delete_gives_stock_back(self, _):
+        pk = self.client.post(f'{API}/sales/', self.body(), format='json').data['id']
+        self.assertEqual(self.client.delete(f'{API}/sales/{pk}/').status_code, 204)
+        self.assertEqual(self.stocks(), [100, 50, 10])
+        self.assertFalse(SalePack.objects.exists())
+        self.assertEqual(StockHistory.objects.filter(note='판매 삭제 · 이름 키링').count(), 2)
+
+    def test_pack_lines_must_be_packaging(self, _):
+        res = self.client.post(f'{API}/sales/', self.body(packs=[{'part': self.ring_part.pk, 'qty': 1}]), format='json')
+        self.assertEqual(res.data['packs'][0]['part'], ['포장재만 고를 수 있습니다.'])
+        res = self.client.post(f'{API}/sales/', self.body(packs=[{'qty': 1}]), format='json')
+        self.assertEqual(res.data['packs'][0]['part'], ['포장재를 고르세요.'])
+        self.assertFalse(StockHistory.objects.exists())

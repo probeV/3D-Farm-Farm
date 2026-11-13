@@ -5,27 +5,27 @@ import Dialog from '../../../components/Dialog'
 interface Props {
   products: Product[] // 지금 고치는 제품은 빼고
   parts: Map<number, Part>
-  existing: Set<number> // 이미 표에 있는 부자재 id (건너뜀)
+  existing: Set<number> // 이미 표에 있는 부속품 id (건너뜀)
   onPick: (partIds: number[]) => void
   onClose: () => void
 }
 
-// 다른 제품에서 부자재 가져오기 (TBD-22): 고른 제품의 부자재 항목만 넣는다. 수량은 넣은 뒤 직접 입력, 이미 있는 부자재는 건너뜀.
+// 다른 제품에서 부속품 가져오기 (TBD-22): 고른 제품의 부속품 항목만 넣는다. 수량은 넣은 뒤 직접 입력, 이미 있는 부속품는 건너뜀.
 // 세트 · 연결은 하지 않는다 (넣은 뒤에는 보통 줄)
 export default function PartsFromDialog({ products, parts, existing, onPick, onClose }: Props) {
   const candidates = products.filter((p) => p.parts.length).sort((a, b) => a.no - b.no)
   const [pickedId, setPickedId] = useState(candidates[0]?.id)
   const picked = candidates.find((p) => p.id === pickedId)
-  // 같은 부자재 줄이 여러 개면 한 번만
+  // 같은 부속품 줄이 여러 개면 한 번만
   const partIds = [...new Set(picked?.parts.map((r) => r.part) ?? [])]
   const fresh = partIds.filter((id) => !existing.has(id))
 
   return (
     <Dialog
       size="wide"
-      title="다른 제품에서 부자재 가져오기"
+      title="다른 제품에서 부속품 가져오기"
       onClose={onClose}
-      submitLabel={!picked ? '넣기' : fresh.length ? `부자재 ${fresh.length}종 넣기` : '모두 이미 있어요'}
+      submitLabel={!picked ? '넣기' : fresh.length ? `부속품 ${fresh.length}종 넣기` : '모두 이미 있어요'}
       busy={!fresh.length}
       onSubmit={() => onPick(fresh)}
     >
@@ -47,7 +47,7 @@ export default function PartsFromDialog({ products, parts, existing, onPick, onC
           <div className="preview">
             {picked && (
               <>
-                <h4>{picked.name} 의 부자재</h4>
+                <h4>{picked.name} 의 부속품</h4>
                 {partIds.map((id) => {
                   const part = parts.get(id)
                   return (
@@ -63,7 +63,7 @@ export default function PartsFromDialog({ products, parts, existing, onPick, onC
           </div>
         </div>
       ) : (
-        <p className="hint">부자재를 쓰는 다른 제품이 없어요.</p>
+        <p className="hint">부속품를 쓰는 다른 제품이 없어요.</p>
       )}
     </Dialog>
   )

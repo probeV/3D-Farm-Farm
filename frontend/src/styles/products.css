@@ -873,3 +873,25 @@ dialog.xwide .dlg-body {
     flex-wrap: wrap;
   }
 }
+
+/* v2 기본 포장 (STOCK-06): 세트 하나 고르기 + 구성 */
+.lines + .lines {
+  margin-top: 18px;
+}
+.pack-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pack-pick select {
+  min-width: 220px;
+}
+.pack-pick .pack-items {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.pack-pick .warn-t {
+  color: var(--warn);
+  font-weight: 600;
+}

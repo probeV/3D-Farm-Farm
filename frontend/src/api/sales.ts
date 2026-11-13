@@ -16,12 +16,23 @@ export interface SaleItem {
   amount: number // 단가 × 수량 (읽기만)
 }
 
+// 주문의 포장 줄 (SALE-06). 단가는 팔 때 복사 (unit_price 를 안 보내면 서버가 포장재의 지금 단가로)
+export interface SalePack {
+  id: number
+  part: number | null // 포장재를 지우면 null (이름은 part_name 에 남음)
+  part_name: string
+  qty: number
+  unit_price: number | null // null = 구매가 없음 (0원)
+  amount: number | null // 단가 × 수량 (읽기만)
+}
+
 export interface Sale {
   id: number
   date: string // "2026-10-23"
   channel: SaleChannel
   order_no: string // 빈 문자열 = 없음
   items: SaleItem[]
+  packs: SalePack[]
   shipping_received: number // 손님이 낸 배송비
   fee: number
   shipping_cost: number // 판매자가 낸 택배비 (주문별 이익 참고용)
@@ -29,7 +40,8 @@ export interface Sale {
   // 읽기만 (서버 계산)
   gross: number // 판매가 합계
   settle: number // 정산 금액 = gross + shipping_received − fee
-  cost: number | null // 원가 합계. 원가 없는 줄이 있으면 null
+  pack_cost: number // 포장비 = Σ 포장 줄 금액 (원 단위)
+  cost: number | null // 원가 합계 (제품 + 포장). 원가 없는 제품 줄이 있으면 null
   profit: number | null // 주문별 이익 = settle − cost − shipping_cost
   created_at: string
 }
@@ -47,11 +59,17 @@ export function useRefreshSales() {
 // ---------------------------------------------------------------- 쓰기
 
 export type SaleItemInput = Omit<SaleItem, 'id' | 'amount'>
-export type SaleInput = Omit<Sale, 'id' | 'items' | 'gross' | 'settle' | 'cost' | 'profit' | 'created_at'> & {
+export type SalePackInput = Omit<SalePack, 'id' | 'amount'>
+export type SaleInput = Omit<
+  Sale,
+  'id' | 'items' | 'packs' | 'gross' | 'settle' | 'pack_cost' | 'cost' | 'profit' | 'created_at'
+> & {
   items: SaleItemInput[]
+  packs: SalePackInput[]
 }
 
-// items 를 보내면 그 목록으로 통째로 바꾼다 (보내지 않으면 줄은 그대로).
+// items · packs 를 보내면 그 목록으로 통째로 바꾼다 (보내지 않으면 줄은 그대로).
+// 저장하면 서버가 부속품 · 포장재를 남은 수량에서 뺀다 (고치면 차이만) → 재고 쪽 목록도 다시 불러온다
 // 같은 주문번호가 이미 있으면 400 `{"order_no": ["이미 넣은 주문번호입니다."]}`
 export const createSale = (body: SaleInput) => send<Sale>('POST', '/sales/', body)
 export const updateSale = (id: number, body: Partial<SaleInput>) => send<Sale>('PATCH', `/sales/${id}/`, body)

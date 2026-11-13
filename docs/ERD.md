@@ -16,12 +16,19 @@ erDiagram
     PRODUCT ||--o{ PRODUCT_FILAMENT : "사용 필라멘트"
     FILAMENT ||--o{ PRODUCT_FILAMENT : "사용됨"
     COLOR |o--o{ PRODUCT_FILAMENT : "사용 색상"
-    PRODUCT ||--o{ PRODUCT_PART : "사용 부자재"
+    PRODUCT ||--o{ PRODUCT_PART : "사용 부속품"
     PART ||--o{ PRODUCT_PART : "사용됨"
     PART_CATEGORY |o--o{ PART : "카테고리"
+    PART ||--o{ STOCK_HISTORY : "입출고 기록"
+    PACK_SET ||--o{ PACK_SET_LINE : "들어가는 포장재"
+    PART ||--o{ PACK_SET_LINE : "사용됨"
+    PACK_SET |o--o{ PRODUCT : "기본 포장"
     RECURRING_EXPENSE |o--o{ EXPENSE : "넣은 지출"
     SALE ||--o{ SALE_ITEM : "판매 제품"
     PRODUCT |o--o{ SALE_ITEM : "팔린 제품"
+    SALE ||--o{ SALE_PACK : "포장 줄"
+    PART |o--o{ SALE_PACK : "쓴 포장재"
+    SALE |o--o{ STOCK_HISTORY : "판매로 빠진 수량"
 
     BRAND {
         bigint id PK
@@ -60,18 +67,45 @@ erDiagram
     }
     PART_CATEGORY {
         bigint id PK
-        varchar name UK "부자재 카테고리 이름"
+        varchar kind "part / pack / supply (탭)"
+        varchar name "카테고리 이름 (탭 안에서 UK)"
     }
     PART {
         bigint id PK
+        varchar kind "part(부속품) / pack(포장재) / supply(소모품)"
         varchar name UK "품목"
-        bigint category_id FK "NULL=미분류"
+        bigint category_id FK "NULL=미분류, 같은 kind 만"
+        varchar photo "사진 파일 경로 (media/parts/), 빈 값 허용"
         varchar shop "회사/구매처"
         varchar buy_url "구매 링크, 빈 문자열=없음"
         decimal price "묶음 구매가, NULL=미입력"
         decimal pack_qty "묶음 수량, 기본 1"
         varchar unit "단위, 기본 개"
+        decimal stock "남은 수량 (0 아래 가능)"
+        decimal alert "부족 알림 기준, 기본 0"
         text note
+    }
+    STOCK_HISTORY {
+        bigint id PK
+        bigint part_id FK
+        date date
+        varchar kind "buy / sale / use / adjust"
+        decimal qty "늘면 +, 줄면 −"
+        decimal after "그 뒤 남은 수량"
+        varchar note "설명 (조정 사유 · 판매 요약)"
+        bigint sale_id FK "판매로 빠진 기록, NULL=그 밖"
+        datetime created_at
+    }
+    PACK_SET {
+        bigint id PK
+        varchar name UK "세트 이름"
+        text note
+    }
+    PACK_SET_LINE {
+        bigint id PK
+        bigint pack_set_id FK
+        bigint part_id FK "포장재"
+        decimal qty "수량"
     }
     CATEGORY {
         bigint id PK
@@ -90,6 +124,7 @@ erDiagram
         varchar name
         int print_minutes "출력 시간(분), NULL=미입력"
         decimal sale_price "판매가, NULL=미입력"
+        bigint default_pack_id FK "기본 포장 세트, NULL=입력 필요"
         varchar status "on_sale / developing / discontinued"
         text note
         datetime created_at
@@ -147,7 +182,15 @@ erDiagram
         varchar product_name "팔 때의 제품명"
         int qty "수량 (1 이상)"
         decimal unit_price "단가"
-        decimal unit_cost "팔 때 복사한 개당 원가, NULL=원가 없음"
+        decimal unit_cost "팔 때 복사한 개당 원가 (포장 빼고), NULL=원가 없음"
+    }
+    SALE_PACK {
+        bigint id PK
+        bigint sale_id FK
+        bigint part_id FK "NULL=포장재를 지움"
+        varchar part_name "팔 때의 포장재 이름"
+        decimal qty "수량"
+        decimal unit_price "팔 때 복사한 개당 단가, NULL=구매가 없음"
     }
     COST_SETTING {
         bigint id PK "항상 1개 행"
@@ -164,9 +207,10 @@ erDiagram
 | 앱 | 모델 |
 |---|---|
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` |
-| `products` | `Category`, `Subcategory`, `PartCategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
+| `stock` | `PartCategory`, `Part`, `StockHistory`, `PackSet`, `PackSetLine` |
+| `products` | `Category`, `Subcategory`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
 | `expenses` | `Expense`, `RecurringExpense` |
-| `sales` | `Sale`, `SaleItem` |
+| `sales` | `Sale`, `SaleItem`, `SalePack` |
 
 ## 모델 설명
 
@@ -177,18 +221,22 @@ erDiagram
 | `Filament` | 회사 + 재질 + 시리즈 단위의 필라멘트 제품. 기본 스풀 가격·무게 |
 | `Color` | 필라멘트 안의 색상. 색상 코드(hex)를 가지며, 가격을 비우면 필라멘트 가격을 따름. 재고는 색상 단위로 셈 |
 | `Spool` | 스풀 1개 = 1행. 스풀 번호, 상태, 날짜, 실제 구매가 |
-| `PartCategory` | 부자재 카테고리 (부품, 포장재 …). 처음 3개는 마이그레이션이 만든다 |
-| `Part` | 부자재. `price ÷ pack_qty` 가 개당 단가. 카테고리 · 구매 링크는 선택 |
+| `PartCategory` | 품목 카테고리. 탭(`kind`)마다 따로 (부속품: 부품 · 키링 / 포장재: 박스 · 봉투 / 소모품: 접착 · 마감 …) |
+| `Part` | 재고 품목 (v2 STOCK). `kind` 로 재고 관리 탭을 나눈다 — 부속품(제품 1개당 수량 → 원가) · 포장재(포장 세트 → 포장비) · 소모품(원가에 안 넣음). `price ÷ pack_qty` 가 개당 단가. 남은 수량 · 부족 알림 기준 · 사진 |
+| `StockHistory` | 입출고 기록 한 줄 (STOCK-05). 지출 구매 · 판매 · 다 씀 · 조정. 남은 수량을 바꿀 때 항상 함께 만든다 (`stock/services.py`) |
+| `PackSet` | 포장 세트 (봉투 포장 · 작은 박스 …, STOCK-06). 제품의 기본 포장 · 판매 주문의 포장 줄을 채운다 |
+| `PackSetLine` | 포장 세트에 들어가는 포장재 + 수량 |
 | `Category` | 제품 카테고리 (수업 교구, 퍼즐 …) |
 | `Subcategory` | 카테고리 안의 세부 분류 (수업 교구 › 수학 …). 선택 |
 | `Product` | 판매 제품. 카테고리 · 세부 분류는 비워도 됨 (미분류) |
 | `ProductFilament` | 제품 ↔ 필라멘트 (다대다) + 사용량 + 색상(선택). 같은 필라멘트를 색상별로 여러 줄 둘 수 있음 |
-| `ProductPart` | 제품 ↔ 부자재 (다대다) + 수량 |
+| `ProductPart` | 제품 ↔ 부속품 (다대다) + 수량. 포장재는 `Product.default_pack` 으로 따로 |
 | `CostSetting` | 원가 계산 설정값. 항상 1개 행만 존재 (기본값은 PRD 3.8) |
 | `Expense` | 지출 한 줄 (PRD 3.10). 분류는 고정 7개 (`ExpenseCategory`) |
 | `RecurringExpense` | 반복 지출 (구독 · 월정액). 지출을 저절로 만들지 않고, 화면에서 확인하고 넣는다 |
 | `Sale` | 판매 한 건 = 주문 하나 (v2 SALE). 판매처는 고정 3개 (`SaleChannel`). 배송비 · 수수료는 주문 단위 |
-| `SaleItem` | 판매 안의 제품 한 줄. 단가 · 수량 · 팔 때 복사한 개당 원가 · 제품명 |
+| `SaleItem` | 판매 안의 제품 한 줄. 단가 · 수량 · 팔 때 복사한 개당 원가(포장 빼고) · 제품명 |
+| `SalePack` | 판매 주문의 포장 줄 (SALE-06). 포장재 · 수량 · 팔 때 복사한 단가 · 이름. 제품 줄과 따로 주문 단위 (묶음 포장) |
 
 ## 계산 규칙
 ```
@@ -214,7 +262,14 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 스마트스토어 수수료 (SALE-03) = (판매가 합계 + Sale.shipping_received) × (CostSetting.fee_order + fee_sales)%, 원 단위 반올림 (Sale.store_fee)
   직접 판매 · 기타는 0 (있으면 직접 입력). 고친 수수료는 그대로 저장
 정산 금액 = 판매가 합계 + shipping_received − fee
-주문별 이익 (SALE-05, 참고) = 정산 금액 − Σ SaleItem.unit_cost × qty − shipping_cost. unit_cost 가 NULL 인 줄이 있으면 이익 없음
+주문별 이익 (SALE-05, 참고) = 정산 금액 − Σ SaleItem.unit_cost × qty − 포장비 − shipping_cost. unit_cost 가 NULL 인 줄이 있으면 이익 없음
+  포장비 (SALE-06) = Σ SalePack.unit_price × qty
+
+포장 세트 원가 (STOCK-06) = Σ PackSetLine.qty × 포장재 개당 단가 → 제품 원가의 포장비 (Product.default_pack)
+바로 쌀 수 있는 수 = 세트 줄마다 ⌊max(0, Part.stock) ÷ qty⌋ 중 가장 작은 값
+남은 수량 상태 (STOCK-04) = stock ≤ 0 이면 없음, stock ≤ alert 이면 부족
+판매로 빠지는 수량 = Σ 제품 줄의 (ProductPart.qty × SaleItem.qty) + Σ SalePack.qty  (품목별)
+  판매를 저장할 때마다 이미 그 판매로 기록된 수량과 비교해 차이만 기록 (`services.sync_sale`), 지우기 전에 되돌리는 기록 (`services.revert_sale`)
 ```
 
 ## 관계와 삭제 규칙
@@ -225,8 +280,13 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Color.filament` → `Filament` | PROTECT | 색상이 있으면 필라멘트 삭제 불가 |
 | `Spool.color` → `Color` | CASCADE | 색상을 지우면 그 색상의 스풀도 함께 삭제. 지우기 전에 스풀 개수를 알려 주고 2차 확인 |
 | `ProductFilament.filament` → `Filament` | PROTECT | 제품에서 쓰면 필라멘트 삭제 불가 |
-| `ProductPart.part` → `Part` | PROTECT | 제품에서 쓰면 부자재 삭제 불가 |
-| `Part.category` → `PartCategory` | SET_NULL | 카테고리를 지우면 그 부자재는 미분류 (원가는 그대로). 부자재가 있으면 화면에서 2차 확인 |
+| `ProductPart.part` → `Part` | PROTECT | 제품에서 쓰면 부속품 삭제 불가 |
+| `Part.category` → `PartCategory` | SET_NULL | 카테고리를 지우면 그 품목은 미분류 (원가는 그대로). 품목이 있으면 화면에서 2차 확인 |
+| `StockHistory.part` → `Part` | CASCADE | 품목을 지우면 그 입출고 기록도 함께 삭제 |
+| `StockHistory.sale` → `Sale` | SET_NULL | 판매를 지우면 되돌리는 기록을 남긴 뒤 연결만 끊김 |
+| `PackSetLine.pack_set` → `PackSet` | CASCADE | 세트를 지우면 구성도 함께 삭제 |
+| `PackSetLine.part` → `Part` | PROTECT | 세트에서 쓰면 포장재 삭제 불가 |
+| `Product.default_pack` → `PackSet` | PROTECT | 기본 포장으로 쓰는 제품이 있으면 세트 삭제 불가 |
 | `ProductFilament.color` → `Color` | SET_NULL | 색상을 지우면 그 줄은 색상 선택 안 함 (필라멘트 가격으로 계산). 지우기 전에 쓰는 제품을 알려 주고 확인 (PRD FIL-09) |
 | `Product.category` → `Category` | PROTECT | 제품이 있으면 카테고리 삭제 불가 |
 | `Product.subcategory` → `Subcategory` | PROTECT | 제품이 있으면 세부 분류 삭제 불가 |
@@ -236,6 +296,8 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Expense.recurring` → `RecurringExpense` | SET_NULL | 반복 지출을 지워도 이미 넣은 지출은 남는다 (연결만 끊김) |
 | `SaleItem.sale` → `Sale` | CASCADE | 판매를 지우면 그 제품 줄도 함께 삭제 |
 | `SaleItem.product` → `Product` | SET_NULL | 제품을 지워도 판매 줄은 남고, 팔 때 저장한 `product_name` 으로 보인다 |
+| `SalePack.sale` → `Sale` | CASCADE | 판매를 지우면 포장 줄도 함께 삭제 |
+| `SalePack.part` → `Part` | SET_NULL | 포장재를 지워도 포장 줄은 남고, 팔 때 저장한 `part_name` · 단가로 보인다 |
 
 ## 제약 조건 · 인덱스
 | 대상 | 종류 | 용도 |
@@ -248,7 +310,12 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Spool.code_no` | UNIQUE | 스풀 번호 (= 스풀 코드) 중복 방지 |
 | `Spool.status` | CHOICES | `sealed`(재고) / `open`(사용 중) / `empty`(사용 완료) |
 | `Spool (color, status)` | INDEX | 색상별 상태 개수 집계 |
-| `Part.name` | UNIQUE | 부자재 품목 이름 중복 방지 |
+| `Part.name` | UNIQUE | 품목 이름 중복 방지 (탭이 달라도) |
+| `PartCategory (kind, name)` | UNIQUE | 같은 탭 안 카테고리 이름 중복 방지 |
+| `Part.category` | 검사 | 카테고리는 같은 탭(kind)의 것 (`Part.clean`) |
+| `Part.kind` · `PartCategory.kind` | CHOICES | `part`(부속품) / `pack`(포장재) / `supply`(소모품) |
+| `StockHistory.kind` | CHOICES | `buy`(지출) / `sale`(판매) / `use`(다 씀) / `adjust`(조정) |
+| `PackSet.name` | UNIQUE | 포장 세트 이름 중복 방지 |
 | `Category.name` | UNIQUE | 카테고리 이름 중복 방지 |
 | `Subcategory (category, name)` | UNIQUE | 같은 카테고리 안 세부 분류 이름 중복 방지 |
 | `Product.no` | UNIQUE | 제품 No. 중복 방지 |
@@ -271,8 +338,14 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
   - 번호: 비우면 자동으로 지금 있는 가장 큰 번호 + 1 (`Spool.next_code_no`), 원하면 직접 지정. 1 이상, 중복 불가.
     스풀을 지우면 그 번호는 비므로 같은 번호로 다시 등록할 수 있다.
   - 글자(`S00012`)가 아니라 숫자로 저장하는 이유: 가장 큰 번호를 구할 때 `S100000` < `S99999` 같은 글자 정렬 문제를 피하려고.
-- `Brand.logo` 는 png · jpg · webp, 5MB 까지. 업로드 시 비율을 유지해 256×256px 이내로 축소해 저장 (Pillow, `Brand.save`).
-  회사를 삭제하거나 이미지를 바꾸거나 지우면 이전 파일도 지운다 (DB 저장이 확정된 뒤에).
+- `Brand.logo` 는 png · jpg · webp, 5MB 까지. 업로드 시 비율을 유지해 256×256px 이내로 축소해 저장 (Pillow, `ShrinkImageMixin`).
+  회사를 삭제하거나 이미지를 바꾸거나 지우면 이전 파일도 지운다 (DB 저장이 확정된 뒤에). `Part.photo` 도 같은 방식, 512×512px 이내.
+- `Part.stock` 은 `StockHistory.qty` 를 다 더한 값과 같게 유지한다 — 남은 수량은 `services.move()` 로만 바꾸고(기록과 함께), API 로 직접 고치지 않는다.
+  0 아래로 내려가도 막지 않는다 (판매를 먼저 넣고 구매를 나중에 넣을 때 — 화면에서 경고만).
+- 부자재(`Part` · `PartCategory`)는 v2 에서 `products` → `stock` 앱으로 옮겼다. 데이터는 그대로 두고 소속만 옮긴 뒤
+  테이블 이름을 `stock_*` 로 바꾼다 (`stock 0001` → `products 0006` → `stock 0002`, SeparateDatabaseAndState).
+- v2 STOCK 마이그레이션(`products 0007`)이 기존 데이터를 옮긴다: `포장재` 카테고리와 그 품목 → 포장재(kind=pack),
+  제품의 포장재 줄 → 기본 포장 세트 `{제품명} 포장` (구성이 같은 제품은 세트 하나). 그 밖의 품목은 부속품 그대로.
 - `Filament.series` 는 빈 문자열 허용 (NULL 대신 `""`) — UNIQUE 조합에서 시리즈 없는 필라멘트도 중복 검사되도록.
 - `Product.no`(No.)는 숫자로 저장하고 화면에도 `1, 2, 3 …` 그대로 보여 준다 (글자로 저장하면 자릿수가 다를 때 `10` 이 `2` 보다 앞에 정렬되므로).
   비우면 지금 있는 가장 큰 번호 + 1 (`Product.next_no`), 원하면 직접 지정. 1 이상, 중복 불가.

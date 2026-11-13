@@ -27,6 +27,7 @@ export type Values = {
   hours: string
   minutes: string
   sale_price: string
+  default_pack: string // 기본 포장 세트 id, 빈칸 = 입력 필요
   note: string
   filaments: FilamentLine[]
   parts: PartLine[]
@@ -65,6 +66,7 @@ export function initialValues({ product, copyOf, preset }: Start, products: Prod
       hours: '',
       minutes: '',
       sale_price: '',
+      default_pack: '',
       note: '',
       filaments: filaments.length ? [newFilamentLine(filaments)] : [],
       parts: [],
@@ -80,6 +82,7 @@ export function initialValues({ product, copyOf, preset }: Start, products: Prod
     hours: minutes == null ? '' : String(Math.floor(minutes / 60)),
     minutes: minutes == null ? '' : String(minutes % 60),
     sale_price: str(src.sale_price),
+    default_pack: str(src.default_pack),
     note: src.note,
     filaments: src.filaments.map((r) => ({
       key: newKey(),
@@ -111,5 +114,6 @@ export function previewOf(v: Values): CostInput {
       grams: loose(r.grams) ?? 0,
     })),
     parts: v.parts.map((r) => ({ part: Number(r.part), qty: loose(r.qty) ?? 0 })),
+    default_pack: v.default_pack ? Number(v.default_pack) : null,
   }
 }
