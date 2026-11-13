@@ -6,6 +6,8 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from expenses.models import last_buy
+
 from .models import LOGO_VALIDATORS, Brand, Color, Filament, Material, Spool, normalize_hex
 
 
@@ -71,10 +73,12 @@ class ColorSerializer(BaseModelSerializer):
     spool_price = NumberField(max_digits=10, decimal_places=0, read_only=True)
     price_per_g = serializers.SerializerMethodField()
     counts = serializers.SerializerMethodField()
+    # 최근 구매 (지출 장부, TBD-31). 있으면 가격은 그 주문의 통당 금액 — 다음 구매 때 다시 바뀜
+    last_buy = serializers.SerializerMethodField()
 
     class Meta:
         model = Color
-        fields = ['id', 'filament', 'name', 'hex', 'price', 'spool_price', 'price_per_g', 'counts']
+        fields = ['id', 'filament', 'name', 'hex', 'price', 'spool_price', 'price_per_g', 'counts', 'last_buy']
         # 이름 중복은 validate() 에서 한국어 메시지로 검사
         validators = []
 
@@ -84,6 +88,9 @@ class ColorSerializer(BaseModelSerializer):
 
     def get_counts(self, obj):
         return {'sealed': obj.sealed_count, 'open': obj.open_count, 'empty': obj.empty_count}
+
+    def get_last_buy(self, obj):
+        return last_buy(obj)
 
     def validate_hex(self, value):
         try:
@@ -165,7 +172,10 @@ class SpoolSerializer(BaseModelSerializer):
             'opened_at',
             'finished_at',
             'note',
+            'buy',
         ]
+        # 주문(지출 구매 줄)은 재고 추가에서만 정한다
+        read_only_fields = ['buy']
         validators = []
 
     def validate_code_no(self, value):
@@ -193,6 +203,8 @@ class PurchaseSerializer(serializers.Serializer):
     price = NumberField(max_digits=10, decimal_places=0, min_value=0, required=False, allow_null=True)
     # 쓰고 싶은 스풀 번호 (지운 번호 다시 쓰기 등). 지정한 것 먼저 쓰고 모자란 만큼은 자동. 비우면 전부 자동
     code_nos = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False, default=list)
+    # 주문 (지출 구매 줄 id, TBD-31). 고르면 구매가 · 구매일은 주문에서
+    buy = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, attrs):
         code_nos = attrs['code_nos']

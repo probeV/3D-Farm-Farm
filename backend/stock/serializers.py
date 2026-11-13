@@ -9,6 +9,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from expenses.models import last_buy
 from filaments.models import LOGO_VALIDATORS
 from filaments.serializers import BaseModelSerializer, NumberField, RelativeImageField
 
@@ -66,6 +67,8 @@ class PartSerializer(BaseModelSerializer):
     product_count = serializers.IntegerField(read_only=True, default=0)
     set_count = serializers.IntegerField(read_only=True, default=0)
     last_used = serializers.DateField(read_only=True, default=None)
+    # 최근 구매 (지출 장부, TBD-31). 있으면 묶음 가격 · 수량은 그 구매 줄 값 — 다음 구매 때 다시 바뀜
+    last_buy = serializers.SerializerMethodField()
 
     class Meta:
         model = Part
@@ -87,11 +90,15 @@ class PartSerializer(BaseModelSerializer):
             'product_count',
             'set_count',
             'last_used',
+            'last_buy',
         ]
         extra_kwargs = {
             'kind': {'error_messages': {'invalid_choice': '없는 종류입니다.'}},
             'buy_url': {'error_messages': {'invalid': 'https:// 로 시작하는 주소로 입력하세요.'}},
         }
+
+    def get_last_buy(self, obj):
+        return last_buy(obj)
 
     def get_unit_price(self, obj):
         value = obj.unit_price
@@ -149,7 +156,7 @@ class UseSerializer(serializers.Serializer):
 class StockHistorySerializer(BaseModelSerializer):
     class Meta:
         model = StockHistory
-        fields = ['id', 'date', 'kind', 'qty', 'after', 'note', 'sale', 'created_at']
+        fields = ['id', 'date', 'kind', 'qty', 'after', 'note', 'sale', 'expense', 'created_at']
 
 
 class PackSetLineSerializer(BaseModelSerializer):

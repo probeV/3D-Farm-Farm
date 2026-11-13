@@ -7,14 +7,15 @@
 
 import calendar
 import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
-from filaments.models import MONEY
-from stock.models import PartKind, qty_field
+from filaments.models import MONEY, Color
+from stock.models import Part, PartKind, qty_field
 
 
 class ExpenseCategory(models.TextChoices):
@@ -154,3 +155,63 @@ class ExpenseLine(models.Model):
     def each(self):
         """1개(통)당 금액 = 줄 금액 ÷ 수량"""
         return self.total / self.qty
+
+
+def split_totals(category, amount, lines):
+    """줄 금액(total) 정하기: 금액 적은 줄은 그대로, 비운 줄은 (지출 총액 − 적은 금액 합계)를 나눠 넣는다.
+    필라멘트는 통 수대로, 그 밖은 똑같이 (그 밖은 비운 줄이 하나뿐이라 그 줄이 전부). 저장은 하지 않는다"""
+    blank = [line for line in lines if line.amount is None]
+    left = amount - sum((line.amount for line in lines if line.amount is not None), Decimal(0))
+    weight = (lambda line: line.qty) if category == ExpenseCategory.FILAMENT else (lambda line: Decimal(1))
+    weights = sum((weight(line) for line in blank), Decimal(0))
+    for line in lines:
+        if line.amount is not None:
+            line.total = line.amount
+        else:
+            line.total = (left * weight(line) / weights).quantize(Decimal('0.01'))
+
+
+def line_key(line):
+    """구매 줄이 가리키는 것 — ('color', id) 또는 ('part', id)"""
+    return ('color', line.color_id) if line.color_id else ('part', line.part_id)
+
+
+def latest_line(key):
+    """그 색상 · 품목의 최근 구매 줄 (지출 날짜 → 나중에 넣은 지출 → 나중 줄 순). 없으면 None"""
+    field, pk = key
+    return ExpenseLine.objects.filter(**{f'{field}_id': pk}).order_by('-expense__date', '-expense_id', '-id').first()
+
+
+def last_buy_annotations(field):
+    """색상(field='color') · 품목(field='part') 목록에 붙이는 최근 구매 — last_buy_expense · _date · _name"""
+    lines = ExpenseLine.objects.filter(**{field: OuterRef('pk')}).order_by('-expense__date', '-expense_id', '-id')
+    return {
+        'last_buy_expense': Subquery(lines.values('expense_id')[:1]),
+        'last_buy_date': Subquery(lines.values('expense__date')[:1]),
+        'last_buy_name': Subquery(lines.values('expense__name')[:1]),
+    }
+
+
+def last_buy(obj):
+    """last_buy_annotations 를 붙인 색상 · 품목 → {'expense', 'date', 'name'} (가격 옆 `최근 구매가 · 날짜 주문명`)"""
+    expense = getattr(obj, 'last_buy_expense', None)
+    if expense is None:
+        return None
+    return {'expense': expense, 'date': obj.last_buy_date, 'name': obj.last_buy_name}
+
+
+def won(value):
+    return value.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
+
+def refresh_buy_prices(keys):
+    """원가 계산표 단가 = 최근 구매가 (TBD-31). 구매 줄이 바뀐 색상 · 품목마다 최근 구매 줄로 다시 맞춘다
+    — 색상 가격 = 통당 금액, 품목 묶음 가격 · 묶음 수량 = 줄 금액 · 수량. 남은 구매가 없으면 지금 값 그대로"""
+    for key in keys:
+        line = latest_line(key)
+        if line is None:
+            continue
+        if key[0] == 'color':
+            Color.objects.filter(pk=key[1]).update(price=won(line.each))
+        else:
+            Part.objects.filter(pk=key[1]).update(price=won(line.total), pack_qty=line.qty)

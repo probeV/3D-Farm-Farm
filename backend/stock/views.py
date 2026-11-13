@@ -11,6 +11,7 @@ from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from expenses.models import last_buy_annotations
 from filaments.views import BaseViewSet
 
 from . import services
@@ -53,6 +54,7 @@ def parts_with_counts():
         product_count=Count('product_parts__product', distinct=True),
         set_count=Count('pack_lines__pack_set', distinct=True),
         last_used=Max('history__date', filter=Q(history__kind=StockHistory.Kind.USE)),
+        **last_buy_annotations('part'),
     ).order_by('name')
 
 

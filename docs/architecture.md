@@ -59,8 +59,8 @@ frontend/ (React)                          backend/ (Django)
 
 **서비스 계층(`services.py`)은 두지 않는다** — 지금은 여러 행을 바꾸는 동작이 API 하나에서만 쓰여서 뷰에 둔다.
 같은 동작을 여러 API 에서 쓰게 되면(예: QR 스캔 등록) 그때 `services.py` 로 뺀다.
-- 첫 예: **`stock/services.py`** — 남은 수량은 품목 조정 · 다 씀 · 판매 저장 · 삭제 · (TBD-31) 지출 구매에서 바뀌어서,
-  `move()` 하나로 남은 수량과 입출고 기록을 함께 바꾼다. 판매는 저장 후 `sync_sale()`(차이만 기록), 지우기 전 `revert_sale()`.
+- 첫 예: **`stock/services.py`** — 남은 수량은 품목 조정 · 다 씀 · 판매 저장 · 삭제 · 지출 구매 줄 저장 · 삭제(TBD-31)에서 바뀌어서,
+  `move()` 하나로 남은 수량과 입출고 기록을 함께 바꾼다. 판매 · 지출은 저장 후 `sync_sale()` · `sync_expense()`(차이만 기록), 지우기 전 `revert_sale()` · `revert_expense()`.
 
 **조회는 뷰가, 시리얼라이저는 읽기만** — 개수 · 평균 같은 계산값은 뷰의 queryset 에서 `annotate` 로 한 번에 붙이고,
 시리얼라이저의 `get_xxx()` 는 붙어 있는 값을 읽기만 한다 (객체마다 쿼리하면 N+1).
