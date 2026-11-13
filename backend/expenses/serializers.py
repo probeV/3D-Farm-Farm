@@ -8,7 +8,6 @@ from filaments.serializers import BaseModelSerializer
 from .models import Expense, RecurringExpense
 
 CATEGORY_ERRORS = {'invalid_choice': '없는 분류입니다.'}
-URL_ERRORS = {'invalid': 'https:// 로 시작하는 주소로 입력하세요.'}
 
 
 class RecurringExpenseSerializer(BaseModelSerializer):
@@ -39,11 +38,10 @@ class ExpenseListSerializer(serializers.ListSerializer):
 class ExpenseSerializer(BaseModelSerializer):
     class Meta:
         model = Expense
-        fields = ['id', 'date', 'name', 'category', 'amount', 'shop', 'url', 'note', 'recurring']
+        fields = ['id', 'date', 'name', 'category', 'amount', 'shop', 'note', 'recurring']
         list_serializer_class = ExpenseListSerializer
         extra_kwargs = {
             'category': {'error_messages': CATEGORY_ERRORS},
-            'url': {'error_messages': URL_ERRORS},
             'recurring': {'error_messages': {'does_not_exist': '없는 반복 지출입니다.'}},
         }
 

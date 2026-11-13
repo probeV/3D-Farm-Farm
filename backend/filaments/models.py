@@ -231,6 +231,15 @@ class Spool(models.Model):
     status = models.CharField('상태', max_length=10, choices=Status.choices, default=Status.SEALED)
     price = models.DecimalField('구매가', null=True, blank=True, **MONEY)
     purchased_at = models.DateField('구매일', default=timezone.localdate)
+    # 지출 장부의 구매 줄 (v2 TBD-31). 고르면 구매가 · 구매일은 그 주문에서 복사. 지출을 고치거나 지워도 구매가는 그대로
+    buy = models.ForeignKey(
+        'expenses.ExpenseLine',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='spools',
+        verbose_name='주문(구매 줄)',
+    )
     opened_at = models.DateTimeField('사용 시작일', null=True, blank=True)
     finished_at = models.DateTimeField('사용 완료일', null=True, blank=True)
     note = models.TextField('메모', blank=True)

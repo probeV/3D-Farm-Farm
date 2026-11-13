@@ -29,7 +29,7 @@ class ExpenseApiTests(APITestCase):
         self.assertEqual(res.data[1]['amount'], 1090000)
 
     def test_create_update_delete(self, _):
-        res = self.client.post(f'{API}/expenses/', self.body(url='https://example.com/order/1'), format='json')
+        res = self.client.post(f'{API}/expenses/', self.body(), format='json')
         self.assertEqual(res.status_code, 201)
         self.assertEqual((res.data['category'], res.data['recurring']), ('invest', None))
         pk = res.data['id']
@@ -42,7 +42,6 @@ class ExpenseApiTests(APITestCase):
         cases = [
             ({'category': 'tax'}, 'category', '없는 분류입니다.'),
             ({'date': '2026-10-29'}, 'date', '오늘 이후 날짜는 넣을 수 없습니다.'),
-            ({'url': 'example'}, 'url', 'https:// 로 시작하는 주소로 입력하세요.'),
         ]
         for patch, field, message in cases:
             with self.subTest(field=field):

@@ -47,6 +47,7 @@ class SpoolAdmin(admin.ModelAdmin):
     search_fields = ['color__name']
     list_select_related = ['color__filament__brand', 'color__filament__material']
     autocomplete_fields = ['color']
+    raw_id_fields = ['buy']
 
     @admin.display(description='스풀 코드', ordering='code_no')
     def code(self, obj):
