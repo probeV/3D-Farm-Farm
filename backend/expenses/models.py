@@ -92,7 +92,7 @@ class Expense(models.Model):
         return f'{self.date} {self.name}'
 
 
-# 구매 줄을 적는 분류 → 고를 수 있는 것. 필라멘트는 색상, 나머지는 같은 키의 재고 관리 탭 품목
+# 구매 항목을 적는 분류 → 고를 수 있는 것. 필라멘트는 색상, 나머지는 같은 키의 재고 관리 탭 품목
 BUY_PART_KINDS = {
     ExpenseCategory.PART: PartKind.PART,
     ExpenseCategory.PACK: PartKind.PACK,
@@ -101,23 +101,23 @@ BUY_PART_KINDS = {
 BUY_CATEGORIES = {ExpenseCategory.FILAMENT, *BUY_PART_KINDS}
 
 
-class ExpenseLine(models.Model):
-    """지출의 구매 줄 (v2 TBD-31). 지출(주문) 한 줄 안에 산 것 여러 줄
+class ExpenseItem(models.Model):
+    """지출의 구매 항목 (v2 TBD-31 · 33). 지출(주문) 하나 안에 산 것 여러 항목. 같은 색상 · 품목도 여러 항목 가능
 
-    - 필라멘트 지출: 색상 · 통 수. 스풀은 재고 추가에서 이 줄을 골라 등록한다 (Spool.buy, 통 수까지)
+    - 필라멘트 지출: 색상 · 롤 수. 저장하면 롤 수만큼 스풀이 생긴다 (Spool.buy — 지출 → 스풀 한 방향, 차이만)
     - 부속품 · 포장재 · 소모품 지출: 그 탭의 품목 · 수량. 저장하면 남은 수량 + 수량 (입출고 기록 `지출`)
-    - 금액(amount)을 비우면 지출 총액(배송비 포함)에서 금액 적은 줄을 빼고 남은 돈을 나눠 넣는다 → total
-    - 그 색상 · 품목의 최근 구매면 원가 계산표 단가(색상 가격 · 묶음 가격)가 이 줄 값이 된다
+    - 금액(amount)을 비우면 지출 총액(배송비 포함)에서 금액 적은 항목을 빼고 남은 돈을 나눠 넣는다 → total
+    - 그 색상 · 품목의 최근 구매면 원가 계산표 단가(색상 가격 · 묶음 가격)가 이 지출의 값이 된다
     """
 
-    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name='lines', verbose_name='지출')
-    # 둘 중 하나만 (아래 constraints). 색상 · 품목을 지우면 그 구매 줄도 지워진다 (지출 금액은 그대로)
+    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name='items', verbose_name='지출')
+    # 둘 중 하나만 (아래 constraints). 색상 · 품목을 지우면 그 구매 항목도 지워진다 (지출 금액은 그대로)
     color = models.ForeignKey(
         'filaments.Color',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='buy_lines',
+        related_name='buy_items',
         verbose_name='색상',
     )
     part = models.ForeignKey(
@@ -125,25 +125,25 @@ class ExpenseLine(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='buy_lines',
+        related_name='buy_items',
         verbose_name='품목',
     )
-    # 필라멘트는 통 수 (정수만 — 검사는 시리얼라이저)
+    # 필라멘트는 롤 수 (정수만 — 검사는 시리얼라이저)
     qty = qty_field('수량', validators=[MinValueValidator(Decimal('0.01'))])
     # 직접 적은 금액. 비우면 나눠 넣음
     amount = models.DecimalField('금액', null=True, blank=True, **MONEY)
-    # 이 줄 금액 = 직접 적은 금액 또는 나눠 넣은 금액 (저장할 때 계산)
-    total = models.DecimalField('줄 금액', max_digits=12, decimal_places=2, default=0)
+    # 이 항목 금액 = 직접 적은 금액 또는 나눠 넣은 금액 (저장할 때 계산)
+    total = models.DecimalField('항목 금액', max_digits=12, decimal_places=2, default=0)
 
     class Meta:
-        verbose_name = '구매 줄'
-        verbose_name_plural = '구매 줄'
+        verbose_name = '구매 항목'
+        verbose_name_plural = '구매 항목'
         ordering = ['id']
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(color__isnull=False, part__isnull=True)
                 | models.Q(color__isnull=True, part__isnull=False),
-                name='expense_line_color_or_part',
+                name='expense_item_color_or_part',
                 violation_error_message='색상이나 품목 중 하나를 고르세요.',
             ),
         ]
@@ -153,42 +153,42 @@ class ExpenseLine(models.Model):
 
     @property
     def each(self):
-        """1개(통)당 금액 = 줄 금액 ÷ 수량"""
+        """1개(롤)당 금액 = 항목 금액 ÷ 수량"""
         return self.total / self.qty
 
 
-def split_totals(category, amount, lines):
-    """줄 금액(total) 정하기: 금액 적은 줄은 그대로, 비운 줄은 (지출 총액 − 적은 금액 합계)를 나눠 넣는다.
-    필라멘트는 통 수대로, 그 밖은 똑같이 (그 밖은 비운 줄이 하나뿐이라 그 줄이 전부). 저장은 하지 않는다"""
-    blank = [line for line in lines if line.amount is None]
-    left = amount - sum((line.amount for line in lines if line.amount is not None), Decimal(0))
-    weight = (lambda line: line.qty) if category == ExpenseCategory.FILAMENT else (lambda line: Decimal(1))
-    weights = sum((weight(line) for line in blank), Decimal(0))
-    for line in lines:
-        if line.amount is not None:
-            line.total = line.amount
+def split_totals(category, amount, items):
+    """항목 금액(total) 정하기: 금액 적은 항목은 그대로, 비운 항목은 (지출 총액 − 적은 금액 합계)를 나눠 넣는다.
+    필라멘트는 롤 수대로, 그 밖은 똑같이 (그 밖은 비운 항목이 하나뿐이라 그 항목이 전부). 저장은 하지 않는다"""
+    blank = [item for item in items if item.amount is None]
+    left = amount - sum((item.amount for item in items if item.amount is not None), Decimal(0))
+    weight = (lambda item: item.qty) if category == ExpenseCategory.FILAMENT else (lambda item: Decimal(1))
+    weights = sum((weight(item) for item in blank), Decimal(0))
+    for item in items:
+        if item.amount is not None:
+            item.total = item.amount
         else:
-            line.total = (left * weight(line) / weights).quantize(Decimal('0.01'))
+            item.total = (left * weight(item) / weights).quantize(Decimal('0.01'))
 
 
-def line_key(line):
-    """구매 줄이 가리키는 것 — ('color', id) 또는 ('part', id)"""
-    return ('color', line.color_id) if line.color_id else ('part', line.part_id)
+def item_key(item):
+    """구매 항목이 가리키는 것 — ('color', id) 또는 ('part', id)"""
+    return ('color', item.color_id) if item.color_id else ('part', item.part_id)
 
 
-def latest_line(key):
-    """그 색상 · 품목의 최근 구매 줄 (지출 날짜 → 나중에 넣은 지출 → 나중 줄 순). 없으면 None"""
+def latest_item(key):
+    """그 색상 · 품목의 최근 구매 항목 (지출 날짜 → 나중에 넣은 지출 → 나중 항목 순). 없으면 None"""
     field, pk = key
-    return ExpenseLine.objects.filter(**{f'{field}_id': pk}).order_by('-expense__date', '-expense_id', '-id').first()
+    return ExpenseItem.objects.filter(**{f'{field}_id': pk}).order_by('-expense__date', '-expense_id', '-id').first()
 
 
 def last_buy_annotations(field):
     """색상(field='color') · 품목(field='part') 목록에 붙이는 최근 구매 — last_buy_expense · _date · _name"""
-    lines = ExpenseLine.objects.filter(**{field: OuterRef('pk')}).order_by('-expense__date', '-expense_id', '-id')
+    items = ExpenseItem.objects.filter(**{field: OuterRef('pk')}).order_by('-expense__date', '-expense_id', '-id')
     return {
-        'last_buy_expense': Subquery(lines.values('expense_id')[:1]),
-        'last_buy_date': Subquery(lines.values('expense__date')[:1]),
-        'last_buy_name': Subquery(lines.values('expense__name')[:1]),
+        'last_buy_expense': Subquery(items.values('expense_id')[:1]),
+        'last_buy_date': Subquery(items.values('expense__date')[:1]),
+        'last_buy_name': Subquery(items.values('expense__name')[:1]),
     }
 
 
@@ -205,13 +205,13 @@ def won(value):
 
 
 def refresh_buy_prices(keys):
-    """원가 계산표 단가 = 최근 구매가 (TBD-31). 구매 줄이 바뀐 색상 · 품목마다 최근 구매 줄로 다시 맞춘다
-    — 색상 가격 = 통당 금액, 품목 묶음 가격 · 묶음 수량 = 줄 금액 · 수량. 남은 구매가 없으면 지금 값 그대로"""
+    """원가 계산표 단가 = 최근 구매가 (TBD-31). 구매 항목이 바뀐 색상 · 품목마다 최근 구매 항목으로 다시 맞춘다
+    — 색상 가격 = 롤당 금액, 품목 묶음 가격 · 묶음 수량 = 항목 금액 · 수량. 남은 구매가 없으면 지금 값 그대로"""
     for key in keys:
-        line = latest_line(key)
-        if line is None:
+        item = latest_item(key)
+        if item is None:
             continue
         if key[0] == 'color':
-            Color.objects.filter(pk=key[1]).update(price=won(line.each))
+            Color.objects.filter(pk=key[1]).update(price=won(item.each))
         else:
-            Part.objects.filter(pk=key[1]).update(price=won(line.total), pack_qty=line.qty)
+            Part.objects.filter(pk=key[1]).update(price=won(item.total), pack_qty=item.qty)

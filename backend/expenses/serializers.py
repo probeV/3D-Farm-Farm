@@ -14,9 +14,9 @@ from .models import (
     BUY_PART_KINDS,
     Expense,
     ExpenseCategory,
-    ExpenseLine,
+    ExpenseItem,
     RecurringExpense,
-    line_key,
+    item_key,
     refresh_buy_prices,
     split_totals,
 )
@@ -49,7 +49,7 @@ class ExpenseListSerializer(serializers.ListSerializer):
         return attrs
 
 
-class ExpenseLineSerializer(BaseModelSerializer):
+class ExpenseItemSerializer(BaseModelSerializer):
     """구매 줄 (TBD-31). 필라멘트 지출은 color · 통 수, 부속품 · 포장재 · 소모품 지출은 그 탭의 part · 수량.
     수정할 때 기존 줄은 id 를 함께 보낸다 (그 줄로 등록한 스풀 연결이 유지됨)"""
 
@@ -63,7 +63,7 @@ class ExpenseLineSerializer(BaseModelSerializer):
     spools = serializers.SerializerMethodField()
 
     class Meta:
-        model = ExpenseLine
+        model = ExpenseItem
         fields = ['id', 'color', 'part', 'qty', 'amount', 'total', 'each', 'name', 'unit', 'spools']
         extra_kwargs = {
             'color': {'required': False, 'error_messages': {'does_not_exist': '없는 색상입니다.'}},
@@ -101,7 +101,7 @@ class ExpenseSerializer(BaseModelSerializer):
        줄을 지우면 스풀은 연결만 끊긴다 (구매가 그대로)
     """
 
-    lines = ExpenseLineSerializer(many=True, required=False)
+    lines = ExpenseItemSerializer(many=True, required=False, source='items')
 
     class Meta:
         model = Expense
@@ -127,10 +127,10 @@ class ExpenseSerializer(BaseModelSerializer):
                 same = same.exclude(pk=self.instance.pk)
             if same.exists():
                 raise serializers.ValidationError({'recurring': ['이 달에 이미 넣은 반복 지출입니다.']})
-        if 'lines' in attrs:
+        if 'items' in attrs:
             category = attrs.get('category', getattr(self.instance, 'category', None))
             amount = attrs.get('amount', getattr(self.instance, 'amount', None))
-            self._check_lines(category, amount, attrs['lines'])
+            self._check_lines(category, amount, attrs['items'])
         return attrs
 
     def _check_lines(self, category, amount, lines):
@@ -143,7 +143,7 @@ class ExpenseSerializer(BaseModelSerializer):
             raise serializers.ValidationError(
                 {'lines': ['구매 줄은 필라멘트 · 부속품 · 포장재 · 소모품 지출에만 적어요.']}
             )
-        old = {line.pk: line for line in self.instance.lines.all()} if self.instance else {}
+        old = {line.pk: line for line in self.instance.items.all()} if self.instance else {}
         seen = set()
         for i, row in enumerate(lines):
             color, part = row.get('color'), row.get('part')
@@ -180,14 +180,14 @@ class ExpenseSerializer(BaseModelSerializer):
     # ---- 저장
     @transaction.atomic
     def create(self, validated_data):
-        lines = validated_data.pop('lines', [])
+        lines = validated_data.pop('items', [])
         expense = super().create(validated_data)
         self._save_lines(expense, lines, before={})
         return expense
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        lines = validated_data.pop('lines', None)
+        lines = validated_data.pop('items', None)
         before = snapshot(instance)
         if lines is None and validated_data.get('category', instance.category) != instance.category:
             lines = []  # 분류를 바꾸면 이전 분류의 구매 줄은 맞지 않으므로 지움
@@ -200,20 +200,20 @@ class ExpenseSerializer(BaseModelSerializer):
         """구매 줄 맞추기(rows 가 None 이면 그대로) → 줄 금액 다시 → 남은 수량 · 최근 구매가"""
         if rows is not None:
             keep = {row['id'] for row in rows if 'id' in row}
-            expense.lines.exclude(pk__in=keep).delete()
+            expense.items.exclude(pk__in=keep).delete()
             for row in rows:
                 row = {'color': None, 'part': None, 'amount': None, **row}
                 pk = row.pop('id', None)
                 if pk:
-                    ExpenseLine.objects.filter(pk=pk).update(**row)
+                    ExpenseItem.objects.filter(pk=pk).update(**row)
                 else:
-                    ExpenseLine.objects.create(expense=expense, **row)
+                    ExpenseItem.objects.create(expense=expense, **row)
         # 응답에서 새 줄이 보이도록 미리 읽어 둔 줄을 비운다
         if hasattr(expense, '_prefetched_objects_cache'):
-            expense._prefetched_objects_cache.pop('lines', None)
-        lines = list(expense.lines.all())
+            expense._prefetched_objects_cache.pop('items', None)
+        lines = list(expense.items.all())
         split_totals(expense.category, expense.amount, lines)
-        ExpenseLine.objects.bulk_update(lines, ['total'])
+        ExpenseItem.objects.bulk_update(lines, ['total'])
         stock.sync_expense(expense)
         after = snapshot(expense)
         refresh_buy_prices({key for key in before.keys() | after.keys() if before.get(key) != after.get(key)})
@@ -221,4 +221,4 @@ class ExpenseSerializer(BaseModelSerializer):
 
 def snapshot(expense):
     """최근 구매가에 쓰는 값 {('color'|'part', id): (날짜, 수량, 줄 금액)}. 저장 전후를 비교해 바뀐 것만 다시 맞춘다"""
-    return {line_key(line): (expense.date, line.qty, line.total) for line in expense.lines.all()}
+    return {item_key(line): (expense.date, line.qty, line.total) for line in expense.items.all()}

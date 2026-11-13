@@ -1,7 +1,7 @@
 """남은 수량 바꾸기 (STOCK-04 · 05). 남은 수량(Part.stock)과 입출고 기록(StockHistory)을 항상 함께 바꾼다.
 
-여러 API 에서 쓴다 — 품목 조정 · 다 씀(stock), 판매 저장 · 삭제(sales), 지출 구매 줄 저장 · 삭제(expenses, TBD-31).
-sales · products · expenses 를 import 하지 않고, 판매의 줄(sale.items · sale.packs) · 지출의 구매 줄(expense.lines) ·
+여러 API 에서 쓴다 — 품목 조정 · 다 씀(stock), 판매 저장 · 삭제(sales), 지출 구매 항목 저장 · 삭제(expenses, TBD-31).
+sales · products · expenses 를 import 하지 않고, 판매의 줄(sale.items · sale.packs) · 지출의 구매 항목(expense.items) ·
 제품의 부속품(product.parts)을 역참조로 읽는다.
 """
 
@@ -93,7 +93,7 @@ def sync_expense(expense):
     """지출을 저장한 뒤 부르면, 구매 줄의 품목 수량만큼 남은 수량을 늘린다 (판매와 같게 — 고치면 차이만)"""
     done = recorded(expense=expense)
     want = defaultdict(Decimal)
-    for line in expense.lines.all():
+    for line in expense.items.all():
         if line.part_id:
             want[line.part_id] += line.qty
     note = expense_note(expense)

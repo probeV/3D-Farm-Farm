@@ -1,12 +1,12 @@
 from django.contrib import admin
 
-from .models import Expense, ExpenseLine, RecurringExpense
+from .models import Expense, ExpenseItem, RecurringExpense
 
 
-class ExpenseLineInline(admin.TabularInline):
+class ExpenseItemInline(admin.TabularInline):
     """구매 줄은 보기만 (남은 수량 · 최근 구매가와 함께 바꿔야 해서 화면 · API 로)"""
 
-    model = ExpenseLine
+    model = ExpenseItem
     extra = 0
     fields = ['color', 'part', 'qty', 'amount', 'total']
     readonly_fields = fields
@@ -22,7 +22,7 @@ class ExpenseAdmin(admin.ModelAdmin):
     list_filter = ['category']
     search_fields = ['name', 'shop', 'note']
     date_hierarchy = 'date'
-    inlines = [ExpenseLineInline]
+    inlines = [ExpenseItemInline]
 
 
 @admin.register(RecurringExpense)

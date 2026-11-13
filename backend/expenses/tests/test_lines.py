@@ -9,14 +9,14 @@ from rest_framework.test import APITestCase
 from filaments.models import Brand, Color, Filament, Material, Spool
 from stock.models import Part, PartKind, StockHistory
 
-from ..models import Expense, ExpenseLine
+from ..models import Expense, ExpenseItem
 
 API = '/api/v0'
 TODAY = datetime.date(2026, 10, 28)
 
 
 @mock.patch('django.utils.timezone.localdate', return_value=TODAY)
-class ExpenseLineApiTests(APITestCase):
+class ExpenseItemApiTests(APITestCase):
     def setUp(self):
         filament = Filament.objects.create(
             brand=Brand.objects.create(name='Bambu Lab'), material=Material.objects.create(name='PLA'), series='Basic'
@@ -225,11 +225,11 @@ class ExpenseLineApiTests(APITestCase):
                 else:
                     self.assertEqual(got, errors)
         self.assertFalse(Expense.objects.exists())
-        self.assertFalse(ExpenseLine.objects.exists())
+        self.assertFalse(ExpenseItem.objects.exists())
 
     def test_line_of_other_expense(self, _):
         a = self.post('part', 9000, [{'part': self.magnet.pk, 'qty': 100}])
         b = self.post('part', 9000, [{'part': self.magnet.pk, 'qty': 100}])
         res = self.patch(b.data['id'], lines=[{'id': a.data['lines'][0]['id'], 'part': self.magnet.pk, 'qty': 1}])
         self.assertEqual(res.data['lines'][0]['id'], ['이 지출의 구매 줄이 아닙니다.'])
-        self.assertEqual(Decimal(ExpenseLine.objects.get(pk=a.data['lines'][0]['id']).qty), 100)
+        self.assertEqual(Decimal(ExpenseItem.objects.get(pk=a.data['lines'][0]['id']).qty), 100)

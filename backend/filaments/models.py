@@ -205,12 +205,36 @@ class Color(models.Model):
         return None if price is None else price / self.filament.spool_g
 
 
+class SpoolNumber(models.Model):
+    """지금까지 쓴 가장 큰 스풀 번호 (v2 TBD-33 · 18). 항상 1행 (pk=1)
+
+    지운 스풀의 번호를 다시 쓰지 않으려고 따로 기억한다 — 라벨을 붙였다가 지운 스풀의 번호가
+    다른 스풀에 다시 붙지 않게. 새 번호는 Spool.take_code_nos() 로만 받는다
+    """
+
+    last = models.PositiveIntegerField('지금까지 쓴 가장 큰 번호', default=0)
+
+    class Meta:
+        verbose_name = '스풀 번호'
+        verbose_name_plural = '스풀 번호'
+
+    def __str__(self):
+        return f'S{self.last:05d}'
+
+    @classmethod
+    def remember(cls, code_no):
+        """이 번호까지 썼다고 기억 (되돌리기로 다시 만든 스풀처럼 번호를 직접 정한 경우)"""
+        cls.objects.get_or_create(pk=1)
+        cls.objects.filter(pk=1, last__lt=code_no).update(last=code_no)
+
+
 class Spool(models.Model):
     """스풀 1개 = 1행
 
     스풀 코드(S00012)는 사용자·라벨용 식별자라서 DB id 와 따로 `code_no` 로 관리한다.
     id 는 DB 사정(이전·재생성)으로 바뀔 수 있지만, 라벨에 찍힌 코드는 바뀌면 안 되기 때문.
-    번호는 비우면 자동(가장 큰 번호 + 1), 원하면 직접 지정 (중복 불가).
+    번호는 비우면 자동 — 지금까지 쓴 가장 큰 번호 + 1 (지운 번호는 다시 쓰지 않음, SpoolNumber).
+    직접 지정은 되돌리기(지운 스풀을 같은 번호로 다시 만들기)용 (중복 불가).
     """
 
     class Status(models.TextChoices):
@@ -231,14 +255,14 @@ class Spool(models.Model):
     status = models.CharField('상태', max_length=10, choices=Status.choices, default=Status.SEALED)
     price = models.DecimalField('구매가', null=True, blank=True, **MONEY)
     purchased_at = models.DateField('구매일', default=timezone.localdate)
-    # 지출 장부의 구매 줄 (v2 TBD-31). 고르면 구매가 · 구매일은 그 주문에서 복사. 지출을 고치거나 지워도 구매가는 그대로
+    # 지출의 구매 항목 (v2 TBD-31 · 33). 필라멘트 지출을 저장하면 생긴 스풀이 그 항목을 가리킴 (지출 → 스풀 한 방향)
     buy = models.ForeignKey(
-        'expenses.ExpenseLine',
+        'expenses.ExpenseItem',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='spools',
-        verbose_name='주문(구매 줄)',
+        verbose_name='주문(구매 항목)',
     )
     opened_at = models.DateTimeField('사용 시작일', null=True, blank=True)
     finished_at = models.DateTimeField('사용 완료일', null=True, blank=True)
@@ -255,7 +279,9 @@ class Spool(models.Model):
 
     def save(self, *args, **kwargs):
         if self.code_no is None:
-            self.code_no = self.next_code_no()
+            self.code_no = self.take_code_nos(1)[0]
+        else:
+            SpoolNumber.remember(self.code_no)
         super().save(*args, **kwargs)
 
     @property
@@ -265,9 +291,21 @@ class Spool(models.Model):
 
     @staticmethod
     def next_code_no():
-        """지금 있는 가장 큰 번호 + 1"""
-        largest = Spool.objects.aggregate(largest=models.Max('code_no'))['largest']
-        return (largest or 0) + 1
+        """다음 번호 (받아 가지는 않음) = 지금까지 쓴 가장 큰 번호 · 지금 있는 가장 큰 번호 중 큰 것 + 1"""
+        largest = Spool.objects.aggregate(largest=models.Max('code_no'))['largest'] or 0
+        last = SpoolNumber.objects.filter(pk=1).values_list('last', flat=True).first() or 0
+        return max(largest, last) + 1
+
+    @staticmethod
+    @transaction.atomic
+    def take_code_nos(count):
+        """새 번호 count 개를 받는다 (다음 번호부터 이어서) → [번호, …]. 받은 번호는 지워도 다시 쓰지 않는다.
+        bulk_create 는 save() 를 거치지 않으므로 여러 개를 만들 때는 이걸로 번호를 받아 넣는다"""
+        start = Spool.next_code_no()
+        numbers = list(range(start, start + count))
+        if numbers:
+            SpoolNumber.remember(numbers[-1])
+        return numbers
 
     @staticmethod
     def code_no_from_code(code):

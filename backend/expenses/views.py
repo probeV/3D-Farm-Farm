@@ -11,19 +11,19 @@ from rest_framework.response import Response
 from filaments.views import BaseViewSet
 from stock import services as stock
 
-from .models import Expense, ExpenseLine, RecurringExpense, line_key, refresh_buy_prices
+from .models import Expense, ExpenseItem, RecurringExpense, item_key, refresh_buy_prices
 from .serializers import ExpenseSerializer, RecurringExpenseSerializer
 
 
-def lines_for_list():
+def items_for_list():
     """구매 줄 + 표시 이름에 쓰는 색상 · 필라멘트 · 품목 + 등록한 스풀 수를 한 번에 (N+1 방지)"""
-    return ExpenseLine.objects.select_related('color__filament__brand', 'color__filament__material', 'part').annotate(
+    return ExpenseItem.objects.select_related('color__filament__brand', 'color__filament__material', 'part').annotate(
         spool_count=Count('spools')
     )
 
 
 class ExpenseViewSet(BaseViewSet):
-    queryset = Expense.objects.prefetch_related(Prefetch('lines', queryset=lines_for_list())).order_by('-date', '-id')
+    queryset = Expense.objects.prefetch_related(Prefetch('items', queryset=items_for_list())).order_by('-date', '-id')
     serializer_class = ExpenseSerializer
 
     # POST /expenses/ — 한 줄이면 객체, 여러 줄(이번 달 반복 지출 넣기)이면 목록
@@ -38,7 +38,7 @@ class ExpenseViewSet(BaseViewSet):
     @transaction.atomic
     def perform_destroy(self, instance):
         # 구매 줄로 늘린 남은 수량을 되돌리고(입출고 기록에 `지출 삭제` 줄), 지운 뒤 단가를 남은 최근 구매로
-        keys = {line_key(line) for line in instance.lines.all()}
+        keys = {item_key(line) for line in instance.items.all()}
         stock.revert_expense(instance)
         instance.delete()
         refresh_buy_prices(keys)

@@ -7,9 +7,9 @@ from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404  # 숫자가 아닌 id 도 404 (Django 것은 500)
 from rest_framework.response import Response
 
-from expenses.models import ExpenseLine, last_buy_annotations, won
+from expenses.models import ExpenseItem, last_buy_annotations, won
 
-from .models import Brand, Color, Filament, Material, Spool
+from .models import Brand, Color, Filament, Material, Spool, SpoolNumber
 from .serializers import (
     BrandSerializer,
     ColorSerializer,
@@ -138,7 +138,7 @@ class ColorViewSet(BaseViewSet):
 
         if buy is not None:
             # 주문(지출 구매 줄)을 고르면 구매가 = 통당 금액, 구매일 = 지출 날짜 (보낸 값은 무시). 수량은 남은 통까지
-            line = buy_lines(color).filter(pk=buy).first()
+            line = buy_items(color).filter(pk=buy).first()
             if line is None:
                 raise serializers.ValidationError({'buy': ['이 색상의 주문이 아닙니다.']})
             left = int(line.qty) - line.spool_count
@@ -171,6 +171,7 @@ class ColorViewSet(BaseViewSet):
             )
             for n in numbers
         )
+        SpoolNumber.remember(max(numbers))  # 지운 번호를 다시 쓰지 않게 (TBD-33)
         spools = Spool.objects.filter(code_no__in=numbers).order_by('code_no')
         return Response(SpoolSerializer(spools, many=True).data, status=status.HTTP_201_CREATED)
 
@@ -179,7 +180,7 @@ class ColorViewSet(BaseViewSet):
     def buys(self, request, pk=None):
         """이 색상을 산 지출 구매 줄 중 등록할 통이 남은 것, 최근 주문 먼저 (TBD-31)"""
         color = get_object_or_404(Color, pk=pk)
-        lines = buy_lines(color).filter(qty__gt=F('spool_count')).order_by('-expense__date', '-expense_id', '-id')
+        lines = buy_items(color).filter(qty__gt=F('spool_count')).order_by('-expense__date', '-expense_id', '-id')
         return Response(
             [
                 {
@@ -196,9 +197,9 @@ class ColorViewSet(BaseViewSet):
         )
 
 
-def buy_lines(color):
+def buy_items(color):
     """이 색상의 지출 구매 줄 + 지출 + 등록한 스풀 수"""
-    return ExpenseLine.objects.filter(color=color).select_related('expense').annotate(spool_count=Count('spools'))
+    return ExpenseItem.objects.filter(color=color).select_related('expense').annotate(spool_count=Count('spools'))
 
 
 class SpoolViewSet(BaseViewSet):
