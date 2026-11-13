@@ -274,7 +274,9 @@ const cat = (k) => CATS.find((c) => c.key === k);
 
 // ---------------------------------------------------------------- 더미 데이터
 const TODAY = "2026-10-28";
-// v2 TBD-31: 필라멘트 · 부속품 · 포장 · 소모품 지출에 '구매' 을 적으면 스풀 구매가 · 단가(최근 구매가) · 남은 수량으로 이어진다
+// v2 TBD-31 · 33: 필라멘트 · 부속품 · 포장 · 소모품 지출에 구매 항목을 적으면 재고로 이어진다
+//   필라멘트 — 저장하면 스풀을 롤 수만큼 바로 만든다 (구매가 = 롤당 금액). 지출 → 스풀 한 방향, 차이만
+//   부속품 · 포장재 · 소모품 — 남은 수량 + 수량. 최근 구매면 단가(색상 가격 · 묶음 가격)가 바뀜
 // 색상 (filaments.html 일부). price = 지금 원가 계산표의 1kg 스풀 가격
 const COLORS = [
   { id: 1, fil: "Bambu Lab › PLA Basic", name: "화이트", hex: "#F5F5F5", price: 14400 },
@@ -285,7 +287,7 @@ const COLORS = [
   { id: 10, fil: "Coobean › PLA", name: "블루", hex: "#1E5BB8", price: 9000 },
 ];
 // v2 재고 관리 품목 (parts.html · packaging.html · consumables.html 과 같음). id = "종류:번호", each = 개당 단가(최근 구매가), stock = 남은 수량
-// 구매 줄에 고르면: 저장할 때 남은 수량 + 수량, 최근 구매면 단가 = 금액 ÷ 수량
+// 구매 항목에 고르면: 저장할 때 남은 수량 + 수량, 최근 구매면 단가 = 금액 ÷ 수량 (같은 품목 여러 항목이면 합계 ÷ 수량 합계)
 const KINDS = { part: "부속품", pack: "포장재", supply: "소모품" };
 const PARTS = [
   { id: "part:1", kind: "part", name: "네오디뮴 자석 6×3mm", unit: "개", each: 60, stock: 1240 },
@@ -319,7 +321,7 @@ const db = {
   // 지출 (EXP-01). recurring: 반복 지출에서 넣은 줄이면 그 id
   expenses: [
     { id: 1, date: "2026-05-11", name: "3D 프린터 (콤보)", category: "invest", amount: 1090000, shop: "쿠팡", url: "https://example.com/order/1", note: "AMS 포함" },
-    { id: 2, date: "2026-05-11", name: "PLA 필라멘트 4롤", category: "filament", amount: 76000, shop: "쿠팡", url: "", note: "배송비 포함", items: [[1, 4, null]], spools: 4 },
+    { id: 2, date: "2026-05-11", name: "PLA 필라멘트 4롤", category: "filament", amount: 76000, shop: "쿠팡", url: "", note: "배송비 포함", items: [[1, 4, null]], used: { 1: 4 } },
     { id: 3, date: "2026-05-20", name: "필라멘트 건조기", category: "invest", amount: 89000, shop: "알리", url: "", note: "" },
     { id: 4, date: "2026-05-20", name: "클라우드 저장소", category: "sub", amount: 2900, shop: "", url: "", note: "" },
     { id: 5, date: "2026-06-03", name: "네오디뮴 자석 6×3mm 200개", category: "part", amount: 12000, shop: "알리", url: "https://example.com/magnet", note: "", items: [["part:1", 200, null]] },
@@ -329,7 +331,7 @@ const db = {
     { id: 9, date: "2026-07-02", name: "OPP 봉투 15×20 500장", category: "pack", amount: 8900, shop: "쿠팡", url: "https://example.com/opp", note: "", items: [["pack:3", 500, null]] },
     { id: 10, date: "2026-07-05", name: "AI 구독", category: "sub", amount: 29000, shop: "", url: "", note: "", recurring: 1 },
     { id: 11, date: "2026-07-12", name: "3D 모델링 툴 구독", category: "sub", amount: 15000, shop: "", url: "", note: "", recurring: 2 },
-    { id: 12, date: "2026-07-18", name: "PETG 필라멘트 2롤", category: "filament", amount: 42000, shop: "쿠팡", url: "", note: "", items: [[9, 2, null]], spools: 2 },
+    { id: 12, date: "2026-07-18", name: "PETG 필라멘트 2롤", category: "filament", amount: 42000, shop: "쿠팡", url: "", note: "", items: [[9, 2, null]], used: { 9: 1 } },
     { id: 13, date: "2026-07-20", name: "클라우드 저장소", category: "sub", amount: 2900, shop: "", url: "", note: "" },
     { id: 14, date: "2026-08-05", name: "AI 구독", category: "sub", amount: 29000, shop: "", url: "", note: "", recurring: 1 },
     { id: 15, date: "2026-08-09", name: "라벨 프린터", category: "invest", amount: 59000, shop: "쿠팡", url: "", note: "QR 라벨용 (TBD-18)" },
@@ -340,7 +342,7 @@ const db = {
     { id: 20, date: "2026-09-08", name: "소형 박스 50개", category: "pack", amount: 22000, shop: "박스몰", url: "", note: "", items: [["pack:4", 50, null]] },
     { id: 21, date: "2026-09-12", name: "3D 모델링 툴 구독", category: "sub", amount: 15000, shop: "", url: "", note: "", recurring: 2 },
     { id: 22, date: "2026-09-15", name: "검색 광고 충전", category: "sell", amount: 50000, shop: "", url: "", note: "" },
-    { id: 23, date: "2026-09-22", name: "PLA 필라멘트 6롤", category: "filament", amount: 108000, shop: "쿠팡", url: "", note: "", items: [[1, 4, null], [2, 2, null]], spools: 3 },
+    { id: 23, date: "2026-09-22", name: "PLA 필라멘트 6롤", category: "filament", amount: 108000, shop: "쿠팡", url: "", note: "", items: [[1, 4, null], [2, 2, null]], used: { 1: 1 } },
     { id: 24, date: "2026-09-30", name: "택배비 (9월)", category: "sell", amount: 31500, shop: "편의점 택배", url: "", note: "9건" },
     { id: 25, date: "2026-10-05", name: "AI 구독", category: "sub", amount: 29000, shop: "", url: "", note: "", recurring: 1 },
     { id: 26, date: "2026-10-10", name: "전기요금 (9월분)", category: "sub", amount: 18400, shop: "", url: "", note: "프린터 쪽 추정" },
@@ -348,6 +350,13 @@ const db = {
     { id: 28, date: "2026-10-21", name: "도장 제작", category: "etc", amount: 12000, shop: "", url: "", note: "사업자 도장" },
   ],
 };
+
+// 스풀 번호: 지금까지 쓴 가장 큰 번호 다음부터 (지운 번호는 다시 쓰지 않음, TBD-33)
+let lastSpoolNo = 100;
+const spoolCode = (n) => "S" + String(n).padStart(5, "0");
+// 필라멘트 지출의 색상별 롤 수 / 사용한(사용 중 · 사용 완료) 스풀 수 — 사용한 스풀은 지출에서 줄이거나 지울 수 없음
+const rollsOf = (items) => items.reduce((m, [id, q]) => m.set(id, (m.get(id) || 0) + q), new Map());
+const usedOf = (x) => Object.values(x?.used || {}).reduce((a, n) => a + n, 0);
 
 // ---------------------------------------------------------------- 유틸
 const $ = (s, r = document) => r.querySelector(s);
@@ -363,9 +372,11 @@ const catBadge = (k) => `<span class="cat ${k === "invest" ? "invest" : ""}">${e
 const LINK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 const orderLink = (x) => (x.url ? `<a class="buy-link" href="${esc(x.url)}" target="_blank" rel="noopener" data-link title="주문 내역 열기 (새 탭) · ${esc(x.url)}">${LINK_ICON}주문</a>` : "");
 let toastTimer;
-function toast(msg) {
+// link: 알림 오른쪽 바로가기 (스풀이 생기면 `라벨 인쇄` → QR 화면, 그 스풀이 골라진 채로)
+function toast(msg, link) {
   const t = $("#toast"); t.textContent = msg; t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200);
+  if (link) t.insertAdjacentHTML("beforeend", ` <a href="${link.href}" style="margin-left:12px;color:var(--accent);filter:brightness(1.2)">${esc(link.label)}</a>`);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), link ? 7000 : 2200);
 }
 
 // 반복 지출: 이번 달 결제일이 지났는데 아직 안 넣은 것 (그 반복에서 이번 달에 넣은 줄이 없음)
@@ -524,7 +535,7 @@ function confirmBox(o) {
   };
 }
 const shopOptions = () => { $("#shops").innerHTML = [...new Set(db.expenses.map((x) => x.shop).filter(Boolean))].sort().map((s) => `<option value="${esc(s)}">`).join(""); };
-// 구매 줄 → 줄마다 금액 · 단가. 배송비 포함 총액에서 금액 적은 줄을 빼고, 남은 금액을 비운 줄에 나눔
+// 구매 항목 → 항목마다 금액 · 단가. 배송비 포함 총액에서 금액 적은 항목을 빼고, 남은 금액을 비운 항목에 나눔
 function splitItems(category, items, amount) {
   const fixed = items.reduce((a, [, , m]) => a + (m ?? 0), 0);
   const blank = items.filter(([, , m]) => m == null);
@@ -540,7 +551,7 @@ function splitItems(category, items, amount) {
 const isLatest = (x, category, id, date) => !db.expenses.some((y) => y !== x && y.category === category && y.date > date && (y.items || []).some(([i]) => i === id));
 const itemMark = (x) => {
   if (!x.items?.length) return "";
-  if (x.category === "filament") { const n = x.items.reduce((a, [, q]) => a + q, 0); return `<span class="rec-mark buy" title="스풀 ${n}통 · 등록 ${x.spools || 0}통">🧵 ${n}통 · 등록 ${x.spools || 0}</span>`; }
+  if (x.category === "filament") { const n = x.items.reduce((a, [, q]) => a + q, 0); return `<span class="rec-mark buy" title="스풀 ${n}개 (사용 ${usedOf(x)}) · ${[...rollsOf(x.items)].map(([id, q]) => `${colorOf(id).name} ${q}롤`).join(", ")}">🧵 ${n}롤</span>`; }
   return `<span class="rec-mark buy" title="재고 관리로 이어짐 · ${x.items.map(([id, q]) => `${KINDS[partOf(id).kind]} ${partOf(id).name} +${q}${partOf(id).unit}`).join(", ")}">📦 ${x.items.map(([id, q]) => `${partOf(id).name.split(" ")[0]} ${q}${partOf(id).unit}`).join(" · ")}</span>`;
 };
 const catPick = (sel) => `<div class="cat-pick" role="radiogroup" aria-label="분류">${CATS.map((c) => `<label title="${esc(c.ex)}"><input type="radio" name="category" value="${c.key}" ${c.key === sel ? "checked" : ""} required><span>${esc(c.label)}</span></label>`).join("")}</div>`;
@@ -568,7 +579,7 @@ function openExpense(x, preset = {}) {
       <button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div>`);
   const form = dlg.form;
   const urlOk = (v) => !v || /^https?:\/\/\S+\.\S+/.test(v);
-  // 구매 줄 (필라멘트: 색상 · 통 수 / 부속품 · 포장, 소모품: 품목 · 수량). 금액은 비우면 나눠 넣음
+  // 구매 항목 (필라멘트: 색상 · 롤 수 / 부속품 · 포장, 소모품: 품목 · 수량). 금액은 비우면 나눠 넣음. 같은 색상 · 품목 여러 항목 가능
   const buy = { category: init.category, items: (init.items || []).map((r) => [...r]) };
   const drawBuy = () => {
     const box = $("#buy-box"), k = buy.category;
@@ -576,6 +587,10 @@ function openExpense(x, preset = {}) {
     if (!buy.items.length) buy.items.push([0, 1, null]);
     const amount = Number(form.elements.amount.value) || 0;
     const rows = splitItems(k, buy.items.filter(([id]) => id), amount);
+    // 같은 색상 · 품목 여러 항목이면 단가는 그 항목들의 합계 ÷ 수량 합계
+    const avg = new Map();
+    rows.forEach((r) => { const g = avg.get(r.id) || { total: 0, qty: 0 }; g.total += r.total; g.qty += r.qty; avg.set(r.id, g); });
+    const newEach = (id) => { const g = avg.get(id); return g && g.qty ? g.total / g.qty : null; };
     const multiPart = k !== "filament" && buy.items.filter(([id, , m]) => id && m == null).length > 1;
     const opts = (sel) => k === "filament"
       ? `<option value="">색상 고르기</option>${[...new Set(COLORS.map((c) => c.fil))].map((fl) => `<optgroup label="${esc(fl)}">${COLORS.filter((c) => c.fil === fl).map((c) => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</optgroup>`).join("")}`
@@ -586,23 +601,25 @@ function openExpense(x, preset = {}) {
         ${buy.items.map(([id, q, m], i) => {
           const r = id ? rows[ri++] : null;
           const cur = id ? (k === "filament" ? colorOf(id).price : partOf(id).each) : null;
-          const newEach = r ? (k === "filament" ? r.each : r.each) : null;
           const latest = id && isLatest(x, k, id, form.elements.date.value);
-          const effect = !r ? "" : !latest ? `<span class="hint">${k === "filament" ? "" : `재고 +${q.toLocaleString("ko-KR")}${partOf(id).unit} · `}최근 구매 아님 · 단가 그대로</span>`
-            : k === "filament" ? `통당 <b>${won(r.each)}</b> · 단가 ${cur == null ? "미입력" : won(cur)} → <b>${won(r.each)}</b>`
-            : `재고 <b>+${q.toLocaleString("ko-KR")}${partOf(id).unit}</b> · 단가 ${(Math.round(cur * 10) / 10).toLocaleString("ko-KR")}원 → <b>${(Math.round(r.each * 10) / 10).toLocaleString("ko-KR")}원</b>`;
+          // 필라멘트: 스풀이 몇 개 생기는지 (수정이면 원래 항목과 비교한 차이)
+          const was = x && x.category === "filament" && x.items[i] && x.items[i][0] === id ? x.items[i][1] : 0;
+          const spool = k !== "filament" ? "" : q - was > 0 ? `스풀 +${q - was}개 · ` : q - was < 0 ? `스풀 −${was - q}개 · ` : x ? "스풀 그대로 · " : "";
+          const effect = !r ? "" : !latest ? `<span class="hint">${k === "filament" ? `롤당 ${won(r.each)} · ${spool}` : `재고 +${q.toLocaleString("ko-KR")}${partOf(id).unit} · `}최근 구매 아님 · 단가 그대로</span>`
+            : k === "filament" ? `롤당 <b>${won(r.each)}</b> · ${spool}단가 ${cur == null ? "미입력" : won(cur)} → <b>${won(newEach(id))}</b>`
+            : `재고 <b>+${q.toLocaleString("ko-KR")}${partOf(id).unit}</b> · 단가 ${(Math.round(cur * 10) / 10).toLocaleString("ko-KR")}원 → <b>${(Math.round(newEach(id) * 10) / 10).toLocaleString("ko-KR")}원</b>`;
           return `<div class="buy-row" data-bi="${i}">
             <select data-b="id" aria-label="${k === "filament" ? "색상" : "품목"}">${opts(id)}</select>
-            <div class="with-suffix"><input type="number" data-b="q" min="1" step="1" value="${q}" aria-label="수량"><em>${k === "filament" ? "통" : id ? partOf(id).unit : "개"}</em></div>
+            <div class="with-suffix"><input type="number" data-b="q" min="1" step="1" value="${q}" aria-label="수량"><em>${k === "filament" ? "롤" : id ? partOf(id).unit : "개"}</em></div>
             <div class="with-suffix"><input type="number" data-b="m" min="0" step="100" value="${m ?? ""}" placeholder="${r && r.auto ? Math.round(r.total).toLocaleString("ko-KR") : "나눠 넣기"}" aria-label="금액"><em>원</em></div>
-            <button type="button" class="icon-btn" data-brm="${i}" title="이 줄 빼기" ${buy.items.length > 1 ? "" : "disabled"}>✕</button>
+            <button type="button" class="icon-btn" data-brm="${i}" title="이 항목 빼기" ${buy.items.length > 1 ? "" : "disabled"}>✕</button>
             <div class="buy-effect">${effect}</div></div>`;
         }).join("")}
       </div>
       <div class="buy-foot"><button type="button" class="btn small add" data-badd>+ ${k === "filament" ? "색상" : "품목"} 추가</button>
-        ${multiPart ? '<span class="warn-t">여러 가지면 줄마다 금액</span>' : ""}
+        ${multiPart ? '<span class="warn-t">여러 가지면 항목마다 금액</span>' : ""}
         ${k !== "filament" ? `<a class="btn small" href="${{ part: "parts.html", pack: "packaging.html", supply: "consumables.html" }[k]}" style="margin-left:auto;text-decoration:none">재고 관리</a>` : ""}
-        ${k === "filament" && x ? `<span class="hint">스풀 등록 ${x.spools || 0} / ${buy.items.reduce((a, [, q]) => a + q, 0)}통</span>` : ""}</div>`;
+        ${k === "filament" && usedOf(x) ? `<span class="hint" title="사용 중 · 사용 완료 스풀은 지출에서 줄이거나 색상을 바꿀 수 없어요">사용한 스풀 ${usedOf(x)}개</span>` : ""}</div>`;
   };
   drawBuy();
   form.addEventListener("change", (e) => {
@@ -627,7 +644,10 @@ function openExpense(x, preset = {}) {
     if (e.target.closest("[data-close]")) return dlg.el.close();
     if (e.target.closest("[data-copy]")) return openExpense(null, { copyOf: x });
     if (e.target.closest("[data-del]")) {
-      confirmBox({ title: "지출 삭제", lead: `<b>${esc(x.name)}</b> (${x.date.replaceAll("-", ".")} · ${won(x.amount)}) 을(를) 삭제할까요?`,
+      // 필라멘트: 사용한 스풀이 있으면 막음 (안), 아니면 재고 스풀도 함께 지움
+      if (x.category === "filament" && usedOf(x)) return toast(`사용한 스풀 ${usedOf(x)}개가 있어 삭제할 수 없어요`);
+      const rolls = x.category === "filament" ? (x.items || []).reduce((a, [, q]) => a + q, 0) : 0;
+      confirmBox({ title: "지출 삭제", lead: `<b>${esc(x.name)}</b> (${x.date.replaceAll("-", ".")} · ${won(x.amount)}) 을(를) 삭제할까요?${rolls ? `<br><span class="hint">재고 스풀 ${rolls}개도 함께 지워져요</span>` : ""}`,
         onOk: () => { db.expenses = db.expenses.filter((y) => y !== x); dlg.el.close(); refresh(); toast("삭제했어요"); } });
     }
   };
@@ -639,24 +659,39 @@ function openExpense(x, preset = {}) {
     if (!d.category) return toast("분류를 고르세요");
     // 구매: 필라멘트 · 부속품 · 포장 · 소모품일 때만. 최근 구매면 단가를 바꾸고, 재고 품목은 남은 수량을 늘린다
     // (수정이면 이전 수량과의 차이만, 삭제하면 되돌림 — 재고 관리 입출고 기록에 `지출 · 항목` 으로)
-    let msg = "저장했어요";
+    let msg = "저장했어요", newSpools = null;
     if (d.category === "filament" || KINDS_OF[d.category]) {
       const items = buy.items.filter(([id]) => id);
-      if (d.category !== "filament" && items.filter(([, , m]) => m == null).length > 1) return toast("여러 가지면 줄마다 금액을 적어요");
+      if (d.category !== "filament" && items.filter(([, , m]) => m == null).length > 1) return toast("여러 가지면 항목마다 금액을 적어요");
+      // 필라멘트: 사용한 스풀보다 적게 줄이거나 그 색상을 빼면 막음
+      if (d.category === "filament" && x?.used) {
+        const now = rollsOf(items);
+        const short = Object.entries(x.used).find(([id, n]) => n > (now.get(Number(id)) || 0));
+        if (short) return toast(`${colorOf(short[0]).name}: 사용한 스풀 ${short[1]}개보다 적게 줄일 수 없어요`);
+      }
       d.items = items;
-      const changed = splitItems(d.category, items, d.amount).filter((r) => isLatest(x, d.category, r.id, d.date));
+      // 최근 구매가: 같은 색상 · 품목 여러 항목이면 합계 ÷ 수량 합계
+      const byId = new Map();
+      splitItems(d.category, items, d.amount).forEach((r) => { const g = byId.get(r.id) || { id: r.id, total: 0, qty: 0 }; g.total += r.total; g.qty += r.qty; byId.set(r.id, g); });
+      const changed = [...byId.values()].map((g) => ({ ...g, each: g.total / g.qty })).filter((r) => isLatest(x, d.category, r.id, d.date));
       changed.forEach((r) => { if (d.category === "filament") colorOf(r.id).price = Math.round(r.each); else partOf(r.id).each = r.each; });
+      // 필라멘트: 롤 수 차이만큼 스풀을 만들거나 재고 스풀을 지움 (지출 → 스풀 한 방향)
+      const rollDiff = d.category === "filament" ? items.reduce((a, [, q]) => a + q, 0) - (x?.category === "filament" ? (x.items || []).reduce((a, [, q]) => a + q, 0) : 0) : 0;
+      let spoolMsg = "";
+      if (rollDiff > 0) { const from = lastSpoolNo + 1; lastSpoolNo += rollDiff; newSpools = { label: "라벨 인쇄", href: `qr.html?pick=${spoolCode(from)}-${spoolCode(lastSpoolNo)}&from=${encodeURIComponent(`방금 저장한 지출 ${d.name}의 스풀`)}` }; spoolMsg = `스풀 ${rollDiff}개 (${spoolCode(from)}${rollDiff > 1 ? " ~ " + spoolCode(lastSpoolNo) : ""})`; }
+      if (rollDiff < 0) spoolMsg = `재고 스풀 ${-rollDiff}개 지움`;
       const before = new Map((x?.items || []).map(([id, q]) => [id, q]));
       const added = d.category === "filament" ? [] : items.map(([id, q]) => [id, q - (before.get(id) || 0)]).filter(([, n]) => n);
       added.forEach(([id, n]) => (partOf(id).stock += n));
       const parts = [
+        spoolMsg,
         added.length ? `재고 ${added.map(([id, n]) => `${partOf(id).name.split(" ")[0]} ${n > 0 ? "+" : ""}${n}${partOf(id).unit}`).join(", ")}` : "",
         changed.length ? `단가 ${changed.map((r) => d.category === "filament" ? `${colorOf(r.id).name} ${won(r.each)}` : `${partOf(r.id).name.split(" ")[0]} ${Math.round(r.each * 10) / 10}원`).join(", ")}` : "",
       ].filter(Boolean);
       if (parts.length) msg = `저장했어요 · ${parts.join(" · ")}`;
     } else d.items = undefined;
-    if (x) Object.assign(x, d); else db.expenses.push({ ...d, id: nextId(db.expenses), spools: 0 });
-    dlg.el.close(); refresh(); toast(msg);
+    if (x) Object.assign(x, d); else db.expenses.push({ ...d, id: nextId(db.expenses) });
+    dlg.el.close(); refresh(); toast(msg, newSpools);
   };
 }
 

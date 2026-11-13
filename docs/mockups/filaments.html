@@ -338,6 +338,8 @@ input[type=color] { width: 44px; height: 36px; padding: 2px; cursor: pointer; }
 .spool-id { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
 .spool-id small { font-size: 11px; }
 .price-cell input { width: 100px; flex: none; padding: 3px 8px; }
+.price-cell.locked { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.price-cell.locked .tag { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; }
 .status-btns { display: flex; gap: 8px; justify-content: flex-end; }
 .status-btns button { min-width: 70px; padding: 4px 0; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; border: 1px solid var(--border); background: var(--surface); }
 .status-btns button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
@@ -454,11 +456,11 @@ const db = {
 };
 // 제품에서 쓰는 색상 (색상 id → 제품 이름). 제품 원가 목업의 사용 필라멘트 줄과 같은 역할
 const COLOR_USED_BY = { 1: ["DNA 모형"], 8: ["분수 원판 세트", "소마 큐브"], 12: ["키링"] };
-// v2 TBD-31: 지출 장부의 필라멘트 주문 (expenses.html '산 것'). 색상별 [통 수, 통당 구매가(배송비 나눠 넣음), 이미 등록한 수]
-// 이 주문이 그 색상의 최근 구매면 색상 가격 = 통당 구매가 (지출을 저장할 때 자동)
+// v2 TBD-31 · 33: 지출 장부의 필라멘트 주문 (expenses.html 구매 항목). 색상별 [롤 수, 롤당 구매가(배송비 나눠 넣음)]
+// 지출을 저장하면 스풀이 롤 수만큼 바로 생긴다 (구매가 · 구매일은 주문에서). 최근 구매면 색상 가격 = 롤당 구매가
 const FIL_ORDERS = [
-  { date: "2026-09-22", name: "PLA 필라멘트 6롤", lines: { 2: [2, 15000, 1], 1: [4, 14400, 3] } },
-  { date: "2026-10-27", name: "Esun PLA 5롤", lines: { 7: [5, 8000, 0] } },
+  { date: "2026-09-22", name: "PLA 필라멘트 6롤", lines: { 2: [2, 15000], 1: [4, 14400] } },
+  { date: "2026-10-27", name: "Esun PLA 5롤", lines: { 7: [5, 8000] } },
 ];
 const lastBuyOf = (cid) => FIL_ORDERS.filter((o) => o.lines[cid]).sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
 // 색상: [필라멘트, 이름, hex, 색상 가격, 재고, 사용 중, 사용 완료]
@@ -484,6 +486,8 @@ const lastBuyOf = (cid) => FIL_ORDERS.filter((o) => o.lines[cid]).sort((a, b) =>
       db.spools.push({
         id, color: c.id, code: "S" + String(id).padStart(5, "0"), status,
         price: base ? base - (k % 2) * 1000 : null,
+        // 주문(지출)으로 생긴 스풀이면 그 주문 — 구매가는 지출에서만 고침 (TBD-33). 없으면 재고 추가(지출 없이)로 넣은 스풀
+        buy: k % 2 === 0 ? { date: "2026-09-22", name: "PLA 필라멘트 6롤" } : null,
         purchased_at: `2026-${String(8 + (id % 3)).padStart(2, "0")}-${String(1 + (id * 7) % 27).padStart(2, "0")}`,
         opened_at: status !== "sealed" ? `2026-10-${String(1 + (id * 3) % 17).padStart(2, "0")}` : null,
         finished_at: status === "empty" ? `2026-10-${String(2 + (id * 5) % 16).padStart(2, "0")}` : null,
@@ -537,9 +541,10 @@ const ORDER = { sealed: 0, open: 1, empty: 2 };
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/;
 const normHex = (v) => "#" + v.replace("#", "").toUpperCase();
 let toastTimer;
-function toast(msg, undo) {
+// link: 오른쪽 바로가기 (재고 추가 뒤 `라벨 인쇄` → QR 화면, 그 스풀이 골라진 채로)
+function toast(msg, undo, link) {
   const t = $("#toast");
-  t.innerHTML = `<span>${esc(msg)}</span>${undo ? "<button type='button'>되돌리기</button>" : ""}`;
+  t.innerHTML = `<span>${esc(msg)}</span>${link ? `<a href="${link.href}" style="color:var(--accent);font-weight:700;filter:brightness(1.2)">${esc(link.label)}</a>` : ""}${undo ? "<button type='button'>되돌리기</button>" : ""}`;
   if (undo) t.querySelector("button").onclick = () => { t.hidden = true; toast("되돌렸어요 (목업)"); };
   t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), undo ? 7000 : 2200);
 }
@@ -990,29 +995,16 @@ function openPurchase(c) {
   show(dlg, `<div class="dlg-head"><span class="title">${swatch(c.hex)} ${esc(filFullName(f))} · ${esc(c.name)} 재고 추가</span></div><div class="dlg-body"><div class="form-grid">
     <label class="field"><span>수량</span><div class="with-suffix"><input type="number" name="qty" min="1" max="100" value="1"><em>개</em></div></label>
     <label class="field"><span>구매일</span><input type="date" name="date" value="2026-10-19"></label>
-    <label class="field full"><span>주문 (지출 장부)</span><select name="order">${FIL_ORDERS.filter((o) => o.lines[c.id] && o.lines[c.id][0] > o.lines[c.id][2]).map((o, i) => `<option value="${FIL_ORDERS.indexOf(o)}" ${i === 0 ? "selected" : ""}>${o.date.replaceAll("-", ".")} ${esc(o.name)} · ${o.lines[c.id][0] - o.lines[c.id][2]}통 남음 · ${won(o.lines[c.id][1])}</option>`).join("")}
-      <option value="">주문 없이 (구매가 직접 입력)</option></select>
-      <span class="hint" id="order-hint"></span></label>
     <label class="field full"><span>스풀 1개 구매가</span><div class="with-suffix"><input type="number" name="price" min="0" step="100" value="${colorPrice(c) ?? ""}"><em>원</em></div>
       <span class="hint">기본값은 ${c.price != null ? "색상" : "필라멘트"} 가격이에요. 할인받았다면 실제 가격을 입력하세요.</span></label>
+    <p class="hint" style="margin:0;grid-column:1 / -1">지출 없이 들어온 스풀용 (선물 · 예전 재고). 산 스풀은 <b>지출</b>에 적으면 자동으로 생겨요</p>
   </div></div>${foot("", "재고에 추가")}`);
   onClose(dlg);
-  // 주문을 고르면 구매가 · 구매일은 주문에서 (고칠 수 없음), 수량은 남은 통까지
-  const syncOrder = () => {
-    const F = dlg.form, o = FIL_ORDERS[F.elements.order.value], l = o?.lines[c.id];
-    F.elements.price.readOnly = F.elements.date.readOnly = !!o;
-    if (o) { F.elements.price.value = l[1]; F.elements.date.value = o.date; F.elements.qty.max = l[0] - l[2];
-      if (Number(F.elements.qty.value) > l[0] - l[2]) F.elements.qty.value = l[0] - l[2];
-      $("#order-hint").textContent = `구매가 · 구매일은 주문에서 (배송비 나눠 넣음) · 최대 ${l[0] - l[2]}통`; }
-    else { F.elements.price.value = colorPrice(c) ?? ""; F.elements.qty.max = 100; $("#order-hint").textContent = "지출 장부와 따로 적어요 (같은 구매를 지출에도 적었다면 주문을 고르세요)"; }
-  };
-  dlg.form.elements.order.onchange = syncOrder; syncOrder();
   dlg.form.onsubmit = (e) => {
-    e.preventDefault(); const fd = new FormData(dlg.form); const qty = Math.max(1, Math.min(Number(dlg.form.elements.qty.max) || 100, Number(fd.get("qty")) || 1)); const codes = [];
-    const ord = FIL_ORDERS[fd.get("order")]; if (ord) ord.lines[c.id][2] += qty;
+    e.preventDefault(); const fd = new FormData(dlg.form); const qty = Math.max(1, Math.min(100, Number(fd.get("qty")) || 1)); const codes = [];
     for (let i = 0; i < qty; i++) { const id = db.spools.length + 1; const code = "S" + String(id).padStart(5, "0"); codes.push(code);
       db.spools.push({ id, color: c.id, code, status: "sealed", price: fd.get("price") ? Number(fd.get("price")) : null, purchased_at: fd.get("date"), opened_at: null, finished_at: null }); }
-    close(dlg); render(); toast(`${qty}개 추가했어요 (${codes[0]}${qty > 1 ? " ~ " + codes.at(-1) : ""})`, true);
+    close(dlg); render(); toast(`${qty}개 추가했어요 (${codes[0]}${qty > 1 ? " ~ " + codes.at(-1) : ""})`, true, { label: "라벨 인쇄", href: `qr.html?pick=${codes[0]}-${codes.at(-1)}&from=${encodeURIComponent("방금 재고 추가한 스풀")}` });
   };
 }
 
@@ -1052,7 +1044,10 @@ function openAdjust(c, page = 1, view = "simple") {
   const list = spoolsOf(c).sort((a, b) => a.id - b.id);
   const pages = Math.max(1, Math.ceil(list.length / PAGE)); page = Math.min(page, pages);
   const rows = list.slice((page - 1) * PAGE, page * PAGE);
-  const price = (s) => `<div class="with-suffix price-cell"><input type="number" min="0" step="100" data-price="${s.id}" value="${s.price ?? ""}" placeholder="미입력"><em>원</em></div>`;
+  // 주문(지출)으로 생긴 스풀은 구매가를 여기서 못 고침 — 지출에서 (현금 기준 지출과 손익 기준 스풀 구매가가 어긋나지 않게)
+  const price = (s) => s.buy
+    ? `<div class="price-cell locked" title="주문 ${s.buy.date.replaceAll("-", ".")} ${esc(s.buy.name)} · 구매가는 지출에서 고쳐요"><span>${won(s.price)}</span><span class="tag">지출</span></div>`
+    : `<div class="with-suffix price-cell"><input type="number" min="0" step="100" data-price="${s.id}" value="${s.price ?? ""}" placeholder="미입력"><em>원</em></div>`;
   const simple = (s) => `<div class="spool-row simple" data-spool="${s.id}"><div class="spool-id"><code>${s.code}</code><small class="muted">${s.purchased_at}</small></div>${price(s)}
     <div class="status-btns">${Object.entries(STATUS).map(([k, v]) => `<button type="button" data-set="${k}" class="${k === s.status ? "current" : ""}" ${k === s.status ? "disabled" : ""}>${v}</button>`).join("")}</div></div>`;
   const detail = (s) => `<div class="spool-row detail" data-spool="${s.id}"><code>${s.code}</code><span class="status-tag s-${s.status}">${STATUS[s.status]}</span>
