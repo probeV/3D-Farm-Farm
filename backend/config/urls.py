@@ -24,6 +24,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # JSON API. 주소가 바뀌는 변경을 하면 v1 을 새로 만들고 v0 는 그대로 둔다
     path('api/v0/', include('filaments.urls')),
+    path('api/v0/', include('stock.urls')),
     path('api/v0/', include('products.urls')),
     path('api/v0/', include('expenses.urls')),
     path('api/v0/', include('sales.urls')),

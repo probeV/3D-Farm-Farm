@@ -1,7 +1,8 @@
 """제품 원가 모델 — docs/ERD.md 기준.
 
-카테고리(Category) → 세부 분류(Subcategory) · 제품(Product), 부자재 카테고리(PartCategory) → 부자재(Part)
-제품 → 사용 필라멘트(ProductFilament, filaments 앱의 Filament · Color) · 사용 부자재(ProductPart → Part)
+카테고리(Category) → 세부 분류(Subcategory) · 제품(Product)
+제품 → 사용 필라멘트(ProductFilament, filaments 앱의 Filament · Color) · 사용 부속품(ProductPart → stock 앱의 Part)
+     · 기본 포장(stock 앱의 PackSet)
 원가 계산 설정값은 CostSetting 1개 행
 """
 
@@ -12,6 +13,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from filaments.models import MONEY, Color, Filament
+from stock.models import PackSet, Part
 
 
 def percent(**kwargs):
@@ -62,60 +64,6 @@ class Subcategory(models.Model):
         return f'{self.category} › {self.name}'
 
 
-class PartCategory(models.Model):
-    """부자재 카테고리 (부품, 포장재 …). 원가 내역에서 부자재비를 카테고리별로 나눠 보여 줄 때 쓴다"""
-
-    name = models.CharField('이름', max_length=50, unique=True)
-
-    class Meta:
-        verbose_name = '부자재 카테고리'
-        verbose_name_plural = '부자재 카테고리'
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-
-class Part(models.Model):
-    """부자재 (자석, 나사, 포장재 …). 묶음 구매가 ÷ 묶음 수량 = 개당 단가"""
-
-    name = models.CharField('품목', max_length=100, unique=True)
-    # 카테고리를 지우면 그 부자재는 미분류 (원가는 그대로)
-    category = models.ForeignKey(
-        PartCategory,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='parts',
-        verbose_name='카테고리',
-    )
-    shop = models.CharField('회사/구매처', max_length=100, blank=True)
-    buy_url = models.URLField('구매 링크', max_length=500, blank=True)
-    price = models.DecimalField('묶음 구매가', null=True, blank=True, **MONEY)
-    pack_qty = models.DecimalField(
-        '묶음 수량',
-        max_digits=10,
-        decimal_places=2,
-        default=1,
-        validators=[MinValueValidator(Decimal('0.01'))],
-    )
-    unit = models.CharField('단위', max_length=10, default='개')
-    note = models.TextField('메모', blank=True)
-
-    class Meta:
-        verbose_name = '부자재'
-        verbose_name_plural = '부자재'
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-    @property
-    def unit_price(self):
-        """개당 단가. 구매가가 없으면 None"""
-        return None if self.price is None else self.price / self.pack_qty
-
-
 class Product(models.Model):
     """판매 제품. 카테고리 · 세부 분류는 비워도 됨 (미분류)
 
@@ -154,6 +102,15 @@ class Product(models.Model):
     name = models.CharField('제품명', max_length=100)
     print_minutes = models.PositiveIntegerField('출력 시간(분)', null=True, blank=True)
     sale_price = models.DecimalField('판매가', null=True, blank=True, **MONEY)
+    # 1개 보낼 때의 포장 (STOCK-06) → 원가 · 권장 판매가의 포장비. 쓰는 제품이 있으면 세트 삭제 불가
+    default_pack = models.ForeignKey(
+        PackSet,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='products',
+        verbose_name='기본 포장',
+    )
     status = models.CharField('상태', max_length=20, choices=Status.choices, default=Status.DEVELOPING)
     note = models.TextField('메모', blank=True)
     created_at = models.DateTimeField('추가일', auto_now_add=True)
@@ -227,15 +184,15 @@ class ProductFilament(models.Model):
 
 
 class ProductPart(models.Model):
-    """제품 ↔ 부자재 + 수량"""
+    """제품 ↔ 부속품 + 수량. 포장재는 기본 포장(PackSet)으로 따로"""
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='parts', verbose_name='제품')
-    part = models.ForeignKey(Part, on_delete=models.PROTECT, related_name='product_parts', verbose_name='부자재')
+    part = models.ForeignKey(Part, on_delete=models.PROTECT, related_name='product_parts', verbose_name='부속품')
     qty = models.DecimalField('수량', max_digits=10, decimal_places=2, default=1, validators=[MinValueValidator(0)])
 
     class Meta:
-        verbose_name = '사용 부자재'
-        verbose_name_plural = '사용 부자재'
+        verbose_name = '사용 부속품'
+        verbose_name_plural = '사용 부속품'
         ordering = ['id']
 
     def __str__(self):

@@ -6,17 +6,15 @@
 from django.db import transaction
 from django.db.models import Count, Prefetch
 from rest_framework import generics, status
-from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from filaments.views import BaseViewSet
+from stock.models import Part
 
-from .models import Category, CostSetting, Part, PartCategory, Product, ProductPart, Subcategory
+from .models import Category, CostSetting, Product, ProductPart, Subcategory
 from .serializers import (
     CategorySerializer,
     CostSettingSerializer,
-    PartCategorySerializer,
-    PartSerializer,
     ProductSerializer,
     ReplacePartSerializer,
     SubcategorySerializer,
@@ -48,25 +46,16 @@ class SubcategoryViewSet(BaseViewSet):
     protected_message = '제품이 있어서 삭제할 수 없습니다.'
 
 
-class PartCategoryViewSet(BaseViewSet):
-    """부자재 카테고리. 지우면 그 부자재는 미분류 (SET_NULL, 막는 것 없음)"""
+class ReplacePartView(generics.GenericAPIView):
+    """POST /parts/{id}/replace/ {to, products?} — 제품에서 쓰는 이 부속품 줄을 다른 부속품으로 (TBD-23).
+    부속품 자체(stock 앱)가 아니라 제품의 줄을 바꾸는 동작이라 여기에 둔다"""
 
-    queryset = PartCategory.objects.annotate(part_count=Count('parts')).order_by('name')
-    serializer_class = PartCategorySerializer
+    queryset = Part.objects.all()
 
-
-class PartViewSet(BaseViewSet):
-    # 같은 제품에 같은 부자재를 두 줄 둘 수도 있으므로 제품 수는 distinct
-    queryset = Part.objects.annotate(product_count=Count('product_parts__product', distinct=True)).order_by('name')
-    serializer_class = PartSerializer
-    protected_message = '제품에서 쓰고 있어서 삭제할 수 없습니다.'
-
-    # POST /parts/{id}/replace/ {to, products?} — 제품에서 쓰는 이 부자재 줄을 다른 부자재로 (TBD-23)
-    @action(detail=True, methods=['post'])
     @transaction.atomic  # 하나라도 실패하면 아무것도 바꾸지 않음
-    def replace(self, request, pk=None):
-        """제품의 부자재 바꾸기 → {replaced: 바꾼 제품 수}.
-        수량은 그대로, 그 제품에 이미 바꿀 부자재가 있으면 수량을 더해 한 줄로"""
+    def post(self, request, pk=None):
+        """제품의 부속품 바꾸기 → {replaced: 바꾼 제품 수}.
+        수량은 그대로, 그 제품에 이미 바꿀 부속품이 있으면 수량을 더해 한 줄로"""
         part = self.get_object()
         data = ReplacePartSerializer(data=request.data, context={'part': part})
         data.is_valid(raise_exception=True)

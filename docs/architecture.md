@@ -24,15 +24,24 @@ frontend/ (React)                          backend/ (Django)
 | 앱 | 모델 | 상태 |
 |---|---|---|
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` | 모델 완료 |
-| `products` | `Category`, `Subcategory`, `Part`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 모델 · API 완료 |
+| `stock` | `PartCategory`, `Part`, `StockHistory`, `PackSet`, `PackSetLine` | v2 STOCK: 모델 (부자재 API 는 그대로 옮김) |
+| `products` | `Category`, `Subcategory`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 모델 · API 완료 |
 | `expenses` | `Expense`, `RecurringExpense` | 모델 · API 완료 |
-| `sales` | `Sale`, `SaleItem` | 모델 · API · 화면 완료 (v2) |
+| `sales` | `Sale`, `SaleItem`, `SalePack` | 모델 · API · 화면 완료 (v2, 포장 줄은 모델만) |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
-- **참조 방향은 한쪽으로만**: `products` → `filaments` (제품이 필라멘트를 씀). `filaments` 는 `products` 를 import 하지 않는다.
-  `expenses` 는 다른 앱의 모델을 쓰지 않는다 (공통 `MONEY` · `BaseViewSet` 만 `filaments` 에서).
-  `sales` → `products` (판매 줄이 제품 · 원가 설정을 씀). `products` 는 `sales` 를 import 하지 않는다.
-- 부자재(`Part`)는 제품 원가에서만 쓰여서 `products` 에 둔다. 따로 커지면 그때 `parts` 앱으로 분리한다.
+- **참조 방향은 한쪽으로만** (`→` = import 함):
+  ```
+  sales ──→ products ──→ filaments
+    │           │            ↑
+    └──→ stock ←┘ ───────────┘        expenses → filaments (공통 MONEY · BaseViewSet 만)
+  ```
+  `products` → `filaments` · `stock` (제품이 필라멘트 · 부속품 · 기본 포장 세트를 씀). `sales` → `products` · `stock` (판매 줄이 제품 · 포장재를 씀).
+  `filaments` · `stock` 은 `products` · `sales` 를 import 하지 않는다 — 입출고 기록(`StockHistory.sale`)만 문자열 `'sales.Sale'` 로
+  판매를 가리키고(판매를 고칠 때 차이 계산용), `stock/services.py` 는 판매 · 제품의 줄을 역참조로 읽는다.
+- 화면의 `재고 관리` 메뉴는 `filaments`(필라멘트 탭)와 `stock`(부속품 · 포장 · 소모품 탭) 두 앱을 쓴다 — 앱은 화면이 아니라 데이터 묶음 단위.
+  필라멘트는 스풀 단위로 따로 관리해서 `filaments` 앱 그대로 둔다.
+- 제품의 부속품 바꾸기(`POST /parts/{id}/replace/`)는 제품의 줄을 바꾸는 동작이라 `products` 의 뷰다 (주소는 `/parts/` 아래 그대로).
 - 새 앱: `backend/` 에서 `python manage.py startapp <앱>` → `config/settings.py` 의 `INSTALLED_APPS` 에 추가.
 
 ### 2.2 앱 안의 파일 역할
@@ -50,6 +59,8 @@ frontend/ (React)                          backend/ (Django)
 
 **서비스 계층(`services.py`)은 두지 않는다** — 지금은 여러 행을 바꾸는 동작이 API 하나에서만 쓰여서 뷰에 둔다.
 같은 동작을 여러 API 에서 쓰게 되면(예: QR 스캔 등록) 그때 `services.py` 로 뺀다.
+- 첫 예: **`stock/services.py`** — 남은 수량은 품목 조정 · 다 씀 · 판매 저장 · 삭제 · (TBD-31) 지출 구매에서 바뀌어서,
+  `move()` 하나로 남은 수량과 입출고 기록을 함께 바꾼다. 판매는 저장 후 `sync_sale()`(차이만 기록), 지우기 전 `revert_sale()`.
 
 **조회는 뷰가, 시리얼라이저는 읽기만** — 개수 · 평균 같은 계산값은 뷰의 queryset 에서 `annotate` 로 한 번에 붙이고,
 시리얼라이저의 `get_xxx()` 는 붙어 있는 값을 읽기만 한다 (객체마다 쿼리하면 N+1).
@@ -61,6 +72,7 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
   ```python
   # config/urls.py
   path('api/v0/', include('filaments.urls')),
+  path('api/v0/', include('stock.urls')),
   path('api/v0/', include('products.urls')),
   path('api/v0/', include('expenses.urls')),
   path('api/v0/', include('sales.urls')),

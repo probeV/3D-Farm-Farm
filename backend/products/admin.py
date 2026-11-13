@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, CostSetting, Part, PartCategory, Product, ProductFilament, ProductPart, Subcategory
+from .models import Category, CostSetting, Product, ProductFilament, ProductPart, Subcategory
 
 
 class SubcategoryInline(admin.TabularInline):
@@ -22,22 +22,6 @@ class SubcategoryAdmin(admin.ModelAdmin):
     list_select_related = ['category']
 
 
-@admin.register(PartCategory)
-class PartCategoryAdmin(admin.ModelAdmin):
-    search_fields = ['name']
-
-
-@admin.register(Part)
-class PartAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'shop', 'price', 'pack_qty', 'unit', 'unit_price']
-    list_filter = ['category']
-    search_fields = ['name', 'shop']
-
-    @admin.display(description='개당 단가')
-    def unit_price(self, obj):
-        return obj.unit_price
-
-
 class ProductFilamentInline(admin.TabularInline):
     model = ProductFilament
     extra = 0
@@ -57,7 +41,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ['status', 'category']
     search_fields = ['name']
     list_select_related = ['category', 'subcategory__category']
-    autocomplete_fields = ['category', 'subcategory']
+    autocomplete_fields = ['category', 'subcategory', 'default_pack']
     inlines = [ProductFilamentInline, ProductPartInline]
 
     def get_search_results(self, request, queryset, search_term):
