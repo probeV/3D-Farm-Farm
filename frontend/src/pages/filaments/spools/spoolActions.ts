@@ -61,8 +61,8 @@ export function useSpoolActions() {
     async remove(spool: Spool) {
       await deleteSpool(spool.id)
       await refresh()
-      const { code_no, color, status, price, purchased_at, opened_at, finished_at, note } = spool
-      const content = { code_no, color, status, price, purchased_at, opened_at, finished_at, note }
+      const { code_no, color, status, price, purchased_at, opened_at, finished_at, note, buy } = spool
+      const content = { code_no, color, status, price, purchased_at, opened_at, finished_at, note, buy }
       withUndo(`${spool.code} 삭제했어요`, () => createSpool(content))
     },
 

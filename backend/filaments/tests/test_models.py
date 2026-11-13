@@ -8,7 +8,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 from django.test import TestCase
 
-from ..models import Brand, Color, Filament, Material, Spool, normalize_hex, validate_logo_size
+from ..models import Brand, Color, Filament, Material, Spool, SpoolNumber, normalize_hex, validate_logo_size
 from .utils import TempMediaMixin, image_size, make_image
 
 
@@ -205,6 +205,28 @@ class SpoolTests(TestCase):
         start = Spool.next_code_no()
         Spool.objects.bulk_create([Spool(color=self.color, code_no=start + i) for i in range(3)])
         self.assertEqual([s.code for s in Spool.objects.all()], ['S00001', 'S00002', 'S00003'])
+
+    def test_deleted_numbers_not_reused(self):
+        """지운 번호는 다시 쓰지 않는다 (TBD-33) — 맨 끝 번호를 지워도 다음 번호는 그 다음부터"""
+        a, b = Spool.objects.create(color=self.color), Spool.objects.create(color=self.color)
+        self.assertEqual((a.code, b.code), ('S00001', 'S00002'))
+        b.delete()
+        self.assertEqual(Spool.objects.create(color=self.color).code, 'S00003')
+
+    def test_take_code_nos(self):
+        Spool.objects.create(color=self.color, code_no=7)  # 직접 정한 번호도 기억
+        self.assertEqual(SpoolNumber.objects.get().last, 7)
+        self.assertEqual(Spool.take_code_nos(3), [8, 9, 10])
+        self.assertEqual(Spool.take_code_nos(1), [11])  # 받은 번호는 만들지 않아도 다시 안 줌
+        self.assertEqual(Spool.take_code_nos(0), [])
+
+    def test_restore_keeps_number(self):
+        """되돌리기: 지운 스풀을 같은 번호로 다시 만들 수 있다 (가장 큰 번호는 그대로)"""
+        spool = Spool.objects.create(color=self.color)
+        Spool.objects.create(color=self.color)
+        spool.delete()
+        self.assertEqual(Spool.objects.create(color=self.color, code_no=1).code, 'S00001')
+        self.assertEqual(SpoolNumber.objects.get().last, 2)
 
     def test_code_no_from_code(self):
         self.assertEqual(Spool.code_no_from_code('S00012'), 12)

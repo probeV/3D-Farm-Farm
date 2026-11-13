@@ -7,7 +7,7 @@ from django.test import TestCase
 from filaments.models import Brand, Color, Filament, Material, Spool
 from stock.models import Part, PartKind
 
-from ..models import Expense, ExpenseCategory, ExpenseLine, RecurringExpense
+from ..models import Expense, ExpenseCategory, ExpenseItem, RecurringExpense
 
 
 class RecurringExpenseTests(TestCase):
@@ -36,8 +36,8 @@ class RecurringExpenseTests(TestCase):
         self.assertIsNone(e.recurring)
 
 
-class ExpenseLineTests(TestCase):
-    """구매 줄 (v2 TBD-31) — 색상이나 품목 중 하나, 지우면 함께 / 스풀은 연결만 끊김"""
+class ExpenseItemTests(TestCase):
+    """구매 항목 (v2 TBD-31 · 33) — 색상이나 품목 중 하나, 지우면 함께 / 스풀은 연결만 끊김"""
 
     def setUp(self):
         filament = Filament.objects.create(
@@ -52,22 +52,22 @@ class ExpenseLineTests(TestCase):
     def test_color_or_part(self):
         for color, part in [(None, None), (self.color, self.part)]:
             with self.subTest(color=color, part=part), self.assertRaises(IntegrityError), transaction.atomic():
-                ExpenseLine.objects.create(expense=self.expense, color=color, part=part, qty=1)
+                ExpenseItem.objects.create(expense=self.expense, color=color, part=part, qty=1)
 
     def test_each(self):
-        line = ExpenseLine.objects.create(expense=self.expense, color=self.color, qty=4, total=Decimal('72000'))
+        line = ExpenseItem.objects.create(expense=self.expense, color=self.color, qty=4, total=Decimal('72000'))
         self.assertEqual(line.each, 18000)
 
     def test_delete_expense_keeps_spool(self):
-        line = ExpenseLine.objects.create(expense=self.expense, color=self.color, qty=4, total=Decimal('72000'))
+        line = ExpenseItem.objects.create(expense=self.expense, color=self.color, qty=4, total=Decimal('72000'))
         spool = Spool.objects.create(color=self.color, price=18000, buy=line)
         self.expense.delete()
         spool.refresh_from_db()
         self.assertEqual((spool.buy, spool.price), (None, 18000))
-        self.assertFalse(ExpenseLine.objects.exists())
+        self.assertFalse(ExpenseItem.objects.exists())
 
     def test_delete_color_deletes_line(self):
-        ExpenseLine.objects.create(expense=self.expense, color=self.color, qty=4)
+        ExpenseItem.objects.create(expense=self.expense, color=self.color, qty=4)
         self.color.delete()
-        self.assertFalse(ExpenseLine.objects.exists())
+        self.assertFalse(ExpenseItem.objects.exists())
         self.assertTrue(Expense.objects.exists())

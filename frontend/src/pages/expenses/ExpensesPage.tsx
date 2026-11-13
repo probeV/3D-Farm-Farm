@@ -296,7 +296,7 @@ export default function ExpensesPage() {
   }
 }
 
-// 항목 옆 구매 표시 (TBD-31): 필라멘트 `🧵 6통 · 등록 3` · 품목 `📦 네오디뮴 200개`
+// 항목 옆 구매 표시 (TBD-31 · 33): 필라멘트 `🧵 6롤` · 품목 `📦 네오디뮴 200개`
 function BuyMark({ expense }: { expense: Expense }) {
   const mark = buyMark(expense)
   return mark ? (

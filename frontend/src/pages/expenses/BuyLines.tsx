@@ -3,7 +3,16 @@ import type { Part } from '../../api/products'
 import Help from '../../components/Help'
 import { unitWon, won } from '../../format'
 import { qty as qtyText } from '../stock/kinds'
-import { emptyRow, isLatest, parseRows, splitTotals, type BuyField, type BuyRow } from './buyRows'
+import {
+  averageEach,
+  emptyRow,
+  isLatest,
+  parseRows,
+  spoolDiff,
+  splitTotals,
+  type BuyField,
+  type BuyRow,
+} from './buyRows'
 
 // 고를 수 있는 색상 (필라멘트 이름 · 지금 원가 계산표의 스풀 가격 포함)
 export interface BuyColor {
@@ -27,8 +36,9 @@ interface Props {
   onChange: (rows: BuyRow[]) => void
 }
 
-// 지출 창의 구매 줄 (v2 TBD-31, docs/screens.md 5.3): [색상 · 품목] [수량] [금액] ✕ + 줄 아래 저장하면 바뀌는 것.
-// 필라멘트는 스풀 구매가 · 색상 가격으로, 부속품 · 포장재 · 소모품은 남은 수량 · 묶음 가격으로 이어진다
+// 지출 창의 구매 항목 (v2 TBD-31 · 33, docs/screens.md 5.3): [색상 · 품목] [수량] [금액] ✕ + 항목 아래 저장하면 바뀌는 것.
+// 필라멘트는 스풀(롤 수만큼 생김) · 색상 가격으로, 부속품 · 포장재 · 소모품은 남은 수량 · 묶음 가격으로 이어진다.
+// 같은 색상 · 품목 여러 항목이면 단가는 합친 평균. 사용한 스풀이 있는 항목은 색상 변경 · 빼기 불가
 export default function BuyLines(p: Props) {
   const { category, field, rows, amount, date, expense, all, colors, parts, error, onChange } = p
   const filament = field === 'color'
@@ -37,34 +47,42 @@ export default function BuyLines(p: Props) {
   const parsed = parseRows(rows)
   const totals = splitTotals(category, amount ?? 0, parsed)
   const totalOf = new Map(parsed.map((r, i) => [r.row, totals[i]]))
+  const avg = averageEach(parsed, totals)
   const set = (i: number, patch: Partial<BuyRow>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
   const fils = [...new Set(colors.map((c) => c.fil))]
   const sortedParts = [...parts].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
-  const spoolsTotal = rows.reduce((a, r) => a + r.spools, 0)
-  const qtyTotal = parsed.reduce((a, r) => a + (r.qty || 0), 0)
+  const usedTotal = rows.reduce((a, r) => a + r.used, 0)
 
-  // 줄 아래: 저장하면 바뀌는 것 (최근 구매면 단가, 품목이면 남은 수량)
+  // 항목 아래: 저장하면 바뀌는 것 (필라멘트면 스풀 수, 품목이면 남은 수량, 최근 구매면 단가)
   const effect = (r: BuyRow) => {
     const total = totalOf.get(r)
     const q = Number(r.qty)
     if (r.pick == null || total == null || !(q > 0)) return null
     const each = total / q
     const latest = isLatest(all, expense, field, r.pick, date)
+    const next = avg.get(r.pick) ?? each
     if (filament) {
       const cur = colorOf.get(r.pick)?.price ?? null
+      const d = spoolDiff(r)
+      const spool = d > 0 ? `스풀 +${d}개` : d < 0 ? `스풀 −${-d}개` : expense && r.id != null ? '스풀 그대로' : ''
       return latest ? (
         <>
-          통당 <b>{won(each)}</b> · 단가 {cur == null ? '미입력' : won(cur)} → <b>{won(each)}</b>
+          롤당 <b>{won(each)}</b>
+          {spool && <> · {d ? <b>{spool}</b> : spool}</>} · 단가 {cur == null ? '미입력' : won(cur)} →{' '}
+          <b>{won(next)}</b>
         </>
       ) : (
-        <span className="hint">통당 {won(each)} · 최근 구매 아님 · 단가 그대로</span>
+        <span className="hint">
+          롤당 {won(each)}
+          {spool && ` · ${spool}`} · 최근 구매 아님 · 단가 그대로
+        </span>
       )
     }
     const part = partOf.get(r.pick)
     const stock = `재고 +${qtyText(q)}${part?.unit ?? ''}`
     return latest ? (
       <>
-        <b>{stock}</b> · 단가 {unitWon(part?.unit_price)} → <b>{unitWon(each)}</b>
+        <b>{stock}</b> · 단가 {unitWon(part?.unit_price)} → <b>{unitWon(next)}</b>
       </>
     ) : (
       <span className="hint">{stock} · 최근 구매 아님 · 단가 그대로</span>
@@ -78,8 +96,8 @@ export default function BuyLines(p: Props) {
         <Help
           tip={
             filament
-              ? '산 색상과 통 수. 금액을 비우면 총액(배송비 포함)을 통 수대로 나눠요. 재고 추가에서 이 주문을 고르면 스풀 구매가 · 구매일이 들어가고, 최근 구매면 색상 가격이 통당 금액으로 바뀌어요'
-              : '산 품목과 수량. 저장하면 재고 관리의 남은 수량이 늘고, 최근 구매면 묶음 가격 · 수량이 이 값으로 바뀌어요. 한 가지면 금액을 비워도 돼요(총액), 여러 가지면 줄마다 금액을 적어요'
+              ? '산 색상과 롤 수. 저장하면 롤 수만큼 스풀이 재고로 생겨요(구매가 = 롤당 금액). 고치면 바뀐 롤 수만큼만 스풀이 생기거나 지워져요. 금액을 비우면 총액(배송비 포함)을 롤 수대로 나눠요. 같은 색상이 값이 다르면 항목을 나눠 적어요'
+              : '산 품목과 수량. 저장하면 재고 관리의 남은 수량이 늘고, 최근 구매면 묶음 가격 · 수량이 이 값으로 바뀌어요. 한 가지면 금액을 비워도 돼요(총액), 여러 가지면 항목마다 금액을 적어요'
           }
         />
       </span>
@@ -93,10 +111,8 @@ export default function BuyLines(p: Props) {
               <select
                 aria-label={filament ? '색상' : '품목'}
                 value={r.pick ?? ''}
-                disabled={filament && r.spools > 0}
-                title={
-                  filament && r.spools > 0 ? `스풀 ${r.spools}통을 이미 등록해서 색상을 바꿀 수 없어요` : undefined
-                }
+                disabled={filament && r.used > 0}
+                title={filament && r.used > 0 ? `사용한 스풀 ${r.used}개가 있어 색상을 바꿀 수 없어요` : undefined}
                 onChange={(e) => set(i, { pick: e.target.value ? Number(e.target.value) : null })}
               >
                 <option value="">{filament ? '색상 고르기' : '품목 고르기'}</option>
@@ -125,7 +141,7 @@ export default function BuyLines(p: Props) {
                   value={r.qty}
                   onChange={(e) => set(i, { qty: e.target.value })}
                 />
-                <em>{filament ? '통' : (part?.unit ?? '개')}</em>
+                <em>{filament ? '롤' : (part?.unit ?? '개')}</em>
               </div>
               <div className="with-suffix">
                 <input
@@ -142,9 +158,9 @@ export default function BuyLines(p: Props) {
               <button
                 type="button"
                 className="icon-btn"
-                title="이 줄 빼기"
-                aria-label="이 줄 빼기"
-                disabled={rows.length < 2}
+                title={r.used ? `사용한 스풀 ${r.used}개가 있어 뺄 수 없어요` : '이 항목 빼기'}
+                aria-label="이 항목 빼기"
+                disabled={rows.length < 2 || r.used > 0}
                 onClick={() => onChange(rows.filter((_, j) => j !== i))}
               >
                 ✕
@@ -159,9 +175,9 @@ export default function BuyLines(p: Props) {
           + {filament ? '색상' : '품목'} 추가
         </button>
         {error && <span className="warn-t">{error}</span>}
-        {filament && expense && (
-          <span className="hint">
-            스풀 등록 {spoolsTotal} / {qtyTotal}통
+        {filament && usedTotal > 0 && (
+          <span className="hint" title="사용 중 · 사용 완료 스풀은 지출에서 줄이거나 색상을 바꾸거나 뺄 수 없어요">
+            사용한 스풀 {usedTotal}개
           </span>
         )}
       </div>

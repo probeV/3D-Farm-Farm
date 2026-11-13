@@ -8,7 +8,7 @@ import { CATEGORY_KEYS } from './categories'
 const category = z.enum(CATEGORY_KEYS, { error: '분류를 고르세요' })
 
 // 서버: Expense — date(오늘 이후 불가), name max_length=100, category(8개 중 하나), amount MONEY 1 이상,
-//       shop max_length=100. 구매 줄은 buyRows.ts checkRows
+//       shop max_length=100. 구매 항목은 buyRows.ts checkRows
 export const expenseSchema = z.object({
   date: date.refine((v) => v <= today(), '오늘 이후 날짜는 넣을 수 없어요'),
   name: text(100),
