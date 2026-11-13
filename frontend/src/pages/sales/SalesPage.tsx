@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useSales, type Sale, type SaleChannel } from '../../api/sales'
 import Help from '../../components/Help'
+import SettingsButton from '../../components/SettingsButton'
 import SortTh from '../../components/SortTh'
 import { downloadText } from '../../csv'
 import { dotDate, pct, today, won } from '../../format'
@@ -26,7 +27,7 @@ import {
 type DialogState = { id: number | null; copyOf?: Sale }
 
 // 판매 화면: 요약 카드 → 제품별 판매 → 판매 목록 (docs/screens.md 판매, 목업 docs/mockups/sales.html)
-export default function SalesPage() {
+export default function SalesPage({ onSettings }: { onSettings: () => void }) {
   const sales = useSales()
   const cost = useCostData() // 판매 창의 제품 목록 · 원가 계산표 · 수수료 설정
   const [filter, setFilter] = useState<ListFilter>(NO_FILTER)
@@ -78,6 +79,7 @@ export default function SalesPage() {
         <button className="btn primary" onClick={() => setDialog({ id: null })}>
           + 판매 추가
         </button>
+        <SettingsButton label="스마트스토어" onClick={onSettings} />
       </div>
 
       <div className="sum-cards four">

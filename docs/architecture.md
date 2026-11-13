@@ -99,7 +99,7 @@ frontend/src/
   components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch, Help, LinkBadge …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
                 products.css — 제품 원가 목업 CSS 중 app.css 에 없는 것
-                parts.css · settings.css · expenses.css — 부자재 · 제품 원가 설정 · 지출 목업 CSS 중 위 파일들에 없는 것
+                parts.css · settings.css · expenses.css — 부자재 · 설정 · 지출 목업 CSS 중 위 파일들에 없는 것
   format.ts     화면 표시용 숫자 모양 (원, kg, 날짜)
   csv.ts        CSV 만들기(UTF-8 BOM) · 파일로 내려받기 (제품 원가 · 지출)
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
@@ -149,7 +149,7 @@ pages/expenses/
                        DueDialog.tsx 이번 달 반복 지출 넣기, schemas.ts
 
 pages/settings/
-  SettingsPage.tsx     제품 원가 설정 (screens 4장): 설정 묶음 · 저장 줄. schemas.ts 에 항목 목록 · 검증 · 계산 예시
+  SettingsPage.tsx     설정 (screens 4장): 왼쪽 분류 · 설정 묶음 · 분류별 저장 줄. schemas.ts 에 분류 · 항목 목록 · 검증 · 계산 예시
 ```
 - 한 기능 폴더에서만 쓰는 것은 그 폴더에, 두 곳 이상에서 쓰면 화면 폴더 바로 아래에, 다른 화면에서도 쓰면 `src/components/` 로 올린다.
 - 폼 검증 스키마는 그 폼이 있는 기능 폴더의 `schemas.ts` 에 둔다.

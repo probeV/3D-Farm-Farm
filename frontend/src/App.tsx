@@ -4,12 +4,15 @@ import ExpensesPage from './pages/expenses/ExpensesPage'
 import SalesPage from './pages/sales/SalesPage'
 import PartsPage from './pages/parts/PartsPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import type { CategoryKey } from './pages/settings/schemas'
 import ProductsPage from './pages/products/ProductsPage'
 import { applyTheme, loadTheme, saveTheme, THEMES, type ThemePref } from './theme'
 
 type Page = 'products' | 'filaments' | 'parts' | 'sales' | 'expenses' | 'settings'
 
-const NAV: { page: Page; label: string; icon: ReactNode }[] = [
+type NavItem = { page: Page; label: string; icon: ReactNode }
+
+const NAV: NavItem[] = [
   {
     page: 'products',
     label: '제품 원가',
@@ -58,19 +61,19 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
       </>
     ),
   },
-  {
-    page: 'settings',
-    label: '제품 원가 설정',
-    icon: (
-      <>
-        <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
-        <circle cx="16" cy="6" r="2" />
-        <circle cx="10" cy="12" r="2" />
-        <circle cx="18" cy="18" r="2" />
-      </>
-    ),
-  },
 ]
+
+// 사이드바 맨 아래 (접기 위). 분류는 설정 화면 안에서 (TBD-16)
+const SETTINGS: NavItem = {
+  page: 'settings',
+  label: '설정',
+  icon: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+    </>
+  ),
+}
 
 function Icon({ children }: { children: ReactNode }) {
   return (
@@ -117,9 +120,26 @@ function loadCollapsed() {
 export default function App() {
   // 처음 여는 화면은 제품 원가 (v1.2.0)
   const [page, setPage] = useState<Page>('products')
+  const [settingsTab, setSettingsTab] = useState<CategoryKey>('cost')
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [theme, setTheme] = useState(loadTheme)
-  const current = NAV.find((n) => n.page === page)!
+  const current = [...NAV, SETTINGS].find((n) => n.page === page)!
+  // 각 화면의 ⚙ 버튼: 설정의 자기 분류로 바로
+  const openSettings = (tab: CategoryKey) => {
+    setSettingsTab(tab)
+    setPage('settings')
+  }
+  const navButton = (n: NavItem) => (
+    <button
+      key={n.page}
+      className={n.page === page ? 'nav-item active' : 'nav-item'}
+      title={n.label}
+      onClick={() => setPage(n.page)}
+    >
+      <Icon>{n.icon}</Icon>
+      <span className="label">{n.label}</span>
+    </button>
+  )
   const currentTheme = THEMES.find((t) => t.pref === theme)!
 
   const chooseTheme = (pref: ThemePref) => {
@@ -147,18 +167,9 @@ export default function App() {
           <span className="mark">3D</span>
           <span className="label">3D Farm Farm</span>
         </div>
-        {NAV.map((n) => (
-          <button
-            key={n.page}
-            className={n.page === page ? 'nav-item active' : 'nav-item'}
-            title={n.label}
-            onClick={() => setPage(n.page)}
-          >
-            <Icon>{n.icon}</Icon>
-            <span className="label">{n.label}</span>
-          </button>
-        ))}
+        {NAV.map(navButton)}
         <div className="side-bottom">
+          {navButton(SETTINGS)}
           <div className="theme-seg" role="radiogroup" aria-label="테마">
             {THEMES.map((t) => (
               <button
@@ -197,15 +208,15 @@ export default function App() {
         {page === 'filaments' ? (
           <FilamentsPage />
         ) : page === 'products' ? (
-          <ProductsPage />
+          <ProductsPage onSettings={() => openSettings('cost')} />
         ) : page === 'parts' ? (
           <PartsPage />
         ) : page === 'sales' ? (
-          <SalesPage />
+          <SalesPage onSettings={() => openSettings('store')} />
         ) : page === 'expenses' ? (
           <ExpensesPage />
         ) : (
-          <SettingsPage />
+          <SettingsPage tab={settingsTab} onTab={setSettingsTab} />
         )}
       </main>
     </div>
