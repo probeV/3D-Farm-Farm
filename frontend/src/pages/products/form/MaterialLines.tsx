@@ -22,7 +22,7 @@ interface Props {
 const lineError = (errors: Record<string, string>, kind: string, i: number) =>
   Object.entries(errors).find(([k]) => k.startsWith(`${kind}.${i}.`))?.[1]
 
-// 사용 필라멘트 · 부자재 표 (docs/screens.md 2.5): 한 항목 = 한 줄, 끝에 그 줄 금액 (단가는 금액에 마우스를 올리면)
+// 사용 필라멘트 · 부속품 표 (docs/screens.md 2.5): 한 항목 = 한 줄, 끝에 그 줄 금액 (단가는 금액에 마우스를 올리면)
 export default function MaterialLines(props: Props) {
   const { values, errors, catalog, filaments, parts, filamentTotal, partTotal, onFilaments, onParts, onPickFrom } =
     props
@@ -132,14 +132,14 @@ export default function MaterialLines(props: Props) {
       <div className="lines">
         <div className="lines-head">
           <h4>
-            사용 부자재<small>1개 기준</small>
+            사용 부속품<small>1개 기준</small>
           </h4>
           <div className="head-btns">
             <button
               type="button"
               className="btn small"
               disabled={!parts.length}
-              title="다른 제품의 부자재 항목을 넣어요 (수량은 직접)"
+              title="다른 제품의 부속품 항목을 넣어요 (수량은 직접)"
               onClick={onPickFrom}
             >
               + 다른 제품에서
@@ -147,12 +147,12 @@ export default function MaterialLines(props: Props) {
           </div>
         </div>
         {!parts.length ? (
-          <div className="none">등록된 부자재가 없어요. 부자재 화면에서 먼저 추가하세요.</div>
+          <div className="none">등록된 부속품 없음 · 재고 관리 › 부속품에서 추가</div>
         ) : (
           <div className="mat parts">
             {values.parts.length > 0 && (
               <div className="mat-head">
-                <span>부자재</span>
+                <span>부속품</span>
                 <span>수량</span>
                 <span className="r">금액</span>
                 <span />
@@ -198,13 +198,13 @@ export default function MaterialLines(props: Props) {
               )
             })}
             <AddLine
-              label="부자재 추가"
+              label="부속품 추가"
               onClick={() => onParts([...values.parts, { key: newKey(), part: String(parts[0].id), qty: '1' }])}
             />
             {values.parts.length > 0 && (
               <div className="mat-total">
                 <span className="cnt">
-                  부자재 <b>{values.parts.length}개</b>
+                  부속품 <b>{values.parts.length}개</b>
                 </span>
                 <span>
                   합계 <b>{won(partTotal)}</b>

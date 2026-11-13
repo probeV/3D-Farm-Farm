@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import type { Part, Product } from '../../api/products'
+import type { PackSet, Part, Product } from '../../api/products'
 import { fieldErrors } from '../../validation'
-import { filterParts, inShop, NO_FILTER, shopsOf, summarize, usagesByPart } from './partList'
+import {
+  canPack,
+  filterParts,
+  inShop,
+  NO_FILTER,
+  setCost,
+  setsByPart,
+  shopsOf,
+  summarize,
+  usagesByPart,
+} from './partList'
 import { partSchema, previewUnitPrice } from './schemas'
 
 const part = (p: Partial<Part>): Part => ({
   id: 1,
+  kind: 'part',
   name: '',
   category: null,
   shop: '',
@@ -16,6 +27,11 @@ const part = (p: Partial<Part>): Part => ({
   unit_price: 100,
   note: '',
   product_count: 0,
+  photo: null,
+  stock: 100,
+  alert: 0,
+  set_count: 0,
+  last_used: null,
   ...p,
 })
 
@@ -28,6 +44,7 @@ const product = (p: Partial<Product>): Product => ({
   status: 'on_sale',
   print_minutes: 60,
   sale_price: 1000,
+  default_pack: null,
   note: '',
   filaments: [],
   parts: [],
@@ -120,17 +137,15 @@ describe('사용하는 제품 · 요약 (PART-03)', () => {
     expect(usages.get(5)).toBeUndefined()
   })
 
-  it('평균 부자재비는 판매중이고 부자재를 쓰는 제품만 (가격 미입력은 0원)', () => {
-    // 분수 원판 = 15 × 60 + 1 × 17.8 = 917.8, 무드등 = 440 → 평균 678.9
-    expect(summarize(parts, products)).toEqual({
-      total: 4,
-      used: 3,
-      unused: 1,
-      noPrice: 1,
-      avgPartsCost: 678.9,
-      avgBase: 2,
-    })
-    expect(summarize(parts, []).avgPartsCost).toBeNull()
+  it('요약: 사용 · 가격 미입력 · 부족 · 남은 금액 (STOCK-04)', () => {
+    const s = summarize(parts)
+    expect([s.total, s.used, s.unused, s.noPrice]).toEqual([4, 3, 1, 1])
+    // 남은 수량 100 × 단가 (가격 없는 것은 0)
+    expect(s.value).toBe(parts.reduce((a, p) => a + 100 * (p.unit_price ?? 0), 0))
+    expect(s.low).toEqual([])
+    const low = summarize([part({ id: 1, stock: 3, alert: 5 }), part({ id: 2, stock: 0 }), part({ id: 3, stock: -2 })])
+    expect(low.low.map((p) => p.id)).toEqual([1, 2, 3])
+    expect(low.value).toBe(300) // 0 아래는 0 으로
   })
 
   it('관리 창 구매처 목록 · 선택', () => {
@@ -150,6 +165,8 @@ describe('부자재 폼 검증 (PART-02)', () => {
     price: '12,000',
     pack_qty: '200',
     unit: '',
+    alert: '0',
+    stock: '0',
     note: '',
   }
 
@@ -162,6 +179,8 @@ describe('부자재 폼 검증 (PART-02)', () => {
       price: 12000,
       pack_qty: 200,
       unit: '개',
+      alert: 0,
+      stock: 0,
       note: '',
     })
     expect(partSchema.parse({ ...values, price: '' }).price).toBeNull()
@@ -184,5 +203,64 @@ describe('부자재 폼 검증 (PART-02)', () => {
     expect(previewUnitPrice('12,000', '200')).toEqual({ price: 12000, packQty: 200, unitPrice: 60 })
     expect(previewUnitPrice('', '200')).toBeNull()
     expect(previewUnitPrice('12000', '0')).toBeNull()
+  })
+})
+
+describe('부족 · 포장 세트 (STOCK-04 · 06)', () => {
+  const bag = part({ id: 1, kind: 'pack', unit_price: 17.8, stock: 30 })
+  const box = part({ id: 2, kind: 'pack', unit_price: 440, stock: 3 })
+  const tape = part({ id: 3, kind: 'pack', unit_price: null, stock: -1 })
+  const byId = new Map([bag, box, tape].map((p) => [p.id, p]))
+  const pack = (id: number, lines: [number, number][]): PackSet => ({
+    id,
+    name: `세트 ${id}`,
+    note: '',
+    product_count: 0,
+    lines: lines.map(([p, qty], i) => ({ id: i + 1, part: p, qty })),
+  })
+
+  it('부족 · 없음만 보기', () => {
+    const list = [part({ id: 1, stock: 3, alert: 5 }), part({ id: 2, stock: 10, alert: 5 }), part({ id: 3, stock: 0 })]
+    expect(filterParts(list, { ...NO_FILTER, lowOnly: true }).map((p) => p.id)).toEqual([1, 3])
+  })
+
+  it('세트 원가: 가격 없는 포장재는 0원', () => {
+    expect(
+      setCost(
+        pack(1, [
+          [1, 2],
+          [2, 1],
+          [3, 1],
+        ]),
+        byId,
+      ),
+    ).toBeCloseTo(35.6 + 440)
+  })
+
+  it('바로 쌀 수 있는 수: 가장 모자란 포장재 기준, 0 아래는 0', () => {
+    expect(
+      canPack(
+        pack(1, [
+          [1, 2],
+          [2, 1],
+        ]),
+        byId,
+      ),
+    ).toBe(3) // 봉투 15번, 박스 3번
+    expect(canPack(pack(2, [[1, 4]]), byId)).toBe(7)
+    expect(canPack(pack(3, [[3, 1]]), byId)).toBe(0)
+    expect(canPack(pack(4, []), byId)).toBe(0)
+  })
+
+  it('포장재별 쓰는 세트', () => {
+    const sets = setsByPart([
+      pack(2, [[1, 1]]),
+      pack(1, [
+        [1, 1],
+        [2, 1],
+      ]),
+    ])
+    expect(sets.get(1)?.map((s) => s.id)).toEqual([1, 2])
+    expect(sets.get(3)).toBeUndefined()
   })
 })

@@ -1,8 +1,15 @@
-// 제품 원가 화면 데이터: 제품 · 카테고리 · 필라멘트 · 부자재(+ 부자재 카테고리) · 설정을 함께 불러와 제품별 원가까지 계산해 둔다
+// 제품 원가 화면 데이터: 제품 · 카테고리 · 필라멘트 · 재고 품목(+ 카테고리) · 포장 세트 · 설정을 함께 불러와 제품별 원가까지 계산해 둔다
 // 목록 · 제품 관리 창 · 제품 창이 같이 쓴다 (같은 쿼리라 한 번만 불러옴)
 import { useMemo } from 'react'
 import { useFilaments } from '../../api/filaments'
-import { useCategories, useCostSetting, usePartCategories, useParts, useProducts } from '../../api/products'
+import {
+  useCategories,
+  useCostSetting,
+  usePackSets,
+  usePartCategories,
+  useParts,
+  useProducts,
+} from '../../api/products'
 import { calcCost, makeCatalog, productColors } from './cost'
 import type { ProductRow } from './list/productList'
 
@@ -13,11 +20,17 @@ export function useCostData() {
   const parts = useParts()
   const partCategories = usePartCategories()
   const setting = useCostSetting()
-  const queries = [products, categories, filaments, parts, partCategories, setting]
+  const packSets = usePackSets()
+  const queries = [products, categories, filaments, parts, partCategories, setting, packSets]
 
   const catalog = useMemo(
-    () => filaments.data && parts.data && setting.data && makeCatalog(filaments.data, parts.data, setting.data),
-    [filaments.data, parts.data, setting.data],
+    () =>
+      filaments.data &&
+      parts.data &&
+      setting.data &&
+      packSets.data &&
+      makeCatalog(filaments.data, parts.data, setting.data, packSets.data),
+    [filaments.data, parts.data, setting.data, packSets.data],
   )
   const rows = useMemo<ProductRow[] | undefined>(
     () =>
@@ -42,6 +55,7 @@ export function useCostData() {
             filaments: filaments.data,
             parts: parts.data,
             partCategories: partCategories.data,
+            packSets: packSets.data!, // catalog 이 있으면 있음
           }
         : null,
   }

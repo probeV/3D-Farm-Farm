@@ -6,6 +6,7 @@ import {
   useRefreshProducts,
   type Part,
   type PartCategory,
+  type PartKind,
 } from '../../api/products'
 import Dialog from '../../components/Dialog'
 import Field from '../../components/Field'
@@ -13,11 +14,13 @@ import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { useForm } from '../../useForm'
 import { text } from '../../validation'
+import { CATEGORY_EXAMPLE, KIND_LABEL } from './kinds'
 
 // 서버: PartCategory — name max_length=50 (중복 불가, 서버만 검사)
 const schema = z.object({ name: text(50) })
 
 interface Props {
+  kind: PartKind // 카테고리는 탭마다 따로
   category: PartCategory | null // null 이면 추가
   parts: Part[] // 삭제 확인 창에 이 카테고리의 부자재 이름을 보여 주려고
   onClose: () => void
@@ -26,7 +29,8 @@ interface Props {
 
 // 부자재 카테고리 추가 / 수정 (TBD-17, docs/screens.md 3.4).
 // 지우면 그 부자재는 미분류 (원가는 그대로). 부자재가 있으면 다른 데이터가 바뀌는 삭제라 2차 확인
-export default function PartCategoryDialog({ category, parts, onClose, onSaved }: Props) {
+export default function PartCategoryDialog({ kind, category, parts, onClose, onSaved }: Props) {
+  const L = KIND_LABEL[kind]
   const refresh = useRefreshProducts()
   const toast = useToast()
   const confirm = useConfirm()
@@ -34,7 +38,7 @@ export default function PartCategoryDialog({ category, parts, onClose, onSaved }
 
   const save = () =>
     submit(async (data) => {
-      const saved = category ? await updatePartCategory(category.id, data) : await createPartCategory(data)
+      const saved = category ? await updatePartCategory(category.id, data) : await createPartCategory({ kind, ...data })
       await refresh()
       toast('저장했어요')
       onSaved?.(saved)
@@ -52,8 +56,8 @@ export default function PartCategoryDialog({ category, parts, onClose, onSaved }
       effects: inside.length
         ? [
             {
-              title: `부자재 ${inside.length}개가 미분류가 돼요`,
-              details: [inside.map((p) => p.name).join(' · '), '부자재와 제품 원가는 그대로예요.'],
+              title: `${L} ${inside.length}개가 미분류가 돼요`,
+              details: [inside.map((p) => p.name).join(' · '), '품목과 제품 원가는 그대로예요.'],
               tone: 'warn',
             },
           ]
@@ -89,12 +93,16 @@ export default function PartCategoryDialog({ category, parts, onClose, onSaved }
       <Field label="카테고리 이름 *" error={errors.name}>
         <input
           value={values.name}
-          placeholder="예: 포장재"
+          placeholder={`예: ${CATEGORY_EXAMPLE[kind]}`}
           data-autofocus
           onChange={(e) => change('name', e.target.value)}
         />
       </Field>
-      {category && <p className="hint">부자재 {category.part_count}개</p>}
+      {category && (
+        <p className="hint">
+          {L} {category.part_count}개
+        </p>
+      )}
     </Dialog>
   )
 }

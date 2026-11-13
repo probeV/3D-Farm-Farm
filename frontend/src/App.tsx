@@ -1,14 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import FilamentsPage from './pages/filaments/FilamentsPage'
 import ExpensesPage from './pages/expenses/ExpensesPage'
 import SalesPage from './pages/sales/SalesPage'
-import PartsPage from './pages/parts/PartsPage'
+import StockPage from './pages/stock/StockPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import type { CategoryKey } from './pages/settings/schemas'
 import ProductsPage from './pages/products/ProductsPage'
 import { applyTheme, loadTheme, saveTheme, THEMES, type ThemePref } from './theme'
 
-type Page = 'products' | 'filaments' | 'parts' | 'sales' | 'expenses' | 'settings'
+type Page = 'products' | 'stock' | 'sales' | 'expenses' | 'settings'
 
 type NavItem = { page: Page; label: string; icon: ReactNode }
 
@@ -24,21 +23,17 @@ const NAV: NavItem[] = [
       </>
     ),
   },
+  // v2 STOCK: 필라멘트 · 부자재 대신 하나 (화면 위 탭: 필라멘트 | 부속품 | 포장 | 소모품)
   {
-    page: 'filaments',
-    label: '필라멘트',
+    page: 'stock',
+    label: '재고 관리',
     icon: (
       <>
-        <circle cx="12" cy="12" r="8" />
-        <circle cx="12" cy="12" r="2.5" />
-        <path d="M12 4v5.5M12 14.5V20" />
+        <path d="M21 8l-9-5-9 5 9 5 9-5z" />
+        <path d="M3 8v8l9 5 9-5V8" />
+        <path d="M12 13v8" />
       </>
     ),
-  },
-  {
-    page: 'parts',
-    label: '부자재',
-    icon: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z" />,
   },
   {
     page: 'sales',
@@ -205,12 +200,10 @@ export default function App() {
       </aside>
       <main>
         <h1 className="page-title">{current.label}</h1>
-        {page === 'filaments' ? (
-          <FilamentsPage />
+        {page === 'stock' ? (
+          <StockPage />
         ) : page === 'products' ? (
           <ProductsPage onSettings={() => openSettings('cost')} />
-        ) : page === 'parts' ? (
-          <PartsPage />
         ) : page === 'sales' ? (
           <SalesPage onSettings={() => openSettings('store')} />
         ) : page === 'expenses' ? (

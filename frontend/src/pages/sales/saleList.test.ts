@@ -48,6 +48,8 @@ const sale = (p: Partial<Sale> & { items?: SaleItem[] }): Sale => {
     date: '2026-10-01',
     channel: 'store',
     order_no: '',
+    packs: [],
+    pack_cost: 0,
     note: '',
     created_at: '',
     ...base,
@@ -71,12 +73,17 @@ describe('autoFee (SALE-03)', () => {
 })
 
 describe('snapshotCost (SALE-05)', () => {
-  const cost = (c: number, warnings: string[]) => ({ cost: c, warnings }) as unknown as Cost
+  const cost = (c: number, warnings: string[], pack = 0, packWarnings: string[] = []) =>
+    ({ cost: c, warnings: [...warnings, ...packWarnings], pack, packWarnings }) as unknown as Cost
   it('원가 계산표 값을 원 단위로', () => expect(snapshotCost(cost(3227.4, []))).toBe(3227))
   it('판매가 미입력은 원가와 상관없음', () => expect(snapshotCost(cost(1459.6, ['판매가 미입력']))).toBe(1460))
   it('가격 · 사용량 · 출력 시간이 덜 됐으면 원가 없음', () => {
     expect(snapshotCost(cost(600, ['Esun › PETG 가격 미입력']))).toBeNull()
     expect(snapshotCost(cost(0, ['출력 시간 미입력', '판매가 미입력']))).toBeNull()
+  })
+  it('포장은 빼고 복사 — 포장비 · 기본 포장 경고는 상관없음 (SALE-06)', () => {
+    expect(snapshotCost(cost(3500, [], 300))).toBe(3200)
+    expect(snapshotCost(cost(3200, [], 0, ['기본 포장 미입력']))).toBe(3200)
   })
 })
 

@@ -111,7 +111,7 @@ frontend/src/
   components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch, Help, LinkBadge …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
                 products.css — 제품 원가 목업 CSS 중 app.css 에 없는 것
-                parts.css · settings.css · expenses.css — 부자재 · 설정 · 지출 목업 CSS 중 위 파일들에 없는 것
+                stock.css · settings.css · expenses.css · sales.css — 재고 관리 · 설정 · 지출 · 판매 목업 CSS 중 위 파일들에 없는 것
   format.ts     화면 표시용 숫자 모양 (원, kg, 날짜)
   csv.ts        CSV 만들기(UTF-8 BOM) · 파일로 내려받기 (제품 원가 · 지출)
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
@@ -147,11 +147,14 @@ pages/products/
   form/                제품 추가 · 복제 · 수정 (screens 2.5): ProductDialog(머리 띠 · 저장), MaterialLines(재료 표),
                        CostPanel(원가 미리보기), draft.ts(처음 값 · 미리보기 값), schemas.ts
 
-pages/parts/
-  PartsPage.tsx        화면 진입점: 사용 여부 개수 · 요약 카드 · 부자재 목록, 대화상자 연결
-  usePartsData.ts      부자재 + 제품(부자재 줄)을 함께 불러와 부자재별 사용하는 제품까지 (목록 · 관리 창이 같이 씀)
-  partList.ts          검색 · 정렬 · 요약 · 사용하는 제품 · 구매처 고르기
-  ManageDialog.tsx     부자재 관리 (구매처 → 부자재, screens 3.4), PartDialog.tsx 추가 · 복제 · 수정, schemas.ts
+pages/stock/           재고 관리 (v2 STOCK, screens 3장). 필라멘트 탭은 pages/filaments 그대로
+  StockPage.tsx        화면 진입점: 탭 필라멘트 | 부속품 | 포장 | 소모품
+  ItemsTab.tsx         부속품 · 포장 · 소모품 탭 (kind 로 나눔): 개수 · 요약 카드 · (포장) 세트 카드 · 카드 / 표 목록
+  kinds.ts             탭 이름 · 품목 이름 · 남은 수량 상태(부족 · 없음)
+  usePartsData.ts      한 탭의 품목 · 카테고리 + 포장 세트 + 제품(부속품 줄)을 함께 (목록 · 관리 창이 같이 씀)
+  partList.ts          검색 · 정렬 · 요약 · 사용하는 제품 · 구매처 고르기 · 세트 원가 · 바로 쌀 수 있는 수
+  ManageDialog.tsx     ○○ 관리 (구매처 / 카테고리 → 품목, screens 3.4), PartDialog.tsx 추가 · 복제 · 수정(사진 · 입출고 기록),
+                       AdjustDialog.tsx 남은 수량 조정, PackSetDialog.tsx 포장 세트, ReplaceDialog.tsx 부속품 바꾸기, schemas.ts
 
 pages/expenses/
   ExpensesPage.tsx     화면 진입점: 요약 카드 · 반복 지출 알림 · 분류별 합계 · 지출 목록, 대화상자 연결

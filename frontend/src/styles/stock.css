@@ -1,0 +1,740 @@
+/* 재고 관리 화면 (부속품 · 포장 · 소모품 탭): docs/mockups/parts.html · packaging.html · consumables.html 의 <style> 중 app.css · products.css 에 없는 것만 옮김.
+   색상 토큰은 app.css 에서만 정의 */
+
+/* 부자재 표 */
+.parts-table .unit-price {
+  font-weight: 700;
+}
+.parts-table .used {
+  cursor: help;
+}
+.parts-table .note {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+/* 부자재 관리: 왼쪽 구매처 목록 (제품 관리 창과 같은 모양) */
+.parts-manage {
+  grid-template-columns: 220px 1fr;
+}
+.list-item.no-shop strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* 부자재 추가 / 수정 */
+.dlg-head .copy-from {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.qty-unit {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: 6px;
+}
+.qty-unit input:last-of-type {
+  text-align: center;
+}
+/* 개당 단가 미리보기: 구매가 ÷ 묶음 수량 */
+.unit-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.unit-preview b {
+  font-size: 16px;
+}
+.unit-preview .was {
+  margin-right: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: line-through;
+}
+/* 사용하는 제품: 제품마다 수량과 이 부자재 금액 (가격을 바꾸면 바뀐 금액도) */
+.used-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.used-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.used-row:last-child {
+  border-bottom: 0;
+}
+.used-row .badge {
+  margin-left: 6px;
+}
+.used-row .qty {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.used-row .amt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.used-row .amt .was {
+  color: var(--muted);
+}
+.used-row .amt .up {
+  color: var(--bad);
+  font-weight: 700;
+}
+.used-row .amt .down {
+  color: var(--good);
+  font-weight: 700;
+}
+.foot-note {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* 구매 링크 버튼: 품목 옆 (TBD-20) */
+.buy-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  background: var(--surface);
+  font-size: 11.5px;
+  font-weight: 600;
+  vertical-align: 1px;
+  text-decoration: none;
+}
+.buy-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.buy-link svg {
+  width: 12px;
+  height: 12px;
+}
+/* 카테고리 배지 (TBD-17) */
+.cat {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.cat.none {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* 제품의 부자재 바꾸기 (TBD-23) */
+.rep-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+}
+.rep-row.off {
+  opacity: 0.5;
+}
+.rep-row .badge {
+  margin-left: 6px;
+}
+.rep-row .merge {
+  display: block;
+  color: var(--accent);
+  font-size: 12px;
+}
+.rep-row .qty {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rep-row .amt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rep-row .amt .was {
+  color: var(--muted);
+}
+.rep-row .amt .up {
+  color: var(--bad);
+  font-weight: 700;
+}
+.rep-row .amt .down {
+  color: var(--good);
+  font-weight: 700;
+}
+.notice {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .parts-manage {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------- v2 재고 관리 (STOCK) */
+/* 탭: 필라멘트 | 부속품 | 포장 | 소모품 */
+.stock-tabs {
+  display: flex;
+  gap: 2px;
+  margin: -4px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.stock-tabs button {
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.stock-tabs button:hover {
+  color: var(--text);
+}
+.stock-tabs button.on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.sum-cards.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.sum-card .sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sum-card .packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+.sum-card .packs b {
+  font-variant-numeric: tabular-nums;
+}
+.sum-card .packs .zero b {
+  color: var(--bad);
+}
+
+/* 카드 보기: 카테고리별 묶음 + 사진 타일 (폭에 맞춰 늘어남, 1440px 에서 한 줄 6개) */
+.cat-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.cat-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.cat-title::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.cat-title h4 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+.cat-title .m {
+  padding: 1px 9px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.cat-title .m b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.cat-title .m.warn {
+  background: var(--warn-soft);
+  border-color: transparent;
+  color: var(--warn);
+}
+.cat-title .m.warn b {
+  color: var(--warn);
+}
+.cat-title.none::before {
+  background: var(--border);
+}
+.cat-title.none h4 {
+  color: var(--muted);
+}
+.ptiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+.ptile {
+  position: relative;
+  min-width: 0;
+  height: 232px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 0.1s;
+}
+.ptile:hover {
+  border-color: var(--accent);
+}
+.ptile .photo {
+  flex: none;
+  height: 112px;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.ptile .photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ptile .photo.none {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.3;
+}
+.ptile .photo.none b {
+  display: block;
+  font-size: 26px;
+  font-weight: 800;
+  opacity: 0.35;
+}
+.ptile .flag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.ptile .flag .badge {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.ptile .body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px 10px;
+}
+.ptile .pn {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ptile .sub {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ptile .foot {
+  margin-top: auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.ptile .left {
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.ptile .left small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 1px;
+}
+.ptile.low .left {
+  color: var(--warn);
+}
+.ptile.out .left {
+  color: var(--bad);
+}
+.ptile .uprice {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ptile .uprice.none {
+  color: var(--warn);
+}
+.ptile .buy-link {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  margin-left: 8px;
+}
+.ptile.add {
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  border-style: dashed;
+  color: var(--muted);
+  font-weight: 600;
+  background: transparent;
+}
+.ptile.add span {
+  font-size: 26px;
+  line-height: 1;
+}
+.ptile.add:hover {
+  color: var(--accent);
+}
+/* 소모품: 사진 아래 오른쪽 `1개 다 씀` · 마지막으로 다 쓴 날 */
+.ptile .use {
+  position: absolute;
+  right: 8px;
+  top: 80px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.ptile .use:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ptile .use:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ptile .last {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.badge.bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.stock-num.low {
+  color: var(--warn);
+}
+.stock-num.out {
+  color: var(--bad);
+}
+@media (max-width: 760px) {
+  .ptiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sum-cards.four {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* 품목 창: 사진 · 남은 수량 · 입출고 기록, 조정 창 */
+.photo-field {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+.photo-box {
+  width: 120px;
+  height: 120px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.photo-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-btns {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.photo-btns label.btn {
+  display: inline-block;
+  cursor: pointer;
+}
+.photo-btns input[type='file'] {
+  display: none;
+}
+.stock-now {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+.stock-now b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.moves {
+  font-size: 13px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.move {
+  display: grid;
+  grid-template-columns: 76px auto minmax(0, 1fr) 64px 84px;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.move:last-child {
+  border-bottom: 0;
+}
+.move .d {
+  color: var(--muted);
+}
+.move .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.move .q {
+  text-align: right;
+  font-weight: 700;
+}
+.move .q.plus {
+  color: var(--good);
+}
+.move .q.minus {
+  color: var(--bad);
+}
+.move .a {
+  text-align: right;
+  color: var(--muted);
+}
+.adj-preview {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.seg {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 3px;
+}
+.seg label {
+  cursor: pointer;
+}
+.seg input {
+  display: none;
+}
+.seg span {
+  display: block;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.seg input:checked + span {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* 포장 세트 카드 · 세트 창 */
+.set-grid {
+  margin-bottom: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.set-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  text-align: left;
+}
+.set-card:hover {
+  border-color: var(--accent);
+}
+.set-card .head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.set-card .head strong {
+  font-size: 15px;
+}
+.set-card .head .cost {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.set-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+.set-card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.set-card li b {
+  color: var(--text);
+  font-weight: 600;
+}
+.set-card li.short b {
+  color: var(--bad);
+}
+.set-card .foot {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.set-card .foot b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.set-card .foot .bad b {
+  color: var(--bad);
+}
+.set-card.add {
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  border-style: dashed;
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: none;
+  background: none;
+}
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 90px 32px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+}
+.line .amt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.line-head {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  padding-bottom: 0;
+}
+.total-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.total-box b {
+  font-size: 16px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  padding: 2px 10px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+}
