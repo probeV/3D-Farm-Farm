@@ -139,6 +139,15 @@ class StockHistory(models.Model):
         related_name='stock_history',
         verbose_name='판매',
     )
+    # 지출 구매 줄로 들어온 기록이면 그 지출 (판매와 같은 방식 — 고칠 때 차이 계산, 지우면 되돌리는 기록)
+    expense = models.ForeignKey(
+        'expenses.Expense',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stock_history',
+        verbose_name='지출',
+    )
     created_at = models.DateTimeField('추가일', auto_now_add=True)
 
     class Meta:

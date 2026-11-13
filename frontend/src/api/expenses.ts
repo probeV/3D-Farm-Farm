@@ -3,8 +3,25 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, send } from './client'
 
-// 분류 (EXP-03, 고정 7개). 이름 · 설명은 pages/expenses/categories.ts
-export type ExpenseCategory = 'invest' | 'filament' | 'part' | 'supply' | 'sub' | 'sell' | 'etc'
+// 분류 (EXP-03, 고정 8개). 이름 · 설명은 pages/expenses/categories.ts
+export type ExpenseCategory = 'invest' | 'filament' | 'part' | 'pack' | 'supply' | 'sub' | 'sell' | 'etc'
+
+// 구매 줄 (v2 TBD-31): 필라멘트 지출은 색상 · 통 수, 부속품 · 포장재 · 소모품 지출은 그 탭의 품목 · 수량
+export interface ExpenseLine {
+  id: number
+  color: number | null
+  part: number | null
+  qty: number
+  amount: number | null // 직접 적은 금액. null = 총액에서 나눠 넣음
+  total: number // 줄 금액 (적은 금액 또는 나눈 금액)
+  each: number // 1개(통)당 = total ÷ qty
+  name: string // `Bambu Lab › PLA Basic · 화이트` / 품목 이름
+  unit: string // `통` / 품목 단위
+  spools: number // 이 줄로 등록한 스풀 수 (필라멘트)
+}
+
+// 보낼 때: 기존 줄은 id 를 함께 (그 줄로 등록한 스풀 연결 유지). 안 보낸 기존 줄은 지워짐
+export type ExpenseLineInput = Pick<ExpenseLine, 'color' | 'part' | 'qty' | 'amount'> & { id?: number }
 
 export interface Expense {
   id: number
@@ -13,9 +30,9 @@ export interface Expense {
   category: ExpenseCategory
   amount: number
   shop: string
-  url: string // 주문 링크, 빈 문자열 = 없음
   note: string
   recurring: number | null // 반복 지출에서 넣은 줄이면 그 id (반복 지출을 지우면 null)
+  lines: ExpenseLine[] // 구매 줄. 필라멘트 · 부속품 · 포장재 · 소모품 지출만, 비어 있을 수 있음
 }
 
 export interface RecurringExpense {
@@ -40,15 +57,16 @@ export const useExpenses = () => useQuery({ queryKey: keys.expenses, queryFn: ()
 export const useRecurringExpenses = () =>
   useQuery({ queryKey: keys.recurring, queryFn: () => api<RecurringExpense[]>('/recurring-expenses/') })
 
-// 저장한 뒤 다시 불러오기. 넣은 지출 수가 반복 지출 목록에도 나오므로 둘 다 무효화한다
+// 저장한 뒤 다시 불러오기. 넣은 지출 수가 반복 지출 목록에도 나오고, 구매 줄이 남은 수량 · 단가(색상 가격 ·
+// 묶음 가격) · 제품 원가까지 바꾸므로 (TBD-31) 모든 목록을 무효화한다
 export function useRefreshExpenses() {
   const queryClient = useQueryClient()
-  return () => Promise.all(Object.values(keys).map((queryKey) => queryClient.invalidateQueries({ queryKey })))
+  return () => queryClient.invalidateQueries()
 }
 
 // ---------------------------------------------------------------- 쓰기
 
-export type ExpenseInput = Omit<Expense, 'id'>
+export type ExpenseInput = Omit<Expense, 'id' | 'lines'> & { lines?: ExpenseLineInput[] }
 
 // 여러 줄을 한 번에 (이번 달 반복 지출 넣기): 하나라도 틀리면 아무것도 넣지 않음.
 // 같은 반복 지출을 같은 달에 또 넣으면 400 `{"recurring": ["이 달에 이미 넣은 반복 지출입니다."]}`

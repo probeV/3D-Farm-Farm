@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react'
-import type { Filament } from '../../../api/filaments'
+import type { Color, Filament } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
-import { won } from '../../../format'
+import { dotDate, won } from '../../../format'
 import { useColorEditor, type ColorEditor } from './useColorEditor'
 
 // 색상 창 머리: 그 색상의 옅은 그라데이션 띠 (입력 중인 색상 코드를 따라 바뀜, TBD-14)
@@ -19,8 +19,19 @@ export function ColorHero({ title, filament, hex }: { title: string; filament: F
   )
 }
 
-// 색상 입력칸: 회사 · 필라멘트(고정) · 이름 · 색상 코드 · 가격
-export function ColorFields({ filament, editor: ed }: { filament: Filament; editor: ColorEditor }) {
+// 색상 입력칸: 회사 · 필라멘트(고정) · 이름 · 색상 코드 · 가격.
+// 가격 아래: 지출에 산 기록이 있으면 `최근 구매가 · 날짜 주문명 (지출)`, 없으면 비울 때 쓰는 필라멘트 가격 (v2 TBD-31)
+export function ColorFields({
+  filament,
+  color,
+  editor: ed,
+}: {
+  filament: Filament
+  color?: Color
+  editor: ColorEditor
+}) {
+  const fallback = `비우면 필라멘트 가격 ${filament.price == null ? '(미입력)' : won(filament.price)} 사용`
+  const lb = color?.last_buy
   return (
     <div className="form-grid">
       <Field label="회사 *">
@@ -61,7 +72,11 @@ export function ColorFields({ filament, editor: ed }: { filament: Filament; edit
       <Field
         label="가격"
         error={ed.errors.price}
-        hint={`비우면 필라멘트 가격 ${filament.price == null ? '(미입력)' : won(filament.price)} 사용`}
+        hint={
+          lb
+            ? `최근 구매가 · ${dotDate(lb.date)} ${lb.name} (지출) · 다음에 이 색상을 지출에 넣으면 자동으로 바뀌어요`
+            : `${fallback} · 지출에 이 색상을 넣으면 최근 구매가로 자동`
+        }
       >
         <div className="with-suffix">
           <input

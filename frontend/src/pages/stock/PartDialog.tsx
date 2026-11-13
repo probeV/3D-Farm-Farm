@@ -218,7 +218,15 @@ export default function PartDialog({ kind, part, copyOf, shop, category, categor
               onChange={(e) => change('buy_url', e.target.value)}
             />
           </Field>
-          <Field label="구매가 (묶음 전체)" error={errors.price}>
+          <Field
+            label="구매가 (묶음 전체)"
+            error={errors.price}
+            hint={
+              part?.last_buy
+                ? `최근 구매가 · ${dotDate(part.last_buy.date)} ${part.last_buy.name} (지출)`
+                : `지출에 이 ${L}${kind === 'pack' ? '를' : '을'} 넣으면 최근 구매가로 자동`
+            }
+          >
             <div className="with-suffix">
               <input
                 inputMode="numeric"

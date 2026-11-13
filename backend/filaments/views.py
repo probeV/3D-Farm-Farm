@@ -1,11 +1,13 @@
 """필라멘트 JSON API (/api/v0/, docs/api.md). 스풀 하나로 끝나는 규칙은 모델에, 여러 행을 함께 바꾸는 동작은 여기서."""
 
 from django.db import transaction
-from django.db.models import Avg, Count, Prefetch, ProtectedError, Q
+from django.db.models import Avg, Count, F, Prefetch, ProtectedError, Q
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404  # 숫자가 아닌 id 도 404 (Django 것은 500)
 from rest_framework.response import Response
+
+from expenses.models import ExpenseLine, last_buy_annotations, won
 
 from .models import Brand, Color, Filament, Material, Spool
 from .serializers import (
@@ -31,6 +33,7 @@ def colors_with_counts():
             sealed_count=Count('spools', filter=Q(spools__status=Spool.Status.SEALED)),
             open_count=Count('spools', filter=Q(spools__status=Spool.Status.OPEN)),
             empty_count=Count('spools', filter=Q(spools__status=Spool.Status.EMPTY)),
+            **last_buy_annotations('color'),
         )
         .order_by('filament_id', 'id')
     )
@@ -131,9 +134,19 @@ class ColorViewSet(BaseViewSet):
         purchased_at = data.validated_data['purchased_at']
         price = data.validated_data.get('price')
         chosen = data.validated_data['code_nos']
+        buy = data.validated_data.get('buy')
 
-        # 가격을 비우면 색상 가격 (없으면 필라멘트 가격)
-        if price is None:
+        if buy is not None:
+            # 주문(지출 구매 줄)을 고르면 구매가 = 통당 금액, 구매일 = 지출 날짜 (보낸 값은 무시). 수량은 남은 통까지
+            line = buy_lines(color).filter(pk=buy).first()
+            if line is None:
+                raise serializers.ValidationError({'buy': ['이 색상의 주문이 아닙니다.']})
+            left = int(line.qty) - line.spool_count
+            if quantity > left:
+                raise serializers.ValidationError({'quantity': [f'이 주문은 {left}통 남았습니다.']})
+            price, purchased_at = won(line.each), line.expense.date
+        elif price is None:
+            # 가격을 비우면 색상 가격 (없으면 필라멘트 가격)
             price = color.spool_price
 
         # 지정한 번호 중 하나라도 이미 있으면 400, 아무것도 만들지 않음
@@ -153,11 +166,39 @@ class ColorViewSet(BaseViewSet):
 
         # bulk_create 는 save() 를 거치지 않으므로 번호를 직접 넣는다
         Spool.objects.bulk_create(
-            Spool(color=color, code_no=n, status=Spool.Status.SEALED, price=price, purchased_at=purchased_at)
+            Spool(
+                color=color, code_no=n, status=Spool.Status.SEALED, price=price, purchased_at=purchased_at, buy_id=buy
+            )
             for n in numbers
         )
         spools = Spool.objects.filter(code_no__in=numbers).order_by('code_no')
         return Response(SpoolSerializer(spools, many=True).data, status=status.HTTP_201_CREATED)
+
+    # GET /colors/{id}/buys/  (재고 추가 창의 `주문` 고르기)
+    @action(detail=True, methods=['get'])
+    def buys(self, request, pk=None):
+        """이 색상을 산 지출 구매 줄 중 등록할 통이 남은 것, 최근 주문 먼저 (TBD-31)"""
+        color = get_object_or_404(Color, pk=pk)
+        lines = buy_lines(color).filter(qty__gt=F('spool_count')).order_by('-expense__date', '-expense_id', '-id')
+        return Response(
+            [
+                {
+                    'id': line.pk,
+                    'expense': line.expense_id,
+                    'date': line.expense.date,
+                    'name': line.expense.name,
+                    'qty': int(line.qty),
+                    'spools': line.spool_count,
+                    'each': int(won(line.each)),
+                }
+                for line in lines
+            ]
+        )
+
+
+def buy_lines(color):
+    """이 색상의 지출 구매 줄 + 지출 + 등록한 스풀 수"""
+    return ExpenseLine.objects.filter(color=color).select_related('expense').annotate(spool_count=Count('spools'))
 
 
 class SpoolViewSet(BaseViewSet):

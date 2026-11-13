@@ -16,7 +16,7 @@ class StockHistoryInline(admin.TabularInline):
     model = StockHistory
     fk_name = 'part'
     extra = 0
-    fields = ['date', 'kind', 'qty', 'after', 'note', 'sale']
+    fields = ['date', 'kind', 'qty', 'after', 'note', 'sale', 'expense']
     readonly_fields = fields
     can_delete = False
 

@@ -1,32 +1,23 @@
-// 지출 분류 (EXP-03, 고정 7개). 서버: expenses/models.py ExpenseCategory
-// v2: v2 손익 기준에서 어떻게 쓰이는지 (현금 기준은 모두 산 날 지출, docs/plans/v2.md)
+// 지출 분류 (EXP-03, 고정 8개). 서버: expenses/models.py ExpenseCategory
+// v2: 재고 관리 탭과 같은 단위로 나눔 (부속품 · 포장재 · 소모품). 손익 기준에서 장비는 투자 회수로,
+// 필라멘트는 사용 시작한 스풀로, 나머지는 산 날 (docs/plans/v2.md "돈을 보는 두 관점")
 import type { ExpenseCategory } from '../../api/expenses'
 
 export interface CategoryInfo {
   key: ExpenseCategory
   label: string
   examples: string
-  v2: string
 }
 
 export const CATEGORIES: CategoryInfo[] = [
-  {
-    key: 'invest',
-    label: '투자(장비)',
-    examples: '프린터 · 필라멘트 건조기 · 라벨 프린터',
-    v2: '누적 투자금에 모여요. v2 손익에는 넣지 않고 투자 회수율로 따로 봐요',
-  },
-  {
-    key: 'filament',
-    label: '필라멘트',
-    examples: '필라멘트 스풀',
-    v2: 'v2 손익에서는 이 지출 대신 사용 시작한 스풀 구매가로 계산해요',
-  },
-  { key: 'part', label: '부자재', examples: '자석 · 박스 · OPP 봉투', v2: 'v2 손익의 재료비 (산 날)' },
-  { key: 'supply', label: '소모품 · 유지', examples: '노즐 · 베드 시트 · 윤활유', v2: 'v2 손익의 운영비' },
-  { key: 'sub', label: '구독 · 운영', examples: 'AI 구독 · 플랫폼 월정액 · 전기요금', v2: 'v2 손익의 운영비' },
-  { key: 'sell', label: '판매비', examples: '택배비 · 광고비', v2: 'v2 손익의 운영비' },
-  { key: 'etc', label: '기타', examples: '위에 안 맞는 것', v2: 'v2 손익의 운영비' },
+  { key: 'invest', label: '장비', examples: '프린터 · 필라멘트 건조기 · 라벨 프린터' },
+  { key: 'filament', label: '필라멘트', examples: '필라멘트 스풀' },
+  { key: 'part', label: '부속품', examples: '자석 · 볼트 · LED 모듈' },
+  { key: 'pack', label: '포장재', examples: '박스 · OPP 봉투 · 완충재' },
+  { key: 'supply', label: '소모품', examples: '접착제 · 노즐 · 베드 시트 · 윤활유' },
+  { key: 'sub', label: '구독 · 운영', examples: 'AI 구독 · 플랫폼 월정액 · 전기요금' },
+  { key: 'sell', label: '판매비', examples: '택배비 · 광고비' },
+  { key: 'etc', label: '기타', examples: '위에 안 맞는 것' },
 ]
 
 export const CATEGORY_KEYS = CATEGORIES.map((c) => c.key) as [ExpenseCategory, ...ExpenseCategory[]]

@@ -32,6 +32,7 @@ const part = (p: Partial<Part>): Part => ({
   alert: 0,
   set_count: 0,
   last_used: null,
+  last_buy: null,
   ...p,
 })
 
