@@ -24,10 +24,10 @@ frontend/ (React)                          backend/ (Django)
 | 앱 | 모델 | 상태 |
 |---|---|---|
 | `filaments` | `Brand`, `Material`, `Filament`, `Color`, `Spool` | 모델 완료 |
-| `stock` | `PartCategory`, `Part`, `StockHistory`, `PackSet`, `PackSetLine` | v2 STOCK: 모델 (부자재 API 는 그대로 옮김) |
+| `stock` | `PartCategory`, `Part`, `StockHistory`, `PackSet`, `PackSetLine` | v2 STOCK: 모델 · API |
 | `products` | `Category`, `Subcategory`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 모델 · API 완료 |
 | `expenses` | `Expense`, `RecurringExpense` | 모델 · API 완료 |
-| `sales` | `Sale`, `SaleItem`, `SalePack` | 모델 · API · 화면 완료 (v2, 포장 줄은 모델만) |
+| `sales` | `Sale`, `SaleItem`, `SalePack` | 모델 · API · 화면 완료 (v2, 포장 줄은 API 까지) |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
 - **참조 방향은 한쪽으로만** (`→` = import 함):

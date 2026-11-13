@@ -5,7 +5,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from filaments.serializers import BaseModelSerializer
-from stock.models import Part
+from stock.models import Part, PartKind
 
 from .models import Category, CostSetting, Product, ProductFilament, ProductPart, Subcategory
 
@@ -60,6 +60,8 @@ class ReplacePartSerializer(serializers.Serializer):
     def validate_to(self, value):
         if value == self.context['part']:
             raise serializers.ValidationError('다른 부자재를 고르세요.')
+        if value.kind != PartKind.PART:
+            raise serializers.ValidationError('부속품만 고를 수 있습니다.')
         return value
 
     def validate_products(self, value):
@@ -86,9 +88,15 @@ class ProductPartSerializer(BaseModelSerializer):
         model = ProductPart
         fields = ['id', 'part', 'qty']
 
+    def validate_part(self, value):
+        # 포장재는 기본 포장(default_pack)으로, 소모품은 원가에 넣지 않음 (v2 STOCK)
+        if value.kind != PartKind.PART:
+            raise serializers.ValidationError('부속품만 고를 수 있습니다.')
+        return value
+
 
 class ProductSerializer(BaseModelSerializer):
-    """제품 + 사용 필라멘트 · 부자재 줄.
+    """제품 + 사용 필라멘트 · 부속품 줄 + 기본 포장(포장 세트 id, null = 입력 필요).
 
     줄(filaments · parts)을 보내면 그 목록으로 통째로 바꾼다 (기존 줄은 지우고 새로 만듦 → 줄 id 가 바뀜).
     보내지 않으면(PATCH) 줄은 그대로.
@@ -109,12 +117,14 @@ class ProductSerializer(BaseModelSerializer):
             'status',
             'print_minutes',
             'sale_price',
+            'default_pack',
             'note',
             'filaments',
             'parts',
             'created_at',
             'updated_at',
         ]
+        extra_kwargs = {'default_pack': {'error_messages': {'does_not_exist': '없는 포장 세트입니다.'}}}
 
     def validate_no(self, value):
         same = Product.objects.filter(no=value)

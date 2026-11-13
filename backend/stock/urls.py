@@ -7,5 +7,6 @@ from . import views
 router = SimpleRouter()
 router.register('part-categories', views.PartCategoryViewSet)
 router.register('parts', views.PartViewSet)
+router.register('pack-sets', views.PackSetViewSet)
 
 urlpatterns = router.urls

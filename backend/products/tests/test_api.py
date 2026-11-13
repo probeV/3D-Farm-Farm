@@ -5,7 +5,7 @@ from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase
 
 from filaments.models import Brand, Color, Filament, Material, Spool
-from stock.models import Part
+from stock.models import PackSet, Part, PartKind
 
 from ..models import Category, CostSetting, Product, ProductFilament, ProductPart, Subcategory
 
@@ -339,3 +339,30 @@ class CostSettingApiTests(APITestCase):
     def test_put_and_delete_not_allowed(self):
         self.assertEqual(self.client.put(f'{API}/cost-setting/', {}, format='json').status_code, 405)
         self.assertEqual(self.client.delete(f'{API}/cost-setting/').status_code, 405)
+
+
+class ProductStockApiTests(ApiTestCase):
+    """v2 STOCK: 제품의 줄은 부속품만, 포장은 기본 포장 세트로"""
+
+    def setUp(self):
+        super().setUp()
+        self.bag = Part.objects.create(kind=PartKind.PACK, name='OPP 봉투', price=8900, pack_qty=500)
+        self.pack = PackSet.objects.create(name='봉투 포장')
+
+    def test_default_pack(self):
+        res = self.client.post(f'{API}/products/', {'name': '이름 키링', 'default_pack': self.pack.pk}, format='json')
+        self.assertEqual((res.status_code, res.data['default_pack']), (201, self.pack.pk))
+        res = self.client.patch(f'{API}/products/{res.data["id"]}/', {'default_pack': None}, format='json')
+        self.assertIsNone(res.data['default_pack'])
+        res = self.client.post(f'{API}/products/', {'name': '키링 2', 'default_pack': 999}, format='json')
+        self.assertEqual(res.data['default_pack'], ['없는 포장 세트입니다.'])
+
+    def test_rows_take_parts_only(self):
+        body = {'name': '이름 키링', 'parts': [{'part': self.bag.pk, 'qty': 1}]}
+        res = self.client.post(f'{API}/products/', body, format='json')
+        self.assertEqual(res.data['parts'][0]['part'], ['부속품만 고를 수 있습니다.'])
+
+    def test_replace_to_parts_only(self):
+        ProductPart.objects.create(product=Product.objects.create(name='분수 원판 세트'), part=self.magnet)
+        res = self.client.post(f'{API}/parts/{self.magnet.pk}/replace/', {'to': self.bag.pk}, format='json')
+        self.assertEqual(res.data['to'], ['부속품만 고를 수 있습니다.'])
