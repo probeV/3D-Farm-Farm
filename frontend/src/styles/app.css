@@ -1885,3 +1885,11 @@ input[type='color'] {
     display: none;
   }
 }
+
+/* ⚙ 설정 바로가기 (화면 위 줄 오른쪽, 정사각형) */
+.btn.gear {
+  width: 36px;
+  padding-left: 0;
+  padding-right: 0;
+  justify-content: center;
+}

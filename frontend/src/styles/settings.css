@@ -1,15 +1,68 @@
-/* 제품 원가 설정 화면: docs/mockups/settings.html 의 <style> 중 app.css · products.css 에 없는 것만 옮김.
+/* 설정 화면: docs/mockups/settings.html 의 <style> 중 app.css · products.css 에 없는 것만 옮김.
    색상 토큰은 app.css 에서만 정의 */
 
-/* 입력 화면이라 다른 화면(1280px)보다 좁게 */
+/* 2단: 왼쪽 분류 | 오른쪽 내용. 입력 화면이라 다른 화면(1280px)보다 좁게 */
 .settings {
-  max-width: 960px;
+  max-width: 1080px;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
 }
-.settings .top-row {
-  margin-bottom: 18px;
+.set-cats {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
-.settings .stats .info b {
+.set-cat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.set-cat:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.set-cat.on {
+  background: var(--accent-soft);
   color: var(--accent);
+}
+.set-cat .ico {
+  width: 22px;
+  text-align: center;
+}
+/* 저장 안 한 변경이 있는 분류 */
+.set-cat .dot {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.cat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.cat-head h3 {
+  margin: 0;
+  font-size: 17px;
 }
 
 /* 설정 묶음 */
@@ -33,7 +86,7 @@
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
-.group-head h3 {
+.group-head h4 {
   margin: 0;
   font-size: 15px;
 }
@@ -61,6 +114,21 @@
   border-bottom: 0;
 }
 .setting .name {
+  font-weight: 600;
+}
+/* 이 값을 쓰는 화면 (제품 원가 · 판매) */
+.uses {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.uses span {
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
   font-weight: 600;
 }
 .setting .desc {
@@ -137,6 +205,17 @@
 }
 
 @media (max-width: 760px) {
+  .settings {
+    grid-template-columns: 1fr;
+  }
+  .set-cats {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .set-cat {
+    white-space: nowrap;
+  }
   .setting {
     grid-template-columns: 1fr;
   }

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { Product } from '../../api/products'
 import Help from '../../components/Help'
+import SettingsButton from '../../components/SettingsButton'
 import { useToast } from '../../components/useToast'
 import { pct, today } from '../../format'
 import { selectionExists } from './categories'
@@ -17,7 +18,7 @@ import { useCostData } from './useCostData'
 type DialogState = { kind: 'manage' } | { kind: 'product'; productId: number }
 
 // 제품 원가 화면: 상태별 개수 → 요약 카드 → 제품 목록 (docs/screens.md 2장)
-export default function ProductsPage() {
+export default function ProductsPage({ onSettings }: { onSettings: () => void }) {
   const { error, retry, data } = useCostData()
   const toast = useToast()
   const [filter, setFilter] = useState<ListFilter>(NO_FILTER)
@@ -78,6 +79,7 @@ export default function ProductsPage() {
         <button className="btn" onClick={() => setDialog({ kind: 'manage' })}>
           제품 관리
         </button>
+        <SettingsButton label="제품 원가" onClick={onSettings} />
       </div>
 
       <div className="sum-cards two">
