@@ -137,6 +137,10 @@ STATIC_URL = 'static/'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# QR 라벨 안의 주소 앞부분 (v2 TBD-18): {PUBLIC_URL}/s/S00012. 폰이 PC 화면에 접속하는 주소 (같은 와이파이).
+# 비우면 화면이 지금 연 주소를 쓴다 (localhost 로 열었으면 폰에서 안 열림)
+PUBLIC_URL = env('PUBLIC_URL', '').strip().rstrip('/')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

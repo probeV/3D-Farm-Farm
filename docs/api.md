@@ -47,7 +47,8 @@
 | GET · POST | `/api/v0/spools/` | 스풀 목록(`?color=&status=`) / 스풀 1개 만들기 |
 | GET · PATCH · DELETE | `/api/v0/spools/{id}/` | 스풀 하나 / 수정 / 삭제 |
 | DELETE | `/api/v0/spools/?ids=3,4,5` | 여러 개 삭제 |
-| GET | `/api/v0/spools/code/{code}/` | 코드로 스풀 찾기 |
+| GET | `/api/v0/spools/code/{code}/` | 코드로 스풀 찾기 (폰 스풀 화면) |
+| GET · POST | `/api/v0/spools/labels/` | QR 주소 앞부분 / 인쇄한 스풀을 `라벨 뽑음` 으로 (TBD-18) |
 | GET · POST | `/api/v0/categories/` | 카테고리 목록(세부 분류 포함) / 추가 |
 | GET · PATCH · DELETE | `/api/v0/categories/{id}/` | 카테고리 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/subcategories/` | 세부 분류 목록 / 추가 |
@@ -185,7 +186,7 @@
   "status": "open", "price": 14000,
   "purchased_at": "2026-10-20",
   "opened_at": "2026-10-20T13:33:30+09:00", "finished_at": null,
-  "note": "", "buy": 7
+  "note": "", "buy": 7, "label_printed": true
 }
 ```
 | 칸 | 쓰기 | 설명 |
@@ -197,6 +198,7 @@
 | `price` | 선택 | 구매가. `buy` 가 있는 스풀(지출로 생김)은 못 고침 → 400 `지출로 생긴 스풀은 구매가를 지출에서 고쳐요.` |
 | `purchased_at` · `opened_at` · `finished_at` · `note` | 선택 | |
 | `buy` | 만들 때만 | 주문 = 지출 구매 항목 id. 필라멘트 지출을 저장하면 정해진다. 만들 때 보내는 건 되돌리기용 · 만든 뒤에는 못 바꿈 (400 `주문은 바꿀 수 없습니다.`). `null` = 재고 추가로 넣은 스풀 |
+| `label_printed` | 선택 | QR 라벨을 뽑았는지 (TBD-18). 새 스풀은 `false`, 보통은 아래 `labels` 로 바꾼다. 만들 때 보내는 건 삭제 되돌리기용 |
 
 ### 목록 `GET /api/v0/spools/?color=3&status=sealed`
 - `color`(정수), `status`(`sealed` / `open` / `empty`) 로 거를 수 있다 (스풀 선택 · 조정 창). 번호 순서
@@ -214,7 +216,15 @@
 | `POST /api/v0/spools/` | 스풀 1개 만들기. **삭제 되돌리기**: 지운 스풀의 내용(`code_no` 포함)을 그대로 보내면 같은 코드로 다시 생김 |
 | `DELETE /api/v0/spools/{id}/` | 삭제 (204) |
 | `DELETE /api/v0/spools/?ids=3,4,5` | 쉼표로 구분한 id, 한 번에 100개까지 → `{"deleted": 3}`. **재고 추가 되돌리기**. 형식이 틀리거나 100개를 넘으면 400 |
-| `GET /api/v0/spools/code/S00012/` | 코드로 찾기 (대소문자 무관). 형식이 틀리면 400, 없으면 404 (PRD INV-09) |
+| `GET /api/v0/spools/code/S00012/` | 코드로 찾기 (대소문자 무관). 형식이 틀리면 400, 없으면 404 (PRD INV-09). 폰 스풀 화면(INV-11)이 쓰므로 스풀 칸에 더해 `color_name` · `color_hex` · `filament_name`(`Bambu Lab › PLA Basic`) · `order`(`{"expense": 31, "date": "2026-10-27", "name": "PLA Basic 10롤"}`, 재고 추가로 넣은 스풀이면 `null`)를 준다 |
+
+### QR 라벨 `GET · POST /api/v0/spools/labels/` (v2 TBD-18)
+| 요청 | 설명 |
+|---|---|
+| `GET` | `{"public_url": "http://192.168.0.10:5173"}` — QR 안의 주소 앞부분 (`backend/.env` 의 `PUBLIC_URL`, 끝의 `/` 뺌). 없으면 `""` → 화면이 지금 연 주소를 쓴다. QR 안의 주소 = `{앞부분}/s/{코드}` (화면의 폰 스풀 화면) |
+| `POST {"ids": [3, 4], "printed": true}` | 인쇄한 스풀을 `라벨 뽑음` 으로 → `{"updated": 2}`. `printed: false` 는 되돌리기. `ids` 는 1~500개, 틀리면 400 `{"ids": [...]}` |
+
+- 라벨 인쇄 화면은 모든 스풀(`GET /spools/`) + 필라멘트 목록으로 그린다. `라벨 없음` = `label_printed` 가 `false` 이고 사용 완료가 아닌 스풀
 
 ## 되돌리기 (PRD 3.5) — 화면이 하는 일
 서버는 이력을 저장하지 않는다. 방금 받은 응답을 화면이 기억해 두었다가 알림의 `되돌리기`(7초)에서 반대 요청을 보낸다.
@@ -223,7 +233,8 @@
 |---|---|
 | 재고 추가 | `DELETE /spools/?ids=…` — 응답으로 받은 스풀 id 들 |
 | 상태 변경 | `PATCH /spools/{id}/` — 바꾸기 전의 `status` · `opened_at` · `finished_at` 를 함께 |
-| 스풀 삭제 | `POST /spools/` — 지우기 전에 갖고 있던 스풀 내용 그대로 (`code_no` 포함) |
+| 스풀 삭제 | `POST /spools/` — 지우기 전에 갖고 있던 스풀 내용 그대로 (`code_no` · `label_printed` 포함) |
+| 라벨 인쇄 | `POST /spools/labels/` — 인쇄한 스풀 id 들, `printed: false` (인쇄 창을 취소했을 때) |
 
 ---
 

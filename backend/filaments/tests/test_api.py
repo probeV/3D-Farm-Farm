@@ -350,3 +350,63 @@ class SpoolApiTests(ApiTestCase):
         for url in [f'{API}/spools/999/', f'{API}/spools/abc/', f'{API}/spools/code/S00999/']:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).data, {'detail': '찾을 수 없습니다.'})
+
+
+class LabelApiTests(ApiTestCase):
+    """QR 라벨 (v2 TBD-18): 라벨 뽑음 표시 · QR 주소 앞부분 · 폰 스풀 화면"""
+
+    def setUp(self):
+        super().setUp()
+        self.spools = [Spool.objects.create(color=self.color) for _ in range(3)]
+
+    def test_new_spool_has_no_label(self):
+        res = self.client.get(f'{API}/spools/')
+        self.assertEqual({s['label_printed'] for s in res.data}, {False})
+
+    def test_mark_printed_and_undo(self):
+        ids = [s.pk for s in self.spools[:2]]
+        res = self.client.post(f'{API}/spools/labels/', {'ids': ids}, format='json')
+        self.assertEqual(res.data, {'updated': 2})
+        self.assertEqual(list(Spool.objects.filter(label_printed=True).values_list('pk', flat=True)), ids)
+        res = self.client.post(f'{API}/spools/labels/', {'ids': ids, 'printed': False}, format='json')
+        self.assertEqual(res.data, {'updated': 2})
+        self.assertFalse(Spool.objects.filter(label_printed=True).exists())
+
+    def test_mark_printed_bad_input(self):
+        for body in [{}, {'ids': []}, {'ids': ['abc']}, {'ids': list(range(1, 502))}]:
+            with self.subTest(body=str(body)[:30]):
+                res = self.client.post(f'{API}/spools/labels/', body, format='json')
+                self.assertEqual(res.status_code, 400)
+                self.assertIn('ids', res.data)
+
+    def test_public_url(self):
+        with self.settings(PUBLIC_URL='http://192.168.0.10:5173'):
+            self.assertEqual(self.client.get(f'{API}/spools/labels/').data, {'public_url': 'http://192.168.0.10:5173'})
+        with self.settings(PUBLIC_URL=''):
+            self.assertEqual(self.client.get(f'{API}/spools/labels/').data, {'public_url': ''})
+
+    def test_restore_keeps_label(self):
+        # 삭제 되돌리기: 라벨을 붙였던 스풀은 다시 만들어도 `라벨 뽑음`
+        res = self.client.post(f'{API}/spools/', {'color': self.color.pk, 'code_no': 99, 'label_printed': True})
+        self.assertEqual((res.status_code, res.data['label_printed']), (201, True))
+
+    def test_scan_shows_names_and_order(self):
+        from expenses.models import Expense, ExpenseItem
+
+        spool = self.spools[0]
+        res = self.client.get(f'{API}/spools/code/{spool.code}/')
+        self.assertEqual(
+            (res.data['color_name'], res.data['color_hex'], res.data['filament_name'], res.data['order']),
+            ('화이트', '#FFFFFF', 'Bambu Lab › PLA Basic', None),
+        )
+        expense = Expense.objects.create(
+            date=date(2026, 10, 27), name='PLA Basic 10롤', category='filament', amount=140000
+        )
+        spool.buy = ExpenseItem.objects.create(expense=expense, color=self.color, qty=1)
+        spool.save()
+        with CaptureQueriesContext(connection) as queries:
+            res = self.client.get(f'{API}/spools/code/{spool.code}/')
+        self.assertEqual(
+            res.data['order'], {'expense': expense.pk, 'date': date(2026, 10, 27), 'name': 'PLA Basic 10롤'}
+        )
+        self.assertEqual(len(queries), 1)

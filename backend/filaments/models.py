@@ -267,6 +267,8 @@ class Spool(models.Model):
     opened_at = models.DateTimeField('사용 시작일', null=True, blank=True)
     finished_at = models.DateTimeField('사용 완료일', null=True, blank=True)
     note = models.TextField('메모', blank=True)
+    # QR 라벨을 뽑았는지 (v2 TBD-18). 라벨 인쇄 화면의 `라벨 없음` 목록용 — 인쇄하면 True
+    label_printed = models.BooleanField('라벨 뽑음', default=False)
 
     class Meta:
         verbose_name = '스풀'

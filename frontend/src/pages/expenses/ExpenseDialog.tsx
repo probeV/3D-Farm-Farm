@@ -15,6 +15,7 @@ import Field from '../../components/Field'
 import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { dotDate, today, unitWon, won } from '../../format'
+import { useNav } from '../../nav'
 import { useForm } from '../../useForm'
 import BuyLines, { type BuyColor } from './BuyLines'
 import {
@@ -50,6 +51,7 @@ interface Props {
 export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, onCopy, onClose }: Props) {
   const refresh = useRefreshExpenses()
   const toast = useToast()
+  const nav = useNav()
   const confirm = useConfirm()
   const filaments = useFilaments()
   const parts = useParts()
@@ -129,10 +131,12 @@ export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, 
       if (problem) throw new Error(problem)
       // 구매 항목: 그 분류일 때만, 고른 항목만. 아닌 분류면 빈 목록 (서버가 기존 항목을 지움)
       const items = field ? toInput(field, rows) : []
+      let saved
       try {
         // 수정할 때 반복 지출 연결은 그대로 둔다 (보내지 않음)
-        if (expense) await updateExpense(expense.id, { ...data, items })
-        else await createExpense({ ...data, recurring: null, items })
+        saved = expense
+          ? await updateExpense(expense.id, { ...data, items })
+          : await createExpense({ ...data, recurring: null, items })
       } catch (e) {
         const msg = itemsErrorMessage(e)
         if (msg) {
@@ -143,7 +147,16 @@ export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, 
       }
       const msg = savedMessage(data.date)
       await refresh()
-      toast(msg)
+      // 새 스풀이 생겼으면 `라벨 인쇄` → 이 지출의 스풀 중 라벨 없는 것을 골라 둔 QR 화면 (TBD-18)
+      const added = field === 'color' && rows.some((r) => r.pick != null && spoolDiff(r) > 0)
+      const buys = saved.items.filter((it) => it.color != null).map((it) => it.id)
+      toast(
+        msg,
+        undefined,
+        added
+          ? { label: '라벨 인쇄', run: () => nav.openLabels({ buys, from: `방금 저장한 지출 ${saved.name}의 스풀` }) }
+          : undefined,
+      )
       onClose()
     })
   }

@@ -1,5 +1,6 @@
 """필라멘트 JSON API (/api/v0/, docs/api.md). 스풀 하나로 끝나는 규칙은 모델에, 여러 행을 함께 바꾸는 동작은 여기서."""
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Avg, Count, Prefetch, ProtectedError, Q
 from rest_framework import status, viewsets
@@ -14,8 +15,10 @@ from .serializers import (
     BrandSerializer,
     ColorSerializer,
     FilamentSerializer,
+    LabelsSerializer,
     MaterialSerializer,
     PurchaseSerializer,
+    ScanSpoolSerializer,
     SpoolCodeSerializer,
     SpoolFilterSerializer,
     SpoolIdsSerializer,
@@ -176,7 +179,23 @@ class SpoolViewSet(BaseViewSet):
 
     @action(detail=False, methods=['get'], url_path=r'code/(?P<code>[^/]+)')
     def by_code(self, request, code=None):
-        """스풀 코드로 찾기 (PRD INV-09): S00012. 형식이 틀리면 400, 없으면 404"""
+        """스풀 코드로 찾기 (PRD INV-09): S00012. 형식이 틀리면 400, 없으면 404.
+        폰 스풀 화면(QR 라벨을 찍으면, TBD-18)도 이것 — 색상 · 필라멘트 이름 · 주문(지출)을 함께 준다"""
         params = SpoolCodeSerializer(data={'code': code})
         params.is_valid(raise_exception=True)
-        return Response(SpoolSerializer(get_object_or_404(Spool, code_no=params.validated_data['code'])).data)
+        spools = Spool.objects.select_related('color__filament__brand', 'color__filament__material', 'buy__expense')
+        return Response(ScanSpoolSerializer(get_object_or_404(spools, code_no=params.validated_data['code'])).data)
+
+    # GET · POST /spools/labels/
+    @action(detail=False, methods=['get', 'post'])
+    def labels(self, request):
+        """QR 라벨 (v2 TBD-18). GET: QR 안의 주소 앞부분 {public_url} (backend/.env 의 PUBLIC_URL, 없으면 "").
+        POST {ids, printed}: 인쇄한 스풀을 `라벨 뽑음` 으로 (printed=false 는 되돌리기) → {updated}"""
+        if request.method == 'GET':
+            return Response({'public_url': settings.PUBLIC_URL})
+        data = LabelsSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        updated = Spool.objects.filter(pk__in=data.validated_data['ids']).update(
+            label_printed=data.validated_data['printed']
+        )
+        return Response({'updated': updated})
