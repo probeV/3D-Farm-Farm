@@ -19,7 +19,7 @@ import { productSchema } from './schemas'
 const NEW_CATEGORY = 'new'
 
 // 머리 띠의 칸은 칸 아래에 글씨 자리가 없어서 머리 띠 맨 아래에 "칸 이름: 오류" 로 모아 보여 준다
-const HERO_FIELDS = { no: 'No.', name: '제품명', category: '카테고리', subcategory: '세부 분류', status: '상태' }
+const HERO_FIELDS = { name: '제품명', category: '카테고리', subcategory: '세부 분류', status: '상태' }
 
 // 제품 추가 · 복제 · 수정 (PRD-04 · PRD-04a · PRD-05~09, docs/screens.md 2.5)
 // 창 제목은 따로 없고 머리 띠의 제품명이 제목. 원가는 입력하는 동안 바로 다시 계산한다
@@ -38,7 +38,7 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
 
   const confirm = useConfirm()
   const products = rows.map((r) => r.product)
-  const form = useForm(productSchema, initialValues({ product, copyOf, preset }, products, filaments))
+  const form = useForm(productSchema, initialValues({ product, copyOf, preset }, filaments))
   const { values, errors, busy, change, update, submit } = form
   const pickedPack = values.default_pack ? catalog.packSets.get(Number(values.default_pack)) : undefined
   const [addingCategory, setAddingCategory] = useState(false)
@@ -57,9 +57,8 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
   }
 
   const save = () =>
-    submit(async ({ no, ...rest }) => {
+    submit(async (body) => {
       // 사용량이 0 인 필라멘트 줄도 그대로 저장 — 색상만 먼저 골라 두고 g 은 나중에 넣을 수 있게 (TBD-32)
-      const body = { ...rest, no: no ?? undefined } // no 를 비우면 서버가 다음 번호 (수정이면 그대로)
       if (product) await updateProduct(product.id, body)
       else await createProduct(body)
       await refresh()
@@ -86,15 +85,6 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
   const header = (
     <div className="hero">
       <div className="hero-top">
-        <label className="code-wrap">
-          No.
-          <input
-            className="ghost"
-            inputMode="numeric"
-            value={values.no}
-            onChange={(e) => change('no', e.target.value)}
-          />
-        </label>
         {!product &&
           (copyOf ? (
             <span className="copy-from">{copyOf.name}에서 복제</span>
@@ -162,7 +152,7 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
         ([k, label]) =>
           errors[k] && (
             <div key={k} className="err">
-              {/* 서버 문구가 이미 칸 이름으로 시작하면 (No. 3 는 이미 있습니다.) 그대로 */}
+              {/* 서버 문구가 이미 칸 이름으로 시작하면 그대로 */}
               {errors[k].startsWith(label) ? errors[k] : `${label}: ${errors[k]}`}
             </div>
           ),

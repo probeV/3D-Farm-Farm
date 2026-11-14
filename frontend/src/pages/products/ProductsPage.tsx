@@ -115,7 +115,7 @@ export default function ProductsPage({ onSettings }: { onSettings: () => void })
         <div className="spacer" />
         <input
           type="search"
-          placeholder="제품명·번호·색상 검색"
+          placeholder="제품명·색상 검색"
           value={filter.q}
           onChange={(e) => set({ q: e.target.value })}
         />

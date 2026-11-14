@@ -33,7 +33,7 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
   // 고른 것이 지워졌으면 전체로
   const sel: CategorySel = selectionExists(categories, picked, hasUncategorized) ? picked : ''
   const count = (s: CategorySel) => rows.filter((r) => inSelection(r.product, s)).length
-  const prods = rows.filter((r) => inSelection(r.product, sel)).sort((a, b) => a.product.no - b.product.no)
+  const prods = rows.filter((r) => inSelection(r.product, sel)).sort((a, b) => a.product.id - b.product.id)
 
   // `+ 제품 추가`: 지금 고른 카테고리 · 세부 분류를 미리 고른 채로
   const preset = () => {
@@ -50,7 +50,6 @@ export default function ManageDialog({ onClose }: { onClose: () => void }) {
         <div>
           <strong>{p.name}</strong>
           <StatusBadge status={p.status} />
-          <div className="hint">No. {p.no}</div>
         </div>
         <div className="price">
           {won(p.sale_price)}

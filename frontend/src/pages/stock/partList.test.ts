@@ -39,7 +39,6 @@ const part = (p: Partial<Part>): Part => ({
 
 const product = (p: Partial<Product>): Product => ({
   id: 1,
-  no: 1,
   category: null,
   subcategory: null,
   name: '',

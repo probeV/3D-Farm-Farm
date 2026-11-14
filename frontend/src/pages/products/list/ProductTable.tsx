@@ -58,9 +58,8 @@ export default function ProductTable({ rows, categories, catalog, sort, onSort, 
     <table>
       <thead>
         <tr>
-          <SortTh sortKey="no" {...th}>
-            No.
-          </SortTh>
+          {/* 줄 번호: 지금 보이는 순서대로 1, 2, 3 … (저장 · 수정 없음) */}
+          <th className="row-no">No.</th>
           <th>카테고리</th>
           <SortTh sortKey="name" {...th}>
             제품명
@@ -88,14 +87,9 @@ export default function ProductTable({ rows, categories, catalog, sort, onSort, 
         </tr>
       </thead>
       <tbody>
-        {rows.map(({ product: p, cost: c, colors }) => (
+        {rows.map(({ product: p, cost: c, colors }, i) => (
           <tr key={p.id} className={p.status === 'discontinued' ? 'discontinued' : ''} onClick={() => onOpen(p)}>
-            {/* 큰 번호는 줄이고 마우스를 올리면 전체 (TBD-12) */}
-            <td className="muted">
-              <span className="no-cell" title={`No. ${p.no}`}>
-                {p.no}
-              </span>
-            </td>
+            <td className="row-no muted">{i + 1}</td>
             <td>
               {p.category == null ? (
                 <span className="muted">미분류</span>

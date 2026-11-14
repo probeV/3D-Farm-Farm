@@ -6,7 +6,6 @@ import { STATUS_LABEL } from '../status'
 import type { ProductRow } from './productList'
 
 const HEAD = [
-  'No.',
   '카테고리',
   '세부 분류',
   '제품명',
@@ -29,9 +28,8 @@ const round = (n: number | null) => (n == null ? '' : Math.round(n))
 
 export function productsCsv(rows: ProductRow[], categories: Category[]) {
   const lines = [...rows]
-    .sort((a, b) => a.product.no - b.product.no)
+    .sort((a, b) => a.product.id - b.product.id)
     .map(({ product: p, cost: c, colors }) => [
-      p.no,
       categories.find((x) => x.id === p.category)?.name ?? '',
       findSubcategory(categories, p.subcategory)?.name ?? '',
       p.name,

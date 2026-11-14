@@ -19,7 +19,6 @@ export interface PartLine {
 
 // 입력칸 글자 그대로 (숫자 변환 · 검사는 schemas.ts). useForm 이 쓰므로 interface 가 아닌 type
 export type Values = {
-  no: string
   name: string
   category: string
   subcategory: string
@@ -38,9 +37,6 @@ export const newKey = () => ++lastKey
 
 const str = (v: number | null | undefined) => (v == null ? '' : String(v))
 
-// 다음 No. = 지금 가장 큰 번호 + 1
-export const nextNo = (products: Product[]) => Math.max(0, ...products.map((p) => p.no)) + 1
-
 export const newFilamentLine = (filaments: Filament[]): FilamentLine => ({
   key: newKey(),
   filament: str(filaments[0]?.id),
@@ -50,15 +46,14 @@ export const newFilamentLine = (filaments: Filament[]): FilamentLine => ({
 
 export interface Start {
   product: Product | null // 수정할 제품 (null 이면 추가)
-  copyOf?: Product // 복제할 원본: 재료까지 복사, No. 는 다음 번호, 이름 "(복사)", 상태 개발중 (PRD-04a)
+  copyOf?: Product // 복제할 원본: 재료까지 복사, 이름 "(복사)", 상태 개발중 (PRD-04a)
   preset?: { category: number | null; subcategory: number | null } // 제품 관리 창에서 고른 카테고리 · 세부 분류
 }
 
-export function initialValues({ product, copyOf, preset }: Start, products: Product[], filaments: Filament[]): Values {
+export function initialValues({ product, copyOf, preset }: Start, filaments: Filament[]): Values {
   const src = product ?? copyOf
   if (!src) {
     return {
-      no: String(nextNo(products)),
       name: '',
       category: str(preset?.category),
       subcategory: str(preset?.subcategory),
@@ -74,7 +69,6 @@ export function initialValues({ product, copyOf, preset }: Start, products: Prod
   }
   const minutes = src.print_minutes
   return {
-    no: product ? String(product.no) : String(nextNo(products)),
     name: product ? src.name : `${src.name} (복사)`,
     category: str(src.category),
     subcategory: str(src.subcategory),

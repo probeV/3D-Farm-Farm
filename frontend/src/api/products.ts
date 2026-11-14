@@ -97,7 +97,6 @@ export interface ProductPart {
 
 export interface Product {
   id: number
-  no: number
   category: number | null
   subcategory: number | null
   name: string

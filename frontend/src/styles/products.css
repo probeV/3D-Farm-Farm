@@ -311,14 +311,12 @@ button.sum-card.active {
   font-weight: 700;
 }
 /* No. 열: 5자리까지 보이고 더 길면 … (마우스를 올리면 전체, TBD-12). 표 칸은 max-width 가 안 먹어서 안쪽 span 으로 */
-.no-cell {
-  display: inline-block;
-  max-width: 5ch;
-  vertical-align: bottom;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.table-wrap .row-no {
+  width: 1%;
+  padding-right: 4px;
+  font-variant-numeric: tabular-nums;
 }
-tr.discontinued td:not(:first-child) {
+tr.discontinued td {
   opacity: 0.55;
 }
 
@@ -440,19 +438,6 @@ dialog.xwide {
 }
 .hero-top .spacer {
   flex: 1;
-}
-.hero .code-wrap {
-  display: inline-flex;
-  align-items: center;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-.hero .code-wrap input {
-  width: 56px;
-  padding: 2px 6px;
-  text-align: left;
-  font-weight: 600;
 }
 .title-input {
   width: 100%;
