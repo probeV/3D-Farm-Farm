@@ -102,7 +102,6 @@ class ProductSerializer(BaseModelSerializer):
     보내지 않으면(PATCH) 줄은 그대로.
     """
 
-    no = serializers.IntegerField(min_value=1, required=False)
     filaments = ProductFilamentSerializer(many=True, required=False)
     parts = ProductPartSerializer(many=True, required=False)
 
@@ -110,7 +109,6 @@ class ProductSerializer(BaseModelSerializer):
         model = Product
         fields = [
             'id',
-            'no',
             'category',
             'subcategory',
             'name',
@@ -125,14 +123,6 @@ class ProductSerializer(BaseModelSerializer):
             'updated_at',
         ]
         extra_kwargs = {'default_pack': {'error_messages': {'does_not_exist': '없는 포장 세트입니다.'}}}
-
-    def validate_no(self, value):
-        same = Product.objects.filter(no=value)
-        if self.instance:  # 수정(PATCH)일 때는 자기 자신 제외
-            same = same.exclude(pk=self.instance.pk)
-        if same.exists():
-            raise serializers.ValidationError(f'No. {value} 는 이미 있습니다.')
-        return value
 
     def validate(self, attrs):
         # 세부 분류는 그 제품의 카테고리 안에서 (Product.clean 과 같은 규칙). PATCH 면 보내지 않은 쪽은 기존 값

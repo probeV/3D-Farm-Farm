@@ -56,39 +56,12 @@ class ProductTests(TestCase):
         self.assertIsNone(product.print_minutes)
         self.assertIsNone(product.sale_price)
 
-    def test_blank_no_gets_next_number(self):
-        first = Product.objects.create(name='분수 원판 세트')
-        second = Product.objects.create(name='소마 큐브')
-        self.assertEqual((first.no, second.no), (1, 2))
-
-    def test_next_no_follows_largest_number(self):
-        Product.objects.create(name='소마 큐브', no=41)
-        self.assertEqual(Product.objects.create(name='하노이 탑').no, 42)
-
-    def test_no_unique(self):
-        Product.objects.create(name='분수 원판 세트', no=1)
-        with self.assertRaises(IntegrityError):
-            Product.objects.create(name='소마 큐브', no=1)
-
-    def test_no_must_be_positive(self):
-        with self.assertRaises(ValidationError):
-            Product(name='소마 큐브', no=0).full_clean()
-
-    def test_no_kept_on_later_save(self):
-        product = Product.objects.create(name='분수 원판 세트')
-        Product.objects.create(name='소마 큐브')
-        product.note = '메모'
-        product.save()
-        product.refresh_from_db()
-        self.assertEqual(product.no, 1)
-
-    def test_sorted_by_number_not_text(self):
-        for no in [10, 2, 1]:
-            Product.objects.create(name=f'제품 {no}', no=no)
-        self.assertEqual([p.no for p in Product.objects.all()], [1, 2, 10])
+    def test_sorted_by_added_order(self):
+        for name in ['하노이 탑', '소마 큐브', '분수 원판']:
+            Product.objects.create(name=name)
+        self.assertEqual([p.name for p in Product.objects.all()], ['하노이 탑', '소마 큐브', '분수 원판'])
 
     def test_str(self):
-        self.assertEqual(str(Product(name='소마 큐브', no=3)), '3. 소마 큐브')
         self.assertEqual(str(Product(name='소마 큐브')), '소마 큐브')
 
     def test_subcategory_must_belong_to_category(self):
@@ -206,7 +179,6 @@ class AdminPagesTests(TestCase):
         return self.client.post(
             '/admin/products/product/add/',
             {
-                'no': '',
                 'name': '분수 원판 세트',
                 'category': category,
                 'subcategory': subcategory,
@@ -218,17 +190,15 @@ class AdminPagesTests(TestCase):
             },
         )
 
-    def test_admin_add_product_gets_next_no(self):
+    def test_admin_add_product(self):
         self.assertEqual(self.add_product(self.edu.pk, self.math.pk).status_code, 302)
-        self.assertEqual(Product.objects.get().no, 1)
+        self.assertEqual(Product.objects.get().name, '분수 원판 세트')
 
-    def test_admin_search_by_name_or_no(self):
-        soma = Product.objects.create(name='소마 큐브', no=3)
-        Product.objects.create(name='하노이 탑', no=30)
-        for term in ['소마', '3']:
-            with self.subTest(term=term):
-                res = self.client.get('/admin/products/product/', {'q': term})
-                self.assertEqual(list(res.context['cl'].result_list), [soma])
+    def test_admin_search_by_name(self):
+        soma = Product.objects.create(name='소마 큐브')
+        Product.objects.create(name='하노이 탑')
+        res = self.client.get('/admin/products/product/', {'q': '소마'})
+        self.assertEqual(list(res.context['cl'].result_list), [soma])
 
     def test_admin_rejects_subcategory_of_other_category(self):
         res = self.add_product('', self.math.pk)

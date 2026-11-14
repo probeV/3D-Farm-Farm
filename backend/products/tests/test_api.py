@@ -154,7 +154,7 @@ class ProductApiTests(ApiTestCase):
     def test_create_with_rows(self):
         res = self.create()
         self.assertEqual(res.status_code, 201)
-        self.assertEqual(res.data['no'], 1)
+        self.assertNotIn('no', res.data)
         self.assertEqual(
             [(r['color'], r['grams']) for r in res.data['filaments']],
             [(self.red.pk, 24), (None, 24.37)],
@@ -170,21 +170,6 @@ class ProductApiTests(ApiTestCase):
             ('developing', None, None, None),
         )
         self.assertEqual((res.data['filaments'], res.data['parts']), ([], []))
-
-    def test_chosen_and_next_no(self):
-        self.assertEqual(self.create(no=41).data['no'], 41)
-        self.assertEqual(self.create().data['no'], 42)
-
-    def test_duplicate_no(self):
-        self.create(no=3)
-        res = self.create(no=3)
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.data['no'], ['No. 3 는 이미 있습니다.'])
-
-    def test_patch_keeps_own_no(self):
-        product = self.create(no=3).data
-        res = self.client.patch(f'{API}/products/{product["id"]}/', {'no': 3, 'name': '분수 원판'}, format='json')
-        self.assertEqual((res.status_code, res.data['name']), (200, '분수 원판'))
 
     def test_subcategory_must_belong_to_category(self):
         puzzle = Category.objects.create(name='퍼즐')
@@ -247,12 +232,12 @@ class ProductApiTests(ApiTestCase):
         self.assertEqual(res.status_code, 400)
         self.assertEqual(ProductFilament.objects.count(), 2)
 
-    def test_list_ordered_by_no_with_few_queries(self):
-        for no in [10, 2, 1]:
-            self.create(no=no)
+    def test_list_in_added_order_with_few_queries(self):
+        for name in ['하노이 탑', '소마 큐브', '분수 원판']:
+            self.create(name=name)
         with CaptureQueriesContext(connection) as queries:
             res = self.client.get(f'{API}/products/')
-        self.assertEqual([p['no'] for p in res.data], [1, 2, 10])
+        self.assertEqual([p['name'] for p in res.data], ['하노이 탑', '소마 큐브', '분수 원판'])
         self.assertLessEqual(len(queries), 3)  # 제품 + 필라멘트 줄 + 부자재 줄
 
     def test_delete_product_deletes_rows(self):

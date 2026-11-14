@@ -65,24 +65,13 @@ class Subcategory(models.Model):
 
 
 class Product(models.Model):
-    """판매 제품. 카테고리 · 세부 분류는 비워도 됨 (미분류)
-
-    No.(no) 는 숫자로 저장하고 그대로 1, 2, 3 … 으로 보여 준다. 비우면 지금 있는 가장 큰 번호 + 1.
-    """
+    """판매 제품. 카테고리 · 세부 분류는 비워도 됨 (미분류). 기본 순서는 추가한 순서 (id) — v2.1.0 에서 No. 를 뺐다"""
 
     class Status(models.TextChoices):
         ON_SALE = 'on_sale', '판매중'
         DEVELOPING = 'developing', '개발중'
         DISCONTINUED = 'discontinued', '판매중지'
 
-    no = models.PositiveIntegerField(
-        'No.',
-        unique=True,
-        blank=True,  # 비우면 save() 가 다음 번호를 붙인다
-        validators=[MinValueValidator(1)],
-        help_text='비우면 다음 번호를 자동으로 붙여요.',
-        error_messages={'unique': '이미 쓰고 있는 No. 입니다.'},
-    )
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
@@ -119,26 +108,15 @@ class Product(models.Model):
     class Meta:
         verbose_name = '제품'
         verbose_name_plural = '제품'
-        ordering = ['no']
+        ordering = ['id']
 
     def __str__(self):
-        return self.name if self.no is None else f'{self.no}. {self.name}'
-
-    def save(self, *args, **kwargs):
-        if self.no is None:
-            self.no = self.next_no()
-        super().save(*args, **kwargs)
+        return self.name
 
     def clean(self):
         # 세부 분류는 그 제품의 카테고리 안에서 골라야 한다 (카테고리 없이 세부 분류만 고를 수도 없음)
         if self.subcategory_id and self.subcategory.category_id != self.category_id:
             raise ValidationError({'subcategory': '세부 분류는 고른 카테고리 안에서 골라야 합니다.'})
-
-    @staticmethod
-    def next_no():
-        """지금 있는 가장 큰 번호 + 1"""
-        largest = Product.objects.aggregate(largest=models.Max('no'))['largest']
-        return (largest or 0) + 1
 
 
 class ProductFilament(models.Model):
