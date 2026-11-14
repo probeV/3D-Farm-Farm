@@ -111,12 +111,12 @@ def adjust(part, mode, qty, note=''):
 
 
 def sale_usage(sale):
-    """이 판매로 빠져야 할 수량 {품목 id: 수량} — 부속품은 제품의 사용 부속품 × 판매 수량, 포장재는 주문의 포장 줄"""
+    """이 판매로 빠져야 할 수량 {품목 id: 수량} — 판매의 부속품 줄과 포장 줄 그대로
+    (부속품 줄은 처음에 제품의 사용 부속품 × 수량으로 채우고 판매마다 고칠 수 있음)"""
     usage = defaultdict(Decimal)
-    for item in sale.items.select_related('product').prefetch_related('product__parts'):
-        if item.product:
-            for row in item.product.parts.all():
-                usage[row.part_id] += row.qty * item.qty
+    for line in sale.parts.all():
+        if line.part_id:
+            usage[line.part_id] += line.qty
     for pack in sale.packs.all():
         if pack.part_id:
             usage[pack.part_id] += pack.qty

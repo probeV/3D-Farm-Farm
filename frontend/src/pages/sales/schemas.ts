@@ -18,6 +18,7 @@ const item = z
     qty: intRange(1, 999_999),
     unit_price: required,
     unit_cost: z.number().nullable(), // 원가는 입력칸이 아니라 화면이 복사해 둔 값
+    store_item_id: z.string(), // 스마트스토어 상품주문번호 (입력칸 아님, 받은 값 그대로)
   })
   .superRefine((v, ctx) => {
     if (!v.product && !v.product_name) ctx.addIssue({ code: 'custom', path: ['product'], message: '제품을 고르세요' })

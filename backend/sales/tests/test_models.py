@@ -4,8 +4,9 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from products.models import CostSetting, Product
+from stock.models import Part
 
-from ..models import Sale, SaleChannel, SaleItem
+from ..models import Sale, SaleChannel, SaleItem, SalePart
 
 
 class SaleTests(TestCase):
@@ -62,3 +63,13 @@ class SaleItemTests(TestCase):
         SaleItem.objects.create(sale=self.sale, product=self.product, qty=1, unit_price=18900)
         self.sale.delete()
         self.assertFalse(SaleItem.objects.exists())
+
+
+class SalePartTests(TestCase):
+    def test_name_copied_and_kept_after_part_deleted(self):
+        part = Part.objects.create(name='오테뮤 청축 스위치')
+        line = SalePart.objects.create(sale=Sale.objects.create(), part=part, qty=150)
+        self.assertEqual(line.part_name, '오테뮤 청축 스위치')
+        part.delete()
+        line.refresh_from_db()
+        self.assertEqual((line.part, line.part_name), (None, '오테뮤 청축 스위치'))

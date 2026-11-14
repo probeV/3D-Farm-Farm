@@ -26,6 +26,8 @@ erDiagram
     RECURRING_EXPENSE |o--o{ EXPENSE : "넣은 지출"
     SALE ||--o{ SALE_ITEM : "판매 제품"
     PRODUCT |o--o{ SALE_ITEM : "팔린 제품"
+    SALE ||--o{ SALE_PART : "부속품 줄"
+    PART |o--o{ SALE_PART : "쓴 부속품"
     SALE ||--o{ SALE_PACK : "포장 줄"
     PART |o--o{ SALE_PACK : "쓴 포장재"
     SALE |o--o{ STOCK_HISTORY : "판매로 빠진 수량"
@@ -34,6 +36,7 @@ erDiagram
     PART |o--o{ EXPENSE_ITEM : "산 품목"
     EXPENSE_ITEM |o--o{ SPOOL : "지출 저장으로 생긴 스풀"
     EXPENSE |o--o{ STOCK_HISTORY : "구매로 늘어난 수량"
+    PRODUCT |o--o{ STORE_LINK : "스토어 상품 연결"
 
     BRAND {
         bigint id PK
@@ -205,6 +208,14 @@ erDiagram
         int qty "수량 (1 이상)"
         decimal unit_price "단가"
         decimal unit_cost "팔 때 복사한 개당 원가 (포장 빼고), NULL=원가 없음"
+        varchar store_item_id "스마트스토어 상품주문번호, 빈 값=직접 넣음 (비어 있지 않으면 UNIQUE)"
+    }
+    SALE_PART {
+        bigint id PK
+        bigint sale_id FK
+        bigint part_id FK "NULL=부속품을 지움"
+        varchar part_name "저장할 때의 부속품 이름"
+        decimal qty "이 판매로 빠지는 수량"
     }
     SALE_PACK {
         bigint id PK
@@ -213,6 +224,24 @@ erDiagram
         varchar part_name "팔 때의 포장재 이름"
         decimal qty "수량"
         decimal unit_price "팔 때 복사한 개당 단가, NULL=구매가 없음"
+    }
+    STORE_LINK {
+        bigint id PK
+        varchar store_product_id "스토어 상품번호"
+        varchar store_name "스토어 상품명"
+        varchar option "옵션 글자, 빈 값=기본 연결 ((상품번호, 옵션) UNIQUE)"
+        bigint product_id FK "NULL=연결 안 함"
+        datetime updated_at
+    }
+    STORE_IMPORT {
+        bigint id PK
+        datetime created_at "가져온 때"
+        date date_from
+        date date_to
+        int added "넣은 주문"
+        int updated "맞춘 주문 (취소 · 반품 · 금액)"
+        int skipped "뺀 주문"
+        varchar note
     }
     COST_SETTING {
         bigint id PK "항상 1개 행"
@@ -232,7 +261,9 @@ erDiagram
 | `stock` | `PartCategory`, `Part`, `StockHistory`, `PackSet`, `PackSetLine` |
 | `products` | `Category`, `Subcategory`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` |
 | `expenses` | `Expense`, `ExpenseItem`, `RecurringExpense` |
-| `sales` | `Sale`, `SaleItem`, `SalePack` |
+| `sales` | `Sale`, `SaleItem`, `SalePart`, `SalePack` |
+| `smartstore` | `StoreLink`, `StoreImport` |
+| `pl` | — (모델 없음) |
 
 ## 모델 설명
 
@@ -255,11 +286,14 @@ erDiagram
 | `ProductFilament` | 제품 ↔ 필라멘트 (다대다) + 사용량 + 색상(선택). 같은 필라멘트를 색상별로 여러 줄 둘 수 있음 |
 | `ProductPart` | 제품 ↔ 부속품 (다대다) + 수량. 포장재는 `Product.default_pack` 으로 따로 |
 | `CostSetting` | 원가 계산 설정값. 항상 1개 행만 존재 (기본값은 PRD 3.8) |
-| `Expense` | 지출 한 줄 = 주문 하나 (PRD 3.10). 분류는 고정 8개 (`ExpenseCategory`) |
+| `Expense` | 지출 한 줄 = 주문 하나 (PRD 3.10). 분류는 고정 9개 (`ExpenseCategory`) |
 | `ExpenseItem` | 지출의 구매 항목 (PRD EXP-08, v2 TBD-31 · 33). 필라멘트 지출은 색상 · 롤 수, 부속품 · 포장재 · 소모품 지출은 그 탭의 품목 · 수량 + 금액(비우면 나눠 넣음). 같은 색상 · 품목 여러 항목 가능 |
 | `RecurringExpense` | 반복 지출 (구독 · 월정액). 지출을 저절로 만들지 않고, 화면에서 확인하고 넣는다 |
 | `Sale` | 판매 한 건 = 주문 하나 (v2 SALE). 판매처는 고정 3개 (`SaleChannel`). 배송비 · 수수료는 주문 단위 |
 | `SaleItem` | 판매 안의 제품 한 줄. 단가 · 수량 · 팔 때 복사한 개당 원가(포장 빼고) · 제품명 |
+| `SalePart` | 판매 주문의 부속품 줄 — 이 판매로 남은 수량에서 빠지는 부속품. 처음엔 제품의 사용 부속품 × 수량, 판매마다 고칠 수 있음 (옵션별 스위치 등). 원가와는 따로 (재고용) |
+| `StoreLink` | 스토어 상품(+ 옵션 글자) → 이 앱의 제품 (PRD STORE-02). 가져올 때 처음 보는 스토어 상품은 기본 연결 줄(제품 없음)로 생김 |
+| `StoreImport` | 스마트스토어 가져오기 기록 (STORE-05) |
 | `SalePack` | 판매 주문의 포장 줄 (SALE-06). 포장재 · 수량 · 팔 때 복사한 단가 · 이름. 제품 줄과 따로 주문 단위 (묶음 포장) |
 
 ## 계산 규칙
@@ -308,7 +342,8 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 포장 세트 원가 (STOCK-06) = Σ PackSetLine.qty × 포장재 개당 단가 → 제품 원가의 포장비 (Product.default_pack)
 바로 쌀 수 있는 수 = 세트 줄마다 ⌊max(0, Part.stock) ÷ qty⌋ 중 가장 작은 값
 남은 수량 상태 (STOCK-04) = stock ≤ 0 이면 없음, stock ≤ alert 이면 부족
-판매로 빠지는 수량 = Σ 제품 줄의 (ProductPart.qty × SaleItem.qty) + Σ SalePack.qty  (품목별)
+판매로 빠지는 수량 = Σ SalePart.qty + Σ SalePack.qty  (품목별, 서버는 화면이 보낸 줄을 그대로)
+  SalePart 처음 값 = Σ 제품 줄의 ProductPart.qty × SaleItem.qty (sales.models.default_parts) — 추가할 때 안 보내면 · 스마트스토어 가져오기
   판매를 저장할 때마다 이미 그 판매로 기록된 수량과 비교해 차이만 기록 (`services.sync_sale`), 지우기 전에 되돌리는 기록 (`services.revert_sale`)
 ```
 
@@ -340,6 +375,9 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Expense.recurring` → `RecurringExpense` | SET_NULL | 반복 지출을 지워도 이미 넣은 지출은 남는다 (연결만 끊김) |
 | `SaleItem.sale` → `Sale` | CASCADE | 판매를 지우면 그 제품 줄도 함께 삭제 |
 | `SaleItem.product` → `Product` | SET_NULL | 제품을 지워도 판매 줄은 남고, 팔 때 저장한 `product_name` 으로 보인다 |
+| `SalePart.sale` → `Sale` | CASCADE | 판매를 지우면 부속품 줄도 함께 삭제 |
+| `SalePart.part` → `Part` | SET_NULL | 부속품을 지워도 줄은 남고 `part_name` 으로 보인다 (재고는 돌려놓지 않음) |
+| `StoreLink.product` → `Product` | SET_NULL | 제품을 지우면 그 스토어 상품은 `연결 안 함` |
 | `SalePack.sale` → `Sale` | CASCADE | 판매를 지우면 포장 줄도 함께 삭제 |
 | `SalePack.part` → `Part` | SET_NULL | 포장재를 지워도 포장 줄은 남고, 팔 때 저장한 `part_name` · 단가로 보인다 |
 
@@ -373,6 +411,9 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `Sale.channel` | CHOICES | `store`(스마트스토어) / `direct`(직접 판매) / `etc`(기타) |
 | `Sale.order_no` | UNIQUE (빈 값 제외) | 같은 주문을 두 번 넣지 않게 (스마트스토어 가져오기). 빈 주문번호는 여러 개 가능 |
 | `SaleItem.qty` | 검사 | 1 이상 |
+| `SaleItem.store_item_id` | UNIQUE (빈 값 제외) | 같은 스마트스토어 상품주문을 두 번 넣지 않게 · 다음 가져오기 때 취소 · 반품을 맞출 때 찾는다 |
+| `SalePart.part` | 검사 | 부속품 탭 품목만 (`SalePartSerializer`) |
+| `StoreLink (store_product_id, option)` | UNIQUE | 스토어 상품마다 기본 연결 하나 + 옵션 글자마다 하나 |
 
 ## 참고 사항
 - 금액·무게·수량은 `DecimalField` (부동소수점 오차 방지). 원 단위 반올림은 화면/CSV 에서 한다.

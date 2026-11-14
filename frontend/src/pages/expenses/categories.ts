@@ -1,6 +1,6 @@
 // 지출 분류 (EXP-03, 고정 9개). 서버: expenses/models.py ExpenseCategory
 // v2: 재고 관리 탭과 같은 단위로 나눔 (부속품 · 포장재 · 소모품). 손익 기준에서 장비는 투자 회수로,
-// 필라멘트는 사용 시작한 스풀로, 세금은 영업이익 다음에(PL-06), 나머지는 산 날 (docs/plans/v2.md "돈을 보는 두 관점")
+// 필라멘트는 사용 시작한 스풀로, 세금은 영업이익 다음에(PL-06), 나머지는 산 날 (docs/PRD.md 3.12 "현금 기준 / 손익 기준")
 import type { ExpenseCategory } from '../../api/expenses'
 
 export interface CategoryInfo {

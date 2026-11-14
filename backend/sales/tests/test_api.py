@@ -115,7 +115,7 @@ class SaleApiTests(APITestCase):
         with CaptureQueriesContext(connection) as q:
             res = self.client.get(f'{API}/sales/')
         self.assertEqual([s['order_no'] for s in res.data], ['b', 'c', 'a'])
-        self.assertLessEqual(len(q), 3)  # 판매 + 제품 줄 + 포장 줄 (판매 수와 상관없이)
+        self.assertLessEqual(len(q), 4)  # 판매 + 제품 줄 + 부속품 줄 + 포장 줄 (판매 수와 상관없이)
 
     def test_delete(self, _):
         pk = self.client.post(f'{API}/sales/', self.body(), format='json').data['id']
@@ -172,11 +172,38 @@ class SalePackStockApiTests(APITestCase):
         pk = self.client.post(f'{API}/sales/', self.body(), format='json').data['id']
         items = [{'product': self.ring.pk, 'qty': 1, 'unit_price': 4900, 'unit_cost': 191}]
         packs = [{'part': self.box.pk, 'qty': 1}]
-        self.client.patch(f'{API}/sales/{pk}/', {'items': items, 'packs': packs}, format='json')
+        parts = [{'part': self.ring_part.pk, 'qty': 1}]
+        self.client.patch(f'{API}/sales/{pk}/', {'items': items, 'parts': parts, 'packs': packs}, format='json')
         self.assertEqual(self.stocks(), [99, 50, 9])
         # 메모만 고치면 재고는 그대로
         self.client.patch(f'{API}/sales/{pk}/', {'note': '포장 바꿈'}, format='json')
         self.assertEqual(self.stocks(), [99, 50, 9])
+
+    def test_parts_default_from_product_and_can_be_changed(self, _):
+        res = self.client.post(f'{API}/sales/', self.body(), format='json')
+        self.assertEqual(
+            [(p['part'], p['part_name'], p['qty']) for p in res.data['parts']], [(self.ring_part.pk, '키링 고리', 3)]
+        )
+        # 제품 줄만 고치면 부속품 줄은 그대로 (화면은 늘 부속품 줄을 함께 보냄)
+        items = [{'product': self.ring.pk, 'qty': 5, 'unit_price': 4900, 'unit_cost': 191}]
+        self.client.patch(f'{API}/sales/{res.data["id"]}/', {'items': items}, format='json')
+        self.assertEqual(self.stocks()[0], 97)
+        # 다른 부속품으로 바꾸면 그 부속품이 빠짐
+        red = Part.objects.create(name='적축 스위치', stock=10)
+        self.client.patch(f'{API}/sales/{res.data["id"]}/', {'parts': [{'part': red.pk, 'qty': 3}]}, format='json')
+        self.assertEqual((self.stocks()[0], Part.objects.get(pk=red.pk).stock), (100, 7))
+
+    def test_part_lines_must_be_parts(self, _):
+        res = self.client.post(f'{API}/sales/', self.body(parts=[{'part': self.bag.pk, 'qty': 1}]), format='json')
+        self.assertEqual(res.data['parts'][0]['part'], ['부속품만 고를 수 있습니다.'])
+        res = self.client.post(f'{API}/sales/', self.body(parts=[{'qty': 1}]), format='json')
+        self.assertEqual(res.data['parts'][0]['part'], ['부속품을 고르세요.'])
+
+    def test_store_item_id_kept_when_lines_resent(self, _):
+        items = [{'product': self.ring.pk, 'qty': 1, 'unit_price': 4900, 'store_item_id': '2026111094085851'}]
+        pk = self.client.post(f'{API}/sales/', self.body(items=items), format='json').data['id']
+        self.client.patch(f'{API}/sales/{pk}/', {'items': items}, format='json')
+        self.assertEqual(SaleItem.objects.get().store_item_id, '2026111094085851')
 
     def test_delete_gives_stock_back(self, _):
         pk = self.client.post(f'{API}/sales/', self.body(), format='json').data['id']

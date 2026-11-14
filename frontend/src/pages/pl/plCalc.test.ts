@@ -34,7 +34,7 @@ const month = (
   expenses: { ...NO_EXP, ...exp },
 })
 
-// v2.md 예: 1월 프린터 120만, 매달 매출 50만 · 재료비 + 운영비 30만
+// 예: 1월 프린터 120만, 매달 매출 50만 · 재료비 + 운영비 30만
 const MONTHS = [
   month('2026-01', { gross: 500000, spool: 100000, spools: 5 }, { invest: 1200000, filament: 200000, sub: 200000 }),
   month('2026-02', { gross: 500000, spool: 100000, spools: 5 }, { sub: 200000 }),

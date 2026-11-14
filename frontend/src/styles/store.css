@@ -1,0 +1,374 @@
+/* 스마트스토어 연동 (v2 STORE) — 목업(docs/mockups/store.html · settings.html 연결) CSS 중 다른 파일에 없는 것.
+   다른 화면의 .panel · .empty · .table-wrap 과 겹치지 않게 st- 로 시작 */
+
+/* 제목: 판매 › 스마트스토어 연동 */
+.st-crumb {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.st-crumb button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+}
+.st-crumb button:hover {
+  color: var(--accent);
+}
+.st-title h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.st-count {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--warn);
+  color: #fff;
+  font-size: 11.5px;
+}
+
+/* 연결 상태 줄 · 점 */
+.st-conn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-size: 13.5px;
+}
+.st-conn .sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+.st-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--good);
+  box-shadow: 0 0 0 3px var(--good-soft);
+}
+.st-dot.off {
+  background: var(--bad);
+  box-shadow: 0 0 0 3px var(--bad-soft);
+}
+
+/* 가져오기 · 기록 패널 */
+.st-panel {
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.st-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.st-panel-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.st-panel-head .spacer {
+  flex: 1;
+}
+.st-empty {
+  padding: 34px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.st-empty.small {
+  padding: 18px 16px;
+}
+.st-empty .big {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.st-loading {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: st-spin 0.7s linear infinite;
+  vertical-align: -2px;
+}
+@keyframes st-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 미리보기 */
+.st-sum {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.st-sum b {
+  font-variant-numeric: tabular-nums;
+}
+.st-sum .warn-t {
+  color: var(--warn);
+  font-weight: 600;
+}
+.st-table-wrap {
+  overflow-x: auto;
+}
+.st-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.st-table th {
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.st-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  white-space: nowrap;
+}
+.st-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.st-table tbody.order tr.item td {
+  border-bottom: 0;
+  padding-top: 0;
+}
+.st-table tbody.order tr:last-child td {
+  border-bottom: 1px solid var(--border);
+}
+.st-table tbody.order:last-of-type tr:last-child td {
+  border-bottom: 0;
+}
+.st-table tbody.order.off td {
+  color: var(--muted);
+}
+.st-table tbody.order.off .store-name,
+.st-table tbody.order.off .num {
+  text-decoration: line-through;
+}
+.st-table .chk {
+  width: 34px;
+}
+.st-table .date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.st-table .ono {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+}
+.st-table .store-name,
+.st-map-row .store-name {
+  font-weight: 600;
+  white-space: normal;
+}
+.st-table .store-name.gone {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.st-table .store-opt {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.st-table .arrow-to {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 12.5px;
+}
+.st-table .arrow-to .to,
+.st-map-row .to {
+  color: var(--muted);
+}
+.st-table .app-prod {
+  font-weight: 700;
+  color: var(--accent);
+}
+.st-table .arrow-to select,
+.st-map-row select.need {
+  padding: 3px 8px;
+  font-size: 12.5px;
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+.st-table .amount {
+  font-weight: 700;
+}
+.st-gap {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--warn);
+}
+.st-kind {
+  margin-top: 3px;
+}
+.st-changes {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--accent);
+  white-space: normal;
+  max-width: 260px;
+}
+.st-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.st-foot .spacer {
+  flex: 1;
+}
+
+/* 가져오기 기록 */
+.st-log {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.st-log:last-child {
+  border-bottom: 0;
+}
+.st-log .when {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 상품 연결 창 */
+.st-map-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.st-map-group {
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.st-map-group:last-child {
+  border-bottom: 0;
+}
+.st-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px 300px;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.st-map-row.opt {
+  padding-left: 18px;
+}
+.st-map-row .to {
+  text-align: center;
+}
+.st-map-row select,
+.st-map-row input {
+  width: 100%;
+}
+.st-opt-tag {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.btn.st-x {
+  margin-left: 6px;
+  padding: 0 6px;
+}
+.st-add {
+  display: flex;
+  gap: 6px;
+}
+.st-add select {
+  flex: 1;
+  min-width: 0;
+}
+.btn.st-add-opt {
+  margin-left: 18px;
+  color: var(--accent);
+}
+
+/* 설정 › 스마트스토어 › 연결 */
+.st-conn-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0 12px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.st-conn-row .st-dot {
+  margin-top: 7px;
+}
+.st-conn-row .spacer {
+  flex: 1;
+}
+.st-note {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.st-note code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.st-env {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .st-map-row {
+    grid-template-columns: 1fr;
+  }
+  .st-map-row .to {
+    display: none;
+  }
+}

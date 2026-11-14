@@ -1,4 +1,4 @@
-// 손익 계산 (docs/plans/v2.md PL "계산 순서"). 서버가 준 달별 합계(PlMonth)를 기간만큼 더해서 두 기준으로 나눈다
+// 손익 계산 (docs/PRD.md 3.12 PL). 서버가 준 달별 합계(PlMonth)를 기간만큼 더해서 두 기준으로 나눈다
 import type { ExpenseCategory } from '../../api/expenses'
 import type { PlMonth } from '../../api/pl'
 

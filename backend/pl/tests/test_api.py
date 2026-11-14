@@ -9,7 +9,7 @@ from rest_framework.test import APITestCase
 from expenses.models import Expense
 from filaments.models import Brand, Color, Filament, Material, Spool
 from products.models import Product, ProductPart
-from sales.models import Sale, SaleItem, SalePack
+from sales.models import Sale, SaleItem, SalePack, SalePart, default_parts
 from stock import services as stock
 from stock.models import Part, PartKind
 
@@ -119,6 +119,8 @@ class PartsUsedTests(APITestCase):
         sale = Sale.objects.create(date=date)
         SaleItem.objects.create(sale=sale, product=self.keyring, qty=qty, unit_price=5000)
         SalePack.objects.create(sale=sale, part=self.bag, qty=1)
+        for part, n in default_parts([(self.keyring, qty)]).items():
+            SalePart.objects.create(sale=sale, part=part, qty=n)
         stock.sync_sale(sale)
         return sale
 
