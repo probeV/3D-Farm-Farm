@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>손익 — 3D Farm Farm 목업</title>
 <!--
-  손익 HTML 목업 (docs/plans/v2.md PL-01 ~ 04 기준)
+  손익 HTML 목업 (docs/PRD.md 3.12 PL-01 ~ 04 기준)
   - 새로 입력하는 것 없음. 판매 장부 · 지출 장부 · 스풀(구매가 · 사용 시작일)을 기간으로 더하기만 한다.
   - 더미 데이터는 sales.html · expenses.html 과 같은 것 + 지출의 필라멘트 구매에 맞춘 스풀. 오늘은 2026-10-28 로 고정.
   - 스크린샷용: ?basis=cash | pl,  ?period=month | year | all,  ?theme=dark | light
@@ -236,7 +236,7 @@ const sign = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
 let toastTimer;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200); }
 
-// ---------------------------------------------------------------- 계산 (v2.md "계산 순서")
+// ---------------------------------------------------------------- 계산 (PRD 3.12)
 // 기간 [from, to] (YYYY-MM-DD, 포함) 의 두 기준 계산
 function calc(from, to) {
   const inR = (d) => d && d >= from && d <= to;

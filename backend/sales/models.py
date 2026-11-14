@@ -1,4 +1,4 @@
-"""판매 장부 모델 — docs/ERD.md · docs/plans/v2.md SALE 기준.
+"""판매 장부 모델 — docs/ERD.md · docs/PRD.md 3.11 SALE 기준.
 
 판매(Sale) 한 건 = 주문 하나. 주문 안에 제품 여러 줄(SaleItem, SALE-04) · 부속품 줄(SalePart) ·
 포장 줄(SalePack, SALE-06).

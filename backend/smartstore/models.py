@@ -1,4 +1,4 @@
-"""스마트스토어 연동 모델 — docs/plans/v2.md STORE.
+"""스마트스토어 연동 모델 — docs/PRD.md 3.13 STORE.
 
 - 상품 연결(StoreLink, STORE-02): 스토어 상품(+ 옵션 글자) → 이 앱의 제품. 한 번 짝지어 두면 다음 가져오기부터 자동
 - 가져오기 기록(StoreImport, STORE-05): 언제 · 어느 기간 · 몇 건 넣음 / 맞춤 / 뺌

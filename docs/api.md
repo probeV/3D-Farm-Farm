@@ -600,7 +600,7 @@
 # 손익 (v2 PL)
 
 새로 저장하는 것 없음. 서버는 **달마다 합계**만 주고, 현금 기준 · 손익 기준 계산 · 연 · 전체 합계 · 투자 회수 · 두 기준 차이는
-화면이 이 합계를 더해서 한다 (`frontend/src/pages/pl/plCalc.ts`, 계산 순서는 [plans/v2.md](plans/v2.md) `PL`).
+화면이 이 합계를 더해서 한다 (`frontend/src/pages/pl/plCalc.ts`, 계산 순서는 [PRD.md](PRD.md) 3.12 `PL`).
 
 ## 손익 `GET /api/v0/pl/`
 ```json

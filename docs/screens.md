@@ -622,7 +622,7 @@
 
 ## 6. 판매 (v2)
 
-> 목업: [mockups/sales.html](mockups/sales.html) · 요구사항: [plans/v2.md](plans/v2.md) `SALE`
+> 목업: [mockups/sales.html](mockups/sales.html) · 요구사항: [PRD.md](PRD.md) 3.11 `SALE`
 
 팔린 주문을 기록하는 곳. 위에서부터 **요약 카드 → 제품별 판매 → 판매 목록** 순서다 (지출 화면과 같은 모양).
 위쪽 줄: 안내 한 줄 · `스마트스토어 가져오기`(6.4) · `+ 판매 추가`(파랑) · `⚙`(설정 › 스마트스토어).
@@ -662,7 +662,7 @@
 
 ### 6.4 스마트스토어 연동 (v2 STORE)
 
-> 목업: [mockups/store.html](mockups/store.html) · 요구사항: PRD 3.11 · [plans/v2.md](plans/v2.md) `STORE` · API: [api.md](api.md) "스마트스토어 연동"
+> 목업: [mockups/store.html](mockups/store.html) · 요구사항: [PRD.md](PRD.md) 3.13 `STORE` · API: [api.md](api.md) "스마트스토어 연동"
 
 판매 화면의 `스마트스토어 가져오기` 로 들어오는 하위 화면 (사이드바는 `판매`, 사이드바를 누르면 판매 목록으로). 위에서부터 **제목 → 연결 상태 → 주문 가져오기 → 가져오기 기록**.
 
@@ -687,7 +687,7 @@
 
 ## 7. 손익 (v2)
 
-> 목업: [mockups/pl.html](mockups/pl.html) · 요구사항: [plans/v2.md](plans/v2.md) `PL`
+> 목업: [mockups/pl.html](mockups/pl.html) · 요구사항: [PRD.md](PRD.md) 3.12 `PL`
 
 번 돈과 쓴 돈을 기간으로 더해 본다. **새로 입력하는 것 없음** — 판매 · 지출 · 스풀(사용 시작일)에서 계산한다.
 위에서부터 **기간 · 기준 전환 → 요약 카드 3개 → 계산표(+ 두 기준 차이) | 월별 그래프** 순서다. 처음 열면 이번 달 · 손익 기준.
