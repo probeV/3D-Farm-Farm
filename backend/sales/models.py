@@ -153,6 +153,19 @@ class SalePack(models.Model):
         return None if self.unit_price is None else self.unit_price * self.qty
 
 
+def default_parts(rows):
+    """제품 줄 [(제품, 수량)] → 처음 채울 부속품 줄 {부속품: 수량} = 제품의 사용 부속품 × 판매 수량
+    같은 부속품은 합친다.
+    직접 넣는 판매(부속품 줄을 안 보냈을 때)와 스마트스토어 가져오기가 같이 쓴다"""
+    out = {}
+    for product, qty in rows:
+        if product is None:
+            continue
+        for row in product.parts.select_related('part'):
+            out[row.part] = out.get(row.part, Decimal(0)) + row.qty * qty
+    return out
+
+
 class SalePart(models.Model):
     """판매 주문의 부속품 줄 — 이 판매로 남은 수량에서 빠지는 부속품 (v2 STORE 하며 추가).
     처음엔 제품의 사용 부속품 × 판매 수량으로 채우고, 판매마다 바꾸기 · 더하기 · 빼기 (옵션별 스위치 등).

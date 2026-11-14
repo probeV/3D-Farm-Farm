@@ -5,7 +5,7 @@ from unittest import mock
 from rest_framework.test import APITestCase
 
 from products.models import Product, ProductPart
-from sales.models import Sale, SaleItem
+from sales.models import Sale, SaleItem, SalePart, default_parts
 
 from .. import services
 from ..models import Part, StockHistory
@@ -38,6 +38,8 @@ class MovingAverageTests(APITestCase):
     def sell(self, date, qty):
         sale = Sale.objects.create(date=date)
         SaleItem.objects.create(sale=sale, product=self.keyring, qty=qty, unit_price=5000)
+        for part, n in default_parts([(self.keyring, qty)]).items():
+            SalePart.objects.create(sale=sale, part=part, qty=n)
         services.sync_sale(sale)
         return sale
 

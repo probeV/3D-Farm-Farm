@@ -149,6 +149,11 @@ class StoreOrderTests(APITestCase):
             (item.qty, item.unit_price, item.unit_cost, item.store_item_id), (150, 3000, 1200, '2026111094085851')
         )
         self.assertEqual([(p.part_id, p.qty) for p in sale.packs.all()], [(self.bag.pk, 1)])  # 기본 포장
+        # 부속품 줄 = 제품의 사용 부속품 × 수량 (옵션은 판매 창에서 확인), 메모에 옵션
+        self.assertEqual(
+            sorted((p.part_name, p.qty) for p in sale.parts.all()), [('청축 스위치', 150), ('후크 키링', 150)]
+        )
+        self.assertEqual(sale.note, '글자: A / 스위치: 청축')
         self.assertEqual(self.stocks(), [30, 150, 49])
         self.assertEqual((record['added'], record['updated'], record['skipped']), (1, 0, 2))
         self.assertEqual(self.preview()[0]['kind'], 'dup')  # 다시 가져오면 이미 있음
@@ -165,6 +170,7 @@ class StoreOrderTests(APITestCase):
         item = SaleItem.objects.get()
         self.assertEqual((item.qty, item.sale.fee), (100, 19890))
         self.assertEqual(self.stocks(), [80, 200, 49])  # 50개씩 되돌림 (포장은 주문 단위라 그대로)
+        self.assertEqual(sorted(p.qty for p in item.sale.parts.all()), [100, 100])  # 부속품 줄도 같은 비율로
         self.assertEqual((record['added'], record['updated']), (0, 1))
 
     def test_full_cancel_deletes_sale_and_reverts_stock(self, _):

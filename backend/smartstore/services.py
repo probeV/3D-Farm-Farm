@@ -21,7 +21,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from products.models import CostSetting
-from sales.models import Sale, SaleChannel, SaleItem, SalePack, won
+from sales.models import Sale, SaleChannel, SaleItem, SalePack, SalePart, default_parts, won
 from stock import services as stock
 
 from . import naver
@@ -217,6 +217,9 @@ def _create(order, costs, shipping_cost):
             unit_cost=costs.get(x['product'].pk),
             store_item_id=x['store_item_id'],
         )
+    # 부속품 줄 = 제품의 사용 부속품 × 수량 (옵션에 따라 다르면 판매 창에서 확인하고 고친다 — 메모에 옵션)
+    for part, qty in default_parts([(x['product'], x['qty']) for x in alive]).items():
+        SalePart.objects.create(sale=sale, part=part, qty=qty)
     for part, qty in _packs_for(alive[0]['product']):
         price = part.unit_price
         SalePack.objects.create(sale=sale, part=part, qty=qty, unit_price=None if price is None else round(price, 2))
@@ -231,6 +234,7 @@ def _sync(order, items_by_id):
         stock.revert_sale(sale)
         sale.delete()
         return
+    before = sum((i.qty for i in sale.items.all()), 0)
     for line in order['lines']:
         item = items_by_id.get(line['store_item_id'])
         if item is None:
@@ -240,9 +244,26 @@ def _sync(order, items_by_id):
             item.save(update_fields=['qty', 'unit_price'])
         else:
             item.delete()
+    _scale_parts(sale, before)
     sale.shipping_received, sale.fee = order['shipping'], order['fee']
     sale.save(update_fields=['shipping_received', 'fee'])
     stock.sync_sale(sale)
+
+
+def _scale_parts(sale, before):
+    """부분 취소 · 반품으로 판매 수량이 줄면 부속품 줄도 같은 비율로 (판매 창에서 바꾼 부속품도 그대로 줄어듦).
+    포장 줄은 주문 단위라 그대로"""
+    after = sum((i.qty for i in sale.items.all()), 0)
+    if not before or after == before:
+        return
+    ratio = Decimal(after) / Decimal(before)
+    for line in sale.parts.all():
+        qty = (line.qty * ratio).quantize(Decimal('0.01'))
+        if qty > 0:
+            line.qty = qty
+            line.save(update_fields=['qty'])
+        else:
+            line.delete()
 
 
 @transaction.atomic

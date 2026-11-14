@@ -8,7 +8,7 @@ from django.db.models import ProtectedError
 from django.test import TestCase
 
 from products.models import Product, ProductPart
-from sales.models import Sale, SaleItem, SalePack
+from sales.models import Sale, SaleItem, SalePack, SalePart, default_parts
 
 from .. import services
 from ..models import PackSet, PackSetLine, Part, PartCategory, PartKind, StockHistory
@@ -95,7 +95,7 @@ class MoveTests(TestCase):
 
 
 class SaleStockTests(TestCase):
-    """판매 저장 → 부속품(제품 × 수량) · 포장재(포장 줄)가 빠진다. 고치면 차이만, 지우면 되돌림"""
+    """판매 저장 → 부속품 줄 · 포장 줄만큼 빠진다 (부속품 줄은 처음에 제품 × 수량). 고치면 차이만, 지우면 되돌림"""
 
     def setUp(self):
         self.ring = Part.objects.create(name='키링 고리', stock=100)
@@ -107,6 +107,8 @@ class SaleStockTests(TestCase):
         self.sale = Sale.objects.create()
         self.item = SaleItem.objects.create(sale=self.sale, product=self.keyring, qty=3, unit_price=5000)
         self.pack = SalePack.objects.create(sale=self.sale, part=self.bag, qty=1, unit_price=Decimal('17.8'))
+        for part, qty in default_parts([(self.keyring, 3)]).items():
+            SalePart.objects.create(sale=self.sale, part=part, qty=qty)
 
     def stocks(self):
         return [Part.objects.get(pk=p.pk).stock for p in (self.ring, self.magnet, self.bag)]
@@ -127,6 +129,8 @@ class SaleStockTests(TestCase):
         services.sync_sale(self.sale)
         self.item.qty = 1
         self.item.save()
+        self.sale.parts.filter(part=self.ring).update(qty=1)
+        self.sale.parts.filter(part=self.magnet).update(qty=2)
         self.pack.delete()
         services.sync_sale(self.sale)
         self.assertEqual(self.stocks(), [99, 98, 50])
@@ -140,11 +144,18 @@ class SaleStockTests(TestCase):
         back = StockHistory.objects.filter(part=self.bag).first()
         self.assertEqual((back.qty, back.note, back.sale), (1, '판매 삭제 · 이름 키링', None))
 
-    def test_deleted_product_line_keeps_taken_stock_until_edit(self):
+    def test_deleted_product_keeps_part_lines(self):
         services.sync_sale(self.sale)
-        self.keyring.delete()  # 판매 줄은 남고 product 만 비워짐 → 다시 저장하면 부속품을 돌려 놓음
+        self.keyring.delete()  # 판매 줄은 남고 product 만 비워짐 — 부속품 줄은 그대로라 재고도 그대로
         services.sync_sale(self.sale)
-        self.assertEqual(self.stocks(), [100, 100, 49])
+        self.assertEqual(self.stocks(), [97, 94, 49])
+
+    def test_swapped_part_line_takes_that_part(self):
+        red = Part.objects.create(name='적축 스위치', stock=10)
+        self.sale.parts.filter(part=self.magnet).update(part=red, part_name='적축 스위치')
+        services.sync_sale(self.sale)
+        self.assertEqual(self.stocks(), [97, 100, 49])
+        self.assertEqual(Part.objects.get(pk=red.pk).stock, 4)
 
     def test_sale_pack_copies_name_and_amount(self):
         self.assertEqual(self.pack.part_name, 'OPP 봉투')

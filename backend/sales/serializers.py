@@ -13,7 +13,7 @@ from filaments.serializers import BaseModelSerializer, NumberField
 from stock import services as stock
 from stock.models import PartKind
 
-from .models import Sale, SaleChannel, SaleItem, SalePack, won
+from .models import Sale, SaleChannel, SaleItem, SalePack, SalePart, default_parts, won
 
 
 def num(value):
@@ -29,9 +29,11 @@ class SaleItemSerializer(BaseModelSerializer):
 
     class Meta:
         model = SaleItem
-        fields = ['id', 'product', 'product_name', 'qty', 'unit_price', 'unit_cost', 'amount']
+        fields = ['id', 'product', 'product_name', 'qty', 'unit_price', 'unit_cost', 'store_item_id', 'amount']
         extra_kwargs = {
             'product': {'required': False, 'error_messages': {'does_not_exist': '없는 제품입니다.'}},
+            # 스마트스토어 상품주문번호 — 줄을 고쳐 다시 만들어도 받은 값을 그대로 보내야 다음 가져오기 때 맞출 수 있다
+            'store_item_id': {'required': False, 'validators': []},
             # 비우면 제품 이름을 복사 (SaleItem.save). 수정할 때 기존 줄은 받은 이름 그대로 — 팔 때 이름 유지
             'product_name': {'required': False},
         }
@@ -43,6 +45,30 @@ class SaleItemSerializer(BaseModelSerializer):
         # 제품을 지운 줄(product 없음)은 이름이 있어야 다시 저장할 수 있다
         if not attrs.get('product') and not attrs.get('product_name'):
             raise serializers.ValidationError({'product': ['제품을 고르세요.']})
+        return attrs
+
+
+class SalePartSerializer(BaseModelSerializer):
+    """주문의 부속품 줄 — 이 판매로 남은 수량에서 빠지는 부속품. 부속품 탭 품목만"""
+
+    qty = NumberField(max_digits=12, decimal_places=2, min_value=Decimal('0.01'))
+
+    class Meta:
+        model = SalePart
+        fields = ['id', 'part', 'part_name', 'qty']
+        extra_kwargs = {
+            'part': {'required': False, 'error_messages': {'does_not_exist': '없는 부속품입니다.'}},
+            'part_name': {'required': False},
+        }
+
+    def validate_part(self, value):
+        if value and value.kind != PartKind.PART:
+            raise serializers.ValidationError('부속품만 고를 수 있습니다.')
+        return value
+
+    def validate(self, attrs):
+        if not attrs.get('part') and not attrs.get('part_name'):
+            raise serializers.ValidationError({'part': ['부속품을 고르세요.']})
         return attrs
 
 
@@ -92,11 +118,14 @@ class SaleSerializer(BaseModelSerializer):
        응답할 때마다 줄로 계산한다 (보내도 무시). 줄은 뷰가 목록을 읽을 때 한 번에 미리 읽어 둔다
        (prefetch_related — 판매마다 따로 조회하지 않게)
     4. 포장 줄(packs): items 와 같은 방식으로 통째로 바꾼다. 안 보내면 그대로 (추가할 때 안 보내면 포장 없음)
-    5. 재고: 추가하거나 제품 · 포장 줄을 바꾸면 부속품(제품 × 수량) · 포장재(포장 줄)를 남은 수량에서 뺀다
+    5. 부속품 줄(parts): items 와 같은 방식으로 통째로 바꾼다. 추가할 때 안 보내면 제품의 사용 부속품 × 수량으로,
+       수정할 때 안 보내면 그대로 (화면은 늘 보낸다 — 옵션에 따라 바꾼 부속품이 그대로 남게)
+    6. 재고: 추가하거나 부속품 · 포장 줄을 바꾸면 그 줄만큼 남은 수량에서 뺀다
        (이미 뺀 만큼과 비교해 차이만, stock.sync_sale). 지울 때는 뷰가 되돌린다
     """
 
     items = SaleItemSerializer(many=True)
+    parts = SalePartSerializer(many=True, required=False)
     packs = SalePackSerializer(many=True, required=False)
     fee = NumberField(max_digits=10, decimal_places=0, min_value=0, required=False)
     gross = serializers.SerializerMethodField()
@@ -113,6 +142,7 @@ class SaleSerializer(BaseModelSerializer):
             'channel',
             'order_no',
             'items',
+            'parts',
             'packs',
             'shipping_received',
             'fee',
@@ -197,6 +227,10 @@ class SaleSerializer(BaseModelSerializer):
     def create(self, validated_data):
         items = validated_data.pop('items')
         packs = validated_data.pop('packs', [])
+        parts = validated_data.pop('parts', None)
+        if parts is None:  # 안 보내면 제품의 사용 부속품 × 수량
+            used = default_parts([(row.get('product'), row['qty']) for row in items])
+            parts = [{'part': part, 'qty': qty} for part, qty in used.items()]
         if 'fee' not in validated_data:
             gross = sum(row['unit_price'] * row['qty'] for row in items)
             store = validated_data.get('channel', SaleChannel.STORE) == SaleChannel.STORE
@@ -204,6 +238,7 @@ class SaleSerializer(BaseModelSerializer):
             validated_data['fee'] = Sale.store_fee(gross, shipping) if store else 0
         sale = Sale.objects.create(**validated_data)
         self._save_items(sale, items)
+        self._save_parts(sale, parts)
         self._save_packs(sale, packs)
         stock.sync_sale(sale)
         return sale
@@ -212,14 +247,18 @@ class SaleSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         items = validated_data.pop('items', None)
         packs = validated_data.pop('packs', None)
+        parts = validated_data.pop('parts', None)
         sale = super().update(instance, validated_data)
         if items is not None:
             sale.items.all().delete()
             self._save_items(sale, items)
+        if parts is not None:
+            sale.parts.all().delete()
+            self._save_parts(sale, parts)
         if packs is not None:
             sale.packs.all().delete()
             self._save_packs(sale, packs)
-        if items is not None or packs is not None:
+        if parts is not None or packs is not None:
             stock.sync_sale(sale)
         return sale
 
@@ -233,6 +272,15 @@ class SaleSerializer(BaseModelSerializer):
         # 응답에서 새 줄이 보이도록 미리 읽어 둔 줄을 비운다
         if hasattr(sale, '_prefetched_objects_cache'):
             sale._prefetched_objects_cache.pop('items', None)
+
+    @staticmethod
+    def _save_parts(sale, parts):
+        for row in parts:
+            if not row.get('part_name') and row.get('part'):
+                row['part_name'] = row['part'].name
+        SalePart.objects.bulk_create(SalePart(sale=sale, **row) for row in parts)
+        if hasattr(sale, '_prefetched_objects_cache'):
+            sale._prefetched_objects_cache.pop('parts', None)
 
     @staticmethod
     def _save_packs(sale, packs):
