@@ -25,6 +25,30 @@
 .sum-cards.two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+/* 상태별 개수: 누르면 그 상태 제품만 (`입력 필요` 와 같은 모양, 색만 기본) */
+.stats .stat {
+  border: 0;
+  background: none;
+  padding: 2px 8px;
+  margin-left: -4px;
+  border-radius: 99px;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.stats .stat:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.stats .stat.active {
+  background: var(--accent);
+  color: #fff;
+}
+.stats .stat.active b {
+  color: #fff;
+}
+.stats .stat:disabled {
+  cursor: default;
+}
 /* 상태별 개수 줄 끝 `입력 필요 N`: 누르면 입력이 덜 된 제품만 (TBD-11) */
 .stats .need {
   border: 0;

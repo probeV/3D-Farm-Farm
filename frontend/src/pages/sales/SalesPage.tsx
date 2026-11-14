@@ -76,7 +76,6 @@ export default function SalesPage({ onSettings }: { onSettings: () => void }) {
   return (
     <>
       <div className="top-row">
-        <span className="hint">팔린 주문을 기록해요. 한 주문에 제품 여러 개를 넣을 수 있어요.</span>
         <div className="spacer" />
         <button className="btn" title="스마트스토어 주문을 가져와 판매 장부에 넣어요" onClick={() => nav.openStore()}>
           스마트스토어 가져오기

@@ -94,6 +94,12 @@ describe('제품 목록 검색 · 필터 · 정렬 (PRD-01b · PRD-03)', () => {
     expect(nos(filterProducts(rows, { ...NO_FILTER, sort: { key: 'cost', dir: 'desc' } }))).toEqual([10, 1, 2, 3])
   })
 
+  it('상태 제품만', () => {
+    const status = rows.find((r) => r.product.no === 2)!.product.status
+    const want = rows.filter((r) => r.product.status === status).map((r) => r.product.no)
+    expect(nos(filterProducts(rows, { ...NO_FILTER, status }))).toEqual([...want].sort((a, b) => a - b))
+  })
+
   it('No. 내림차순', () => {
     expect(nos(filterProducts(rows, { ...NO_FILTER, sort: { key: 'no', dir: 'desc' } }))).toEqual([10, 3, 2, 1])
   })
@@ -102,9 +108,7 @@ describe('제품 목록 검색 · 필터 · 정렬 (PRD-01b · PRD-03)', () => {
 describe('요약 (PRD-02)', () => {
   it('상태별 개수 · 평균 순마진율은 판매중이고 입력이 끝난 제품만', () => {
     expect(summarize(rows)).toEqual({
-      onSale: 2,
-      developing: 1,
-      discontinued: 1,
+      byStatus: { on_sale: 2, developing: 1, discontinued: 1 },
       total: 4,
       avgMargin: (0.1 + 0.5) / 2,
       avgBase: 2,

@@ -13,6 +13,7 @@ import { productsCsv } from './list/csv'
 import ProductTable from './list/ProductTable'
 import { filterProducts, NO_FILTER, SORT_COLUMNS, summarize, type ListFilter, type Sort } from './list/productList'
 import { nextSort } from '../../sort'
+import { STATUS_LABEL, STATUSES } from './status'
 import { useCostData } from './useCostData'
 
 type DialogState = { kind: 'manage' } | { kind: 'product'; productId: number }
@@ -43,7 +44,7 @@ export default function ProductsPage({ onSettings }: { onSettings: () => void })
   const category = selectionExists(categories, filter.category, true) ? filter.category : ''
   const list = filterProducts(rows, { ...filter, category })
   const sum = summarize(rows)
-  const filtered = filter.q !== '' || category !== '' || filter.needOnly
+  const filtered = filter.q !== '' || category !== '' || filter.status !== '' || filter.needOnly
   const sortBy = (key: Sort['key']) => set({ sort: nextSort(SORT_COLUMNS, filter.sort, key) })
 
   const exportCsv = () => {
@@ -55,15 +56,24 @@ export default function ProductsPage({ onSettings }: { onSettings: () => void })
     <>
       <div className="top-row">
         <div className="stats">
-          <span>
-            판매중<b>{sum.onSale}</b>
-          </span>
-          <span>
-            개발중<b>{sum.developing}</b>
-          </span>
-          <span className={sum.discontinued ? 'bad' : ''}>
-            판매중지<b>{sum.discontinued}</b>
-          </span>
+          {/* 상태별 제품 수. 누르면 그 상태 제품만, 다시 누르면 해제 */}
+          {STATUSES.map((s) => {
+            const n = sum.byStatus[s]
+            const on = filter.status === s
+            return (
+              <button
+                key={s}
+                type="button"
+                className={['stat', s === 'discontinued' && n ? 'bad' : '', on ? 'active' : ''].join(' ')}
+                disabled={!n && !on}
+                title={on ? '다시 누르면 해제' : `${STATUS_LABEL[s]} 제품만 보기`}
+                onClick={() => set({ status: on ? '' : s })}
+              >
+                {STATUS_LABEL[s]}
+                <b>{n}</b>
+              </button>
+            )
+          })}
           {/* 입력이 덜 된 제품 수. 누르면 그 제품만 (PRD-02 · PRD-03) */}
           <button
             type="button"
@@ -124,7 +134,7 @@ export default function ProductsPage({ onSettings }: { onSettings: () => void })
           {rows.some((r) => r.product.category == null) && <option value="none">미분류</option>}
         </select>
         {filtered && (
-          <button className="btn small" onClick={() => set({ q: '', category: '', needOnly: false })}>
+          <button className="btn small" onClick={() => set({ q: '', category: '', status: '', needOnly: false })}>
             필터 지우기
           </button>
         )}

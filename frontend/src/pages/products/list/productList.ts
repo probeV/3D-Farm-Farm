@@ -1,6 +1,6 @@
 // 제품 목록의 검색 · 필터 · 정렬 (PRD-01b · PRD-03, docs/screens.md 2.3). 요약 · CSV 는 검색 · 필터와 상관없이 전체
 import type { Color } from '../../../api/filaments'
-import type { Product } from '../../../api/products'
+import type { Product, ProductStatus } from '../../../api/products'
 import { compareBy, type SortColumns, type SortState } from '../../../sort'
 import { inSelection, type CategorySel } from '../categories'
 import { completeMargin, type Cost } from '../cost'
@@ -30,11 +30,12 @@ export type Sort = SortState<keyof typeof SORT_COLUMNS>
 export interface ListFilter {
   q: string
   category: CategorySel
+  status: ProductStatus | '' // 맨 위 상태(판매중 · 개발중 · 판매중지)를 눌러 그 상태 제품만
   needOnly: boolean // `입력 필요` 카드를 눌러 입력이 덜 된 제품만
   sort: Sort
 }
 
-export const NO_FILTER: ListFilter = { q: '', category: '', needOnly: false, sort: { key: 'no', dir: 'asc' } }
+export const NO_FILTER: ListFilter = { q: '', category: '', status: '', needOnly: false, sort: { key: 'no', dir: 'asc' } }
 
 // 검색: 제품명 · No. · 색상 이름
 export function filterProducts(rows: ProductRow[], filter: ListFilter) {
@@ -43,6 +44,7 @@ export function filterProducts(rows: ProductRow[], filter: ListFilter) {
     .filter(
       ({ product, cost, colors }) =>
         inSelection(product, filter.category) &&
+        (!filter.status || product.status === filter.status) &&
         (!filter.needOnly || cost.warnings.length > 0) &&
         (!q || [product.no, product.name, ...colors.map((c) => c.name)].join(' ').toLowerCase().includes(q)),
     )
@@ -57,9 +59,7 @@ export function summarize(rows: ProductRow[]) {
     .map((r) => completeMargin(r.cost))
     .filter((m) => m != null)
   return {
-    onSale: count('on_sale'),
-    developing: count('developing'),
-    discontinued: count('discontinued'),
+    byStatus: { on_sale: count('on_sale'), developing: count('developing'), discontinued: count('discontinued') },
     total: rows.length,
     avgMargin: margins.length ? margins.reduce((a, m) => a + m, 0) / margins.length : null,
     avgBase: margins.length, // 평균에 들어간 제품 수 (툴팁용)
