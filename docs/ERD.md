@@ -88,6 +88,7 @@ erDiagram
         decimal price "묶음 구매가, NULL=미입력"
         decimal pack_qty "묶음 수량, 기본 1"
         varchar unit "단위, 기본 개"
+        decimal avg_price "평균 단가 (이동평균, 계산값), NULL=들어온 값 없음"
         decimal stock "남은 수량 (0 아래 가능)"
         decimal alert "부족 알림 기준, 기본 0"
         text note
@@ -102,6 +103,7 @@ erDiagram
         varchar note "설명 (조정 사유 · 판매 요약)"
         bigint sale_id FK "판매로 빠진 기록, NULL=그 밖"
         bigint expense_id FK "지출 구매로 늘어난 기록, NULL=그 밖"
+        decimal unit_price "그때의 개당 단가 (손익 쓴 만큼), NULL=구매가 없음"
         datetime created_at
     }
     PACK_SET {
@@ -155,7 +157,7 @@ erDiagram
         bigint id PK
         date date "지출 날짜 (오늘 이후 불가)"
         varchar name "항목"
-        varchar category "invest / filament / part / pack / supply / sub / sell / etc"
+        varchar category "invest / filament / part / pack / supply / sub / sell / tax / etc"
         decimal amount "금액 (1원 이상, 배송비 포함)"
         varchar shop "구매처, 빈 값 허용"
         text note
@@ -178,7 +180,7 @@ erDiagram
     RECURRING_EXPENSE {
         bigint id PK
         varchar name
-        varchar category "EXPENSE.category 와 같은 8개"
+        varchar category "EXPENSE.category 와 같은 9개"
         decimal amount "금액 (1원 이상)"
         smallint day "결제일 1~31"
         date start "시작 달 (항상 1일)"
@@ -284,10 +286,12 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
   ExpenseItem.total = amount 가 있으면 그 값,
                       없으면 (Expense.amount − 금액 적은 항목 합계) × 무게 ÷ 비운 항목 무게 합 (무게: 필라멘트는 qty, 그 밖은 1)
   1개(롤)당 금액 = total ÷ qty
-최근 구매 = 그 색상 · 품목이 들어 있는 Expense 중 date → id 가 가장 큰 것 (expenses.models.latest_buy)
-최근 구매가 (원가 계산표 단가) — 구매 항목이 바뀔 때 최근 구매로 다시 맞춤 (refresh_buy_prices). 그 지출의 같은 것 항목은 합침
-  Color.price = Σ total ÷ Σ qty (원 단위 반올림)
-  Part.price · Part.pack_qty = Σ total(원 단위) · Σ qty
+필라멘트 원가 계산의 스풀 가격 (v2 PL, Color.spool_price)
+  = 그 색상의 보유 스풀(sealed · open, 구매가 있는 것) price 평균 (원 단위 반올림), 없으면 Color.price ?? Filament.price
+품목 평균 단가 (v2 PL, stock.services.recalc — 품목의 지출 구매 항목 · 입출고 기록이 바뀔 때마다 처음부터 다시)
+  날짜 → 넣은 순으로: 구매 항목 · 처음 수량이면 Part.avg_price = (max(남은, 0) × 평균 + 수량 × 단가) ÷ (max(남은, 0) + 수량)
+                      그 밖(판매 · 조정 · 다 씀)이면 StockHistory.unit_price = 그때 평균 (평균은 그대로)
+  Part.unit_price(원가 계산 · 판매 포장 줄 · 손익) = avg_price, 없으면 price ÷ pack_qty (지출로 산 적이 없는 품목의 직접 넣은 값)
 필라멘트 항목 → 스풀 (filaments.services.sync_item, 지출 → 스풀 한 방향, 차이만)
   스풀 수 변화 = 새 qty − 저장 전 qty (새 항목은 qty). + 면 새 스풀(재고), − 면 그 항목의 재고 스풀을 code_no 큰 것부터 지움
   그 항목 스풀 전부: color = 항목 색상, price = 롤당 금액(원 단위 반올림), purchased_at = Expense.date
