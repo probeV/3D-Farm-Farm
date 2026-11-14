@@ -99,15 +99,27 @@ describe('반복 지출', () => {
     expect(payDate({ day: 5 }, '2026-10')).toBe('2026-10-05')
   })
 
-  it('넣을 것: 결제일이 지났고 이번 달에 아직 안 넣은 것만', () => {
+  it('넣을 것: 결제일이 지났고 그 달에 아직 안 넣은 것만', () => {
+    const start = '2026-10-01' // 이번 달만 보려고 이번 달 시작 (지난달은 아래 테스트)
     const rs = [
-      recurring({ id: 1, day: 5 }), // 이번 달 이미 넣음
-      recurring({ id: 2, name: '모델링 툴', day: 12 }),
-      recurring({ id: 3, name: '보증', day: 30 }), // 결제일 전
-      recurring({ id: 4, name: '오늘 결제', day: 28 }), // 오늘이 결제일
+      recurring({ id: 1, day: 5, start }), // 이번 달 이미 넣음
+      recurring({ id: 2, name: '모델링 툴', day: 12, start }),
+      recurring({ id: 3, name: '보증', day: 30, start }), // 결제일 전
+      recurring({ id: 4, name: '오늘 결제', day: 28, start }), // 오늘이 결제일
       recurring({ id: 5, name: '다음 달 시작', day: 1, start: '2026-11-01' }),
     ]
-    expect(dueRecurring(rs, ALL, TODAY).map((r) => r.id)).toEqual([2, 4])
+    expect(dueRecurring(rs, ALL, TODAY).map((d) => d.key)).toEqual(['2-2026-10', '4-2026-10'])
+  })
+
+  it('지난달을 놓쳤으면 그 달도 (시작한 달부터, 해가 바뀌어도)', () => {
+    const r = recurring({ id: 7, name: 'AI 구독', day: 28, start: '2026-08-01' })
+    const paid = expense({ date: '2026-09-28', recurring: 7 }) // 9월만 넣음
+    expect(dueRecurring([r], [paid], '2026-11-14').map((d) => [d.month, d.date])).toEqual([
+      ['2026-08', '2026-08-28'],
+      ['2026-10', '2026-10-28'], // 11월은 결제일(28일) 전
+    ])
+    const dec = recurring({ id: 8, day: 31, start: '2026-12-01' })
+    expect(dueRecurring([dec], [], '2027-02-28').map((d) => d.date)).toEqual(['2026-12-31', '2027-01-31', '2027-02-28'])
   })
 })
 

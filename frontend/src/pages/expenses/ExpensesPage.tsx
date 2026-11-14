@@ -116,8 +116,9 @@ export default function ExpensesPage() {
       {due.length > 0 && (
         <div className="due">
           <span>
-            결제일이 지난 반복 지출 <b>{due.length}건</b>을 아직 넣지 않았어요 · {due.map((r) => r.name).join(', ')} (
-            {won(due.reduce((a, r) => a + r.amount, 0))})
+            결제일이 지난 반복 지출 <b>{due.length}건</b>을 아직 넣지 않았어요 ·{' '}
+            {due.map((d) => `${d.recurring.name} ${Number(d.month.slice(5))}월`).join(', ')} (
+            {won(due.reduce((a, d) => a + d.recurring.amount, 0))})
           </span>
           <div className="spacer" />
           <button className="btn small primary" onClick={() => setDialog({ kind: 'due' })}>

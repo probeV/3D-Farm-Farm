@@ -109,15 +109,33 @@ export function payDate(r: Pick<RecurringExpense, 'day'>, month: string) {
   return `${month}-${String(Math.min(r.day, last)).padStart(2, '0')}`
 }
 
-// 이번 달에 넣을 반복 지출: 시작한 달이 지났고, 이번 달 결제일이 지났고(오늘 포함), 이번 달에 그 반복에서 넣은 줄이 없음
-export function dueRecurring(recurring: RecurringExpense[], expenses: Expense[], today: string) {
-  const month = monthOf(today)
-  return recurring.filter(
-    (r) =>
-      monthOf(r.start) <= month &&
-      payDate(r, month) <= today &&
-      !expenses.some((x) => x.recurring === r.id && monthOf(x.date) === month),
-  )
+// 아직 넣지 않은 반복 지출 한 달치 (반복 지출 × 달)
+export interface Due {
+  key: string // `${반복 지출 id}-${YYYY-MM}`
+  recurring: RecurringExpense
+  month: string // YYYY-MM
+  date: string // 그 달 결제일
+}
+
+// 'YYYY-MM' 의 다음 달
+const nextMonth = (month: string) => {
+  const [y, m] = month.split('-').map(Number)
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+}
+
+// 넣을 반복 지출: 시작한 달부터 이번 달까지, 결제일이 지났고(오늘 포함) 그 달에 그 반복에서 넣은 줄이 없는 달마다 한 줄
+// 지난달을 놓쳐도 계속 보인다 (예: 10월 결제를 11월에 넣기). 결제일 순
+export function dueRecurring(recurring: RecurringExpense[], expenses: Expense[], today: string): Due[] {
+  const now = monthOf(today)
+  const due: Due[] = []
+  for (const r of recurring) {
+    const done = new Set(expenses.filter((x) => x.recurring === r.id).map((x) => monthOf(x.date)))
+    for (let m = monthOf(r.start); m <= now; m = nextMonth(m)) {
+      const date = payDate(r, m)
+      if (date <= today && !done.has(m)) due.push({ key: `${r.id}-${m}`, recurring: r, month: m, date })
+    }
+  }
+  return due.sort((a, b) => a.date.localeCompare(b.date) || a.recurring.name.localeCompare(b.recurring.name, 'ko'))
 }
 
 // ---------------------------------------------------------------- CSV (EXP-07)
