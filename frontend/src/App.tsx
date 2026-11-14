@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { NavContext, type LabelPick, type Nav } from './nav'
 import ExpensesPage from './pages/expenses/ExpensesPage'
 import SalesPage from './pages/sales/SalesPage'
 import StockPage from './pages/stock/StockPage'
@@ -116,6 +117,14 @@ export default function App() {
   // 처음 여는 화면은 제품 원가 (v1.2.0)
   const [page, setPage] = useState<Page>('products')
   const [settingsTab, setSettingsTab] = useState<CategoryKey>('cost')
+  // QR 라벨 인쇄 화면 (재고 관리 › 필라멘트 › QR, TBD-18). null 이면 재고 관리 탭 화면. key 는 열 때마다 새로 (고른 스풀 다시)
+  const [labels, setLabels] = useState<{ pick: LabelPick | null; key: number } | null>(null)
+  const nav: Nav = {
+    openLabels: (pick) => {
+      setLabels({ pick: pick ?? null, key: Date.now() })
+      setPage('stock')
+    },
+  }
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [theme, setTheme] = useState(loadTheme)
   const current = [...NAV, SETTINGS].find((n) => n.page === page)!
@@ -129,7 +138,10 @@ export default function App() {
       key={n.page}
       className={n.page === page ? 'nav-item active' : 'nav-item'}
       title={n.label}
-      onClick={() => setPage(n.page)}
+      onClick={() => {
+        setLabels(null)
+        setPage(n.page)
+      }}
     >
       <Icon>{n.icon}</Icon>
       <span className="label">{n.label}</span>
@@ -156,62 +168,64 @@ export default function App() {
   }
 
   return (
-    <div className={collapsed ? 'layout collapsed' : 'layout'}>
-      <aside className="sidebar">
-        <div className="side-brand">
-          <span className="mark">3D</span>
-          <span className="label">3D Farm Farm</span>
-        </div>
-        {NAV.map(navButton)}
-        <div className="side-bottom">
-          {navButton(SETTINGS)}
-          <div className="theme-seg" role="radiogroup" aria-label="테마">
-            {THEMES.map((t) => (
-              <button
-                key={t.pref}
-                type="button"
-                role="radio"
-                aria-checked={t.pref === theme}
-                className={t.pref === theme ? 'on' : ''}
-                title={`테마: ${t.label}`}
-                onClick={() => chooseTheme(t.pref)}
-              >
-                <Icon>{THEME_ICON[t.pref]}</Icon>
-                {t.label}
-              </button>
-            ))}
+    <NavContext.Provider value={nav}>
+      <div className={collapsed ? 'layout collapsed' : 'layout'}>
+        <aside className="sidebar">
+          <div className="side-brand">
+            <span className="mark">3D</span>
+            <span className="label">3D Farm Farm</span>
           </div>
-          <button
-            className="nav-item theme-one"
-            title={`테마: ${currentTheme.label} (누르면 다음)`}
-            onClick={nextTheme}
-          >
-            <Icon>{THEME_ICON[theme]}</Icon>
-            <span className="label">{currentTheme.label}</span>
-          </button>
-          <button className="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onClick={toggleSide}>
-            <Icon>
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <path d="M9 4v16" />
-            </Icon>
-            <span className="label">{collapsed ? '펼치기' : '접기'}</span>
-          </button>
-        </div>
-      </aside>
-      <main>
-        <h1 className="page-title">{current.label}</h1>
-        {page === 'stock' ? (
-          <StockPage />
-        ) : page === 'products' ? (
-          <ProductsPage onSettings={() => openSettings('cost')} />
-        ) : page === 'sales' ? (
-          <SalesPage onSettings={() => openSettings('store')} />
-        ) : page === 'expenses' ? (
-          <ExpensesPage />
-        ) : (
-          <SettingsPage tab={settingsTab} onTab={setSettingsTab} />
-        )}
-      </main>
-    </div>
+          {NAV.map(navButton)}
+          <div className="side-bottom">
+            {navButton(SETTINGS)}
+            <div className="theme-seg" role="radiogroup" aria-label="테마">
+              {THEMES.map((t) => (
+                <button
+                  key={t.pref}
+                  type="button"
+                  role="radio"
+                  aria-checked={t.pref === theme}
+                  className={t.pref === theme ? 'on' : ''}
+                  title={`테마: ${t.label}`}
+                  onClick={() => chooseTheme(t.pref)}
+                >
+                  <Icon>{THEME_ICON[t.pref]}</Icon>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="nav-item theme-one"
+              title={`테마: ${currentTheme.label} (누르면 다음)`}
+              onClick={nextTheme}
+            >
+              <Icon>{THEME_ICON[theme]}</Icon>
+              <span className="label">{currentTheme.label}</span>
+            </button>
+            <button className="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onClick={toggleSide}>
+              <Icon>
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M9 4v16" />
+              </Icon>
+              <span className="label">{collapsed ? '펼치기' : '접기'}</span>
+            </button>
+          </div>
+        </aside>
+        <main>
+          <h1 className="page-title">{current.label}</h1>
+          {page === 'stock' ? (
+            <StockPage labels={labels} onCloseLabels={() => setLabels(null)} />
+          ) : page === 'products' ? (
+            <ProductsPage onSettings={() => openSettings('cost')} />
+          ) : page === 'sales' ? (
+            <SalesPage onSettings={() => openSettings('store')} />
+          ) : page === 'expenses' ? (
+            <ExpensesPage />
+          ) : (
+            <SettingsPage tab={settingsTab} onTab={setSettingsTab} />
+          )}
+        </main>
+      </div>
+    </NavContext.Provider>
   )
 }

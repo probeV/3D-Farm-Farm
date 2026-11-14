@@ -3,8 +3,14 @@ import { createContext, useContext } from 'react'
 // 되돌리기: 방금 한 동작의 반대 요청 (PRD 3.5)
 export type Undo = () => Promise<unknown>
 
-// toast('저장했어요') / toast('3개 추가했어요', 되돌리기)
-export type ShowToast = (message: string, undo?: Undo) => void
+// 알림 오른쪽 바로가기 버튼 (예: `라벨 인쇄` → QR 화면, TBD-18)
+export interface ToastAction {
+  label: string
+  run: () => void
+}
+
+// toast('저장했어요') / toast('3개 추가했어요', 되돌리기) / toast('저장했어요', undefined, { label: '라벨 인쇄', run })
+export type ShowToast = (message: string, undo?: Undo, action?: ToastAction) => void
 
 export const ToastContext = createContext<ShowToast>(() => {})
 

@@ -13,6 +13,7 @@ import {
   type SpoolStatus,
 } from '../../../api/filaments'
 import { useToast } from '../../../components/useToast'
+import { useNav } from '../../../nav'
 import { STATUS_LABEL } from '../stock'
 
 // 만든 스풀 코드 (번호 순서로 옴): 이어진 번호면 "S00041 ~ S00043", 아니면 "S00011, S00051, S00052" (5개 넘으면 "외 N개")
@@ -30,6 +31,7 @@ export function codesText(spools: Spool[]) {
 
 export function useSpoolActions() {
   const toast = useToast()
+  const nav = useNav()
   // 스풀이 바뀌면 필라멘트 화면(개수 · kg)과 열려 있는 스풀 창을 함께 다시 불러온다
   const refresh = useRefreshFilaments()
   const withUndo = (message: string, undo: () => Promise<unknown>) =>
@@ -42,11 +44,19 @@ export function useSpoolActions() {
     // 실패 알림 (입력칸 오류가 아닌 것)
     fail: (e: unknown) => toast(e instanceof Error ? e.message : String(e)),
 
-    // 재고 추가 → 되돌리기: 만든 스풀을 지움
+    // 재고 추가 → 되돌리기: 만든 스풀을 지움 / `라벨 인쇄`: 만든 스풀을 골라 둔 QR 화면 (TBD-18)
     async purchase(color: Color, input: PurchaseInput) {
       const made = await addSpools(color.id, input)
       await refresh()
-      withUndo(`${made.length}개 추가했어요 (${codesText(made)})`, () => deleteSpools(made.map((s) => s.id)))
+      const ids = made.map((s) => s.id)
+      toast(
+        `${made.length}개 추가했어요 (${codesText(made)})`,
+        async () => {
+          await deleteSpools(ids)
+          await refresh()
+        },
+        { label: '라벨 인쇄', run: () => nav.openLabels({ ids, from: `방금 재고 추가한 ${color.name} 스풀` }) },
+      )
     },
 
     // 상태 변경 (날짜는 서버 규칙) → 되돌리기: 이전 상태 · 날짜를 그대로
@@ -61,8 +71,8 @@ export function useSpoolActions() {
     async remove(spool: Spool) {
       await deleteSpool(spool.id)
       await refresh()
-      const { code_no, color, status, price, purchased_at, opened_at, finished_at, note, buy } = spool
-      const content = { code_no, color, status, price, purchased_at, opened_at, finished_at, note, buy }
+      const { code_no, color, status, price, purchased_at, opened_at, finished_at, note, buy, label_printed } = spool
+      const content = { code_no, color, status, price, purchased_at, opened_at, finished_at, note, buy, label_printed }
       withUndo(`${spool.code} 삭제했어요`, () => createSpool(content))
     },
 

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { useBrands, useFilaments, useMaterials, type ByStatus, type Color, type Filament } from '../../api/filaments'
+import { useNav } from '../../nav'
 import ColorDialog from './catalog/ColorDialog'
 import ColorManageDialog from './ColorManageDialog'
 import FilamentDialog from './catalog/FilamentDialog'
@@ -42,6 +43,7 @@ export default function FilamentsPage() {
   const brands = useBrands()
   const materials = useMaterials()
   const filaments = useFilaments()
+  const nav = useNav()
   const [filter, setFilter] = useState<Filter>(NO_FILTER)
   const toolbarRef = useRef<HTMLDivElement>(null)
   // 열린 타일 메뉴 · 대화상자. 색상 · 필라멘트는 id 로 기억하고 그릴 때마다 최신 데이터에서 찾는다 (저장하면 목록이 새로 옴)
@@ -117,6 +119,23 @@ export default function FilamentsPage() {
           </span>
         </div>
         <div className="spacer" />
+        <button className="btn" title="QR 라벨 인쇄 · 폰으로 찍어서 상태 바꾸기" onClick={() => nav.openLabels()}>
+          <svg
+            className="btn-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3" />
+          </svg>
+          QR
+        </button>
         <button className="btn" onClick={() => setDialog({ kind: 'manage' })}>
           필라멘트 관리
         </button>
