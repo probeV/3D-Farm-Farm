@@ -3,7 +3,6 @@
 // 원가 · 순마진율은 서버가 주지 않는다. 화면이 pages/products/cost.ts 로 계산한다
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, send } from './client'
-import type { LastBuy } from './filaments'
 
 export type ProductStatus = 'on_sale' | 'developing' | 'discontinued'
 
@@ -43,14 +42,15 @@ export interface Part {
   price: number | null // 묶음 구매가, null = 미입력
   pack_qty: number
   unit: string
-  unit_price: number | null // price ÷ pack_qty
+  unit_price: number | null // 개당 단가 = 평균 단가 (원가 계산 · 판매 포장 줄 · 손익). 평균이 없으면 직접 넣은 구매가 ÷ 묶음 수량
+  avg_price: number | null // 평균 단가 (이동평균 — 지출 구매 · 처음 수량을 남은 수량과 섞은 값, v2 PL)
   stock: number // 남은 수량 (0 아래 가능). 바꿀 때는 adjustPart · usePart
   alert: number // 부족 알림 기준
   note: string
   product_count: number // 쓰는 제품 수 (부속품)
   set_count: number // 쓰는 포장 세트 수 (포장재)
   last_used: string | null // 마지막으로 다 쓴 날 (소모품)
-  last_buy: LastBuy | null // 최근 구매 (지출 구매 항목). 있으면 price · pack_qty 는 그 지출의 값 (다음 구매 때 다시 바뀜)
+  bought: boolean // 지출로 산 적이 있음 → 구매가 · 묶음 수량은 못 고치고 쓰지 않음 (단가는 평균만)
 }
 
 // 포장 세트 (STOCK-06): 제품의 기본 포장 · 판매 주문의 포장 줄을 채운다

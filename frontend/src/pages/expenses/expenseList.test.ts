@@ -86,9 +86,9 @@ describe('summarize · byCategory', () => {
     expect(summarize([], TODAY).since).toBeNull()
   })
 
-  it('분류별 합계는 8개 분류 모두 (없으면 0)', () => {
+  it('분류별 합계는 9개 분류 모두 (없으면 0)', () => {
     const rows = byCategory(ALL)
-    expect(rows.map((c) => c.amount)).toEqual([1179000, 0, 22000, 0, 15000, 29000, 0, 0])
+    expect(rows.map((c) => c.amount)).toEqual([1179000, 0, 22000, 0, 15000, 29000, 0, 0, 0])
   })
 })
 

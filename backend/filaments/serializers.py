@@ -6,8 +6,6 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from expenses.models import last_buy
-
 from .models import LOGO_VALIDATORS, Brand, Color, Filament, Material, Spool, normalize_hex
 
 
@@ -70,15 +68,15 @@ class MaterialSerializer(BaseModelSerializer):
 
 
 class ColorSerializer(BaseModelSerializer):
+    # 원가 계산의 스풀 가격 = 보유 스풀 평균(held_price), 없으면 등록 가격(색상 가격 → 필라멘트 가격)
     spool_price = NumberField(max_digits=10, decimal_places=0, read_only=True)
+    held_price = NumberField(max_digits=10, decimal_places=0, read_only=True)
     price_per_g = serializers.SerializerMethodField()
     counts = serializers.SerializerMethodField()
-    # 최근 구매 (지출 장부, TBD-31). 있으면 가격은 그 주문의 통당 금액 — 다음 구매 때 다시 바뀜
-    last_buy = serializers.SerializerMethodField()
 
     class Meta:
         model = Color
-        fields = ['id', 'filament', 'name', 'hex', 'price', 'spool_price', 'price_per_g', 'counts', 'last_buy']
+        fields = ['id', 'filament', 'name', 'hex', 'price', 'spool_price', 'held_price', 'price_per_g', 'counts']
         # 이름 중복은 validate() 에서 한국어 메시지로 검사
         validators = []
 
@@ -88,9 +86,6 @@ class ColorSerializer(BaseModelSerializer):
 
     def get_counts(self, obj):
         return {'sealed': obj.sealed_count, 'open': obj.open_count, 'empty': obj.empty_count}
-
-    def get_last_buy(self, obj):
-        return last_buy(obj)
 
     def validate_hex(self, value):
         try:

@@ -2,7 +2,7 @@
 
 반복 지출(RecurringExpense) → 지출(Expense) → 구매 줄(ExpenseLine → 색상 · 재고 품목, v2 TBD-31).
 반복 지출은 저절로 지출을 만들지 않고, 화면에서 확인하고 넣는다 (EXP-04)
-분류는 고정 8개 (EXP-03). v2 손익이 분류로 계산하므로 사용자가 추가 · 수정하지 않는다
+분류는 고정 9개 (EXP-03, v2 PL-06 에서 `세금` 추가). v2 손익이 분류로 계산하므로 사용자가 추가 · 수정하지 않는다
 """
 
 import calendar
@@ -11,11 +11,10 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import OuterRef, Subquery, Sum
 from django.utils import timezone
 
-from filaments.models import MONEY, Color
-from stock.models import Part, PartKind, qty_field
+from filaments.models import MONEY
+from stock.models import PartKind, qty_field
 
 
 class ExpenseCategory(models.TextChoices):
@@ -28,6 +27,8 @@ class ExpenseCategory(models.TextChoices):
     SUPPLY = 'supply', '소모품'
     SUBSCRIPTION = 'sub', '구독 · 운영'
     SELLING = 'sell', '판매비'
+    # 종합소득세 등 낸 세금 (v2 PL-06). 손익 기준에서는 영업이익 다음에 뺀다
+    TAX = 'tax', '세금'
     ETC = 'etc', '기타'
 
 
@@ -107,7 +108,7 @@ class ExpenseItem(models.Model):
     - 필라멘트 지출: 색상 · 롤 수. 저장하면 롤 수만큼 스풀이 생긴다 (Spool.buy — 지출 → 스풀 한 방향, 차이만)
     - 부속품 · 포장재 · 소모품 지출: 그 탭의 품목 · 수량. 저장하면 남은 수량 + 수량 (입출고 기록 `지출`)
     - 금액(amount)을 비우면 지출 총액(배송비 포함)에서 금액 적은 항목을 빼고 남은 돈을 나눠 넣는다 → total
-    - 그 색상 · 품목의 최근 구매면 원가 계산표 단가(색상 가격 · 묶음 가격)가 이 지출의 값이 된다
+    - 원가 계산 단가: 품목은 평균 단가(이동평균)가 다시 계산되고, 필라멘트는 보유 스풀 평균 (v2 PL)
     """
 
     expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name='items', verbose_name='지출')
@@ -171,56 +172,5 @@ def split_totals(category, amount, items):
             item.total = (left * weight(item) / weights).quantize(Decimal('0.01'))
 
 
-def item_key(item):
-    """구매 항목이 가리키는 것 — ('color', id) 또는 ('part', id)"""
-    return ('color', item.color_id) if item.color_id else ('part', item.part_id)
-
-
-def latest_buy(key):
-    """그 색상 · 품목의 최근 구매 → (항목 금액 합계, 수량 합계). 없으면 None
-    최근 = 그것이 들어 있는 지출 중 날짜가 가장 늦은 것 (같은 날이면 나중에 넣은 지출).
-    그 지출에 같은 색상 · 품목이 여러 항목이면 합친다 (예: 화이트 9롤 + 할인 1롤 → 10롤 평균, TBD-33)"""
-    field, pk = key
-    items = ExpenseItem.objects.filter(**{f'{field}_id': pk})
-    expense = items.order_by('-expense__date', '-expense_id').values_list('expense_id', flat=True).first()
-    if expense is None:
-        return None
-    total = items.filter(expense_id=expense).aggregate(total=Sum('total'), qty=Sum('qty'))
-    return total['total'], total['qty']
-
-
-def last_buy_annotations(field):
-    """색상(field='color') · 품목(field='part') 목록에 붙이는 최근 구매 — last_buy_expense · _date · _name"""
-    items = ExpenseItem.objects.filter(**{field: OuterRef('pk')}).order_by('-expense__date', '-expense_id', '-id')
-    return {
-        'last_buy_expense': Subquery(items.values('expense_id')[:1]),
-        'last_buy_date': Subquery(items.values('expense__date')[:1]),
-        'last_buy_name': Subquery(items.values('expense__name')[:1]),
-    }
-
-
-def last_buy(obj):
-    """last_buy_annotations 를 붙인 색상 · 품목 → {'expense', 'date', 'name'} (가격 옆 `최근 구매가 · 날짜 주문명`)"""
-    expense = getattr(obj, 'last_buy_expense', None)
-    if expense is None:
-        return None
-    return {'expense': expense, 'date': obj.last_buy_date, 'name': obj.last_buy_name}
-
-
 def won(value):
     return value.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-
-
-def refresh_buy_prices(keys):
-    """원가 계산표 단가 = 최근 구매가 (TBD-31 · 33). 구매 항목이 바뀐 색상 · 품목마다 최근 구매로 다시 맞춘다
-    — 색상 가격 = 롤당 금액(합계 ÷ 롤 수), 품목 묶음 가격 · 묶음 수량 = 금액 합계 · 수량 합계.
-    남은 구매가 없으면 그대로"""
-    for key in keys:
-        buy = latest_buy(key)
-        if buy is None:
-            continue
-        total, qty = buy
-        if key[0] == 'color':
-            Color.objects.filter(pk=key[1]).update(price=won(total / qty))
-        else:
-            Part.objects.filter(pk=key[1]).update(price=won(total), pack_qty=qty)

@@ -3,8 +3,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, send } from './client'
 
-// 분류 (EXP-03, 고정 8개). 이름 · 설명은 pages/expenses/categories.ts
-export type ExpenseCategory = 'invest' | 'filament' | 'part' | 'pack' | 'supply' | 'sub' | 'sell' | 'etc'
+// 분류 (EXP-03, 고정 9개 — v2 PL-06 에서 세금 추가). 이름 · 설명은 pages/expenses/categories.ts
+export type ExpenseCategory = 'invest' | 'filament' | 'part' | 'pack' | 'supply' | 'sub' | 'sell' | 'tax' | 'etc'
 
 // 구매 항목 (v2 TBD-31 · 33): 필라멘트 지출은 색상 · 롤 수, 부속품 · 포장재 · 소모품 지출은 그 탭의 품목 · 수량.
 // 같은 색상 · 품목도 여러 항목 가능. 필라멘트 항목을 저장하면 롤 수만큼 스풀이 생긴다 (지출 → 스풀 한 방향, 차이만)

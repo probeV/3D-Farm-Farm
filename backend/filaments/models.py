@@ -5,6 +5,7 @@
 
 import os
 import re
+from decimal import ROUND_HALF_UP, Decimal
 from functools import partial
 from io import BytesIO
 
@@ -195,9 +196,28 @@ class Color(models.Model):
         super().save(*args, **kwargs)
 
     @property
-    def spool_price(self):
-        """색상 가격이 있으면 그 값, 없으면 필라멘트 가격 (둘 다 없으면 None)"""
+    def base_price(self):
+        """등록 가격: 색상 가격이 있으면 그 값, 없으면 필라멘트 가격 (둘 다 없으면 None)"""
         return self.price if self.price is not None else self.filament.price
+
+    @property
+    def held_price(self):
+        """보유 스풀(재고 · 사용 중) 구매가 평균, 원 단위 (v2 PL). 구매가 있는 보유 스풀이 없으면 None.
+        목록은 views.colors_with_counts 가 held_avg 로 미리 붙여 두고, 없으면 여기서 센다"""
+        if hasattr(self, 'held_avg'):
+            value = self.held_avg
+        elif self.pk is None:
+            value = None
+        else:
+            held = self.spools.filter(status__in=['sealed', 'open'], price__isnull=False)
+            value = held.aggregate(value=models.Avg('price'))['value']
+        return None if value is None else Decimal(value).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
+    @property
+    def spool_price(self):
+        """원가 계산의 스풀 1개 가격 = 보유 스풀 평균 (부속품의 평균 단가와 같은 생각). 보유 스풀이 없으면 등록 가격"""
+        held = self.held_price
+        return held if held is not None else self.base_price
 
     @property
     def price_per_g(self):

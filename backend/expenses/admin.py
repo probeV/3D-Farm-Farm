@@ -4,7 +4,7 @@ from .models import Expense, ExpenseItem, RecurringExpense
 
 
 class ExpenseItemInline(admin.TabularInline):
-    """구매 줄은 보기만 (남은 수량 · 최근 구매가와 함께 바꿔야 해서 화면 · API 로)"""
+    """구매 줄은 보기만 (남은 수량 · 스풀 · 평균 단가와 함께 바꿔야 해서 화면 · API 로)"""
 
     model = ExpenseItem
     extra = 0

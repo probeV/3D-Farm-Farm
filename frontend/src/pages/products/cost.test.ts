@@ -30,7 +30,7 @@ const color = (
   spool_price,
   price_per_g: null,
   counts,
-  last_buy: null,
+  held_price: null,
 })
 const filament = (id: number, display_name: string, price: number | null, colors: Color[]): Filament => ({
   id,
@@ -56,6 +56,7 @@ const part = (id: number, name: string, unit_price: number | null): Part => ({
   pack_qty: 1,
   unit: '개',
   unit_price,
+  avg_price: unit_price,
   note: '',
   product_count: 0,
   photo: null,
@@ -63,7 +64,7 @@ const part = (id: number, name: string, unit_price: number | null): Part => ({
   alert: 0,
   set_count: 0,
   last_used: null,
-  last_buy: null,
+  bought: false,
 })
 
 // 화이트: 색상 가격 없음(필라멘트 가격 14,400) / 블랙: 색상 가격 15,000 / PETG: 가격 미입력
@@ -249,6 +250,15 @@ describe('단가 안내 · 색상 · 순마진율 색', () => {
       '색상 가격 15,000원 / 1000g · g당 15.0원',
     )
     expect(filamentUnitText(catalog, { filament: 1, color: null, grams: 1 })).toBe('14,400원 / 1000g · g당 14.4원')
+    // 보유 스풀이 있으면 원가는 그 구매가 평균 (서버가 spool_price 에 넣어 줌, v2 PL)
+    const held = makeCatalog(
+      [filament(1, 'Bambu Lab › PLA Basic', 14400, [{ ...color(WHITE, 1, '화이트', null, 17500), held_price: 17500 }])],
+      parts,
+      setting,
+    )
+    expect(filamentUnitText(held, { filament: 1, color: WHITE, grams: 1 })).toBe(
+      '보유 스풀 평균 17,500원 / 1000g · g당 17.5원',
+    )
     expect(filamentUnitText(catalog, { filament: 2, color: null, grams: 1 })).toBe(
       '필라멘트 가격 미입력 — 0원으로 계산',
     )

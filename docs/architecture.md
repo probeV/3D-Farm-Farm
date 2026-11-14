@@ -28,6 +28,7 @@ frontend/ (React)                          backend/ (Django)
 | `products` | `Category`, `Subcategory`, `Product`, `ProductFilament`, `ProductPart`, `CostSetting` | 모델 · API 완료 |
 | `expenses` | `Expense`, `RecurringExpense` | 모델 · API 완료 |
 | `sales` | `Sale`, `SaleItem`, `SalePack` | 모델 · API · 화면 완료 (v2, 포장 줄은 API 까지) |
+| `pl` | — (모델 없음) 판매 · 지출 · 스풀을 달마다 더하는 API 하나 | API · 화면 완료 (v2 PL) |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
 - **참조 방향은 한쪽으로만** (`→` = import 함):
@@ -37,6 +38,7 @@ frontend/ (React)                          backend/ (Django)
     └──→ stock ←┘ ───────────┘        expenses → filaments (공통 MONEY · BaseViewSet 만)
   ```
   `products` → `filaments` · `stock` (제품이 필라멘트 · 부속품 · 기본 포장 세트를 씀). `sales` → `products` · `stock` (판매 줄이 제품 · 포장재를 씀).
+  `pl` → `sales` · `expenses` · `filaments` (읽기만, 다른 앱은 `pl` 을 import 하지 않음).
   `filaments` · `stock` 은 `products` · `sales` 를 import 하지 않는다 — 입출고 기록(`StockHistory.sale`)만 문자열 `'sales.Sale'` 로
   판매를 가리키고(판매를 고칠 때 차이 계산용), `stock/services.py` 는 판매 · 제품의 줄을 역참조로 읽는다.
 - 화면의 `재고 관리` 메뉴는 `filaments`(필라멘트 탭)와 `stock`(부속품 · 포장 · 소모품 탭) 두 앱을 쓴다 — 앱은 화면이 아니라 데이터 묶음 단위.
@@ -79,6 +81,7 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
   path('api/v0/', include('products.urls')),
   path('api/v0/', include('expenses.urls')),
   path('api/v0/', include('sales.urls')),
+  path('api/v0/', include('pl.urls')),
   ```
 - 주소 · 응답 모양이 바뀌는 변경은 `v1` 을 새로 만들고 `v0` 는 그대로 둔다. 칸을 추가하는 정도는 같은 버전에서
 - 주소는 복수형 명사: `/api/v0/brands/`, `/api/v0/filaments/`, `/api/v0/colors/{id}/`, `/api/v0/spools/`
@@ -110,12 +113,12 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
 frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
                 client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
-  pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, expenses/, settings/)
+  pages/        사이드바 메뉴 하나 = 폴더 하나 (products/, filaments/ · stock/, sales/, expenses/, pl/, settings/)
                 scan/ — 폰 스풀 화면 /s/{코드} (QR 라벨을 찍으면, 사이드바 없음, TBD-18)
   components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch, Help, LinkBadge …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
                 products.css — 제품 원가 목업 CSS 중 app.css 에 없는 것
-                stock.css · settings.css · expenses.css · sales.css · qr.css — 재고 관리 · 설정 · 지출 · 판매 · QR 목업 CSS 중 위 파일들에 없는 것
+                stock.css · settings.css · expenses.css · sales.css · qr.css · pl.css — 재고 관리 · 설정 · 지출 · 판매 · QR · 손익 목업 CSS 중 위 파일들에 없는 것
   format.ts     화면 표시용 숫자 모양 (원, kg, 날짜)
   csv.ts        CSV 만들기(UTF-8 BOM) · 파일로 내려받기 (제품 원가 · 지출)
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수

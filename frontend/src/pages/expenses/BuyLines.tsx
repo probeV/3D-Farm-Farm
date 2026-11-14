@@ -3,16 +3,7 @@ import type { Part } from '../../api/products'
 import Help from '../../components/Help'
 import { unitWon, won } from '../../format'
 import { qty as qtyText } from '../stock/kinds'
-import {
-  averageEach,
-  emptyRow,
-  isLatest,
-  parseRows,
-  spoolDiff,
-  splitTotals,
-  type BuyField,
-  type BuyRow,
-} from './buyRows'
+import { emptyRow, nextAverage, parseRows, spoolDiff, splitTotals, type BuyField, type BuyRow } from './buyRows'
 
 // 고를 수 있는 색상 (필라멘트 이름 · 지금 원가 계산표의 스풀 가격 포함)
 export interface BuyColor {
@@ -27,9 +18,7 @@ interface Props {
   field: BuyField
   rows: BuyRow[]
   amount: number | null // 지출 금액 (배송비 포함 총액)
-  date: string
-  expense: Expense | null // 고치는 지출 (최근 구매인지 볼 때 자기 자신 제외)
-  all: Expense[]
+  expense: Expense | null // 고치는 지출 (새 지출이면 null)
   colors: BuyColor[]
   parts: Part[] // 이 분류의 탭 품목만
   error: string | null
@@ -37,55 +26,46 @@ interface Props {
 }
 
 // 지출 창의 구매 항목 (v2 TBD-31 · 33, docs/screens.md 5.3): [색상 · 품목] [수량] [금액] ✕ + 항목 아래 저장하면 바뀌는 것.
-// 필라멘트는 스풀(롤 수만큼 생김) · 색상 가격으로, 부속품 · 포장재 · 소모품은 남은 수량 · 묶음 가격으로 이어진다.
-// 같은 색상 · 품목 여러 항목이면 단가는 합친 평균. 사용한 스풀이 있는 항목은 색상 변경 · 빼기 불가
+// 필라멘트는 스풀(롤 수만큼 생김, 원가는 보유 스풀 평균)로, 부속품 · 포장재 · 소모품은 남은 수량 · 평균 단가(이동평균)로 이어진다.
+// 사용한 스풀이 있는 항목은 색상 변경 · 빼기 불가
 export default function BuyLines(p: Props) {
-  const { category, field, rows, amount, date, expense, all, colors, parts, error, onChange } = p
+  const { category, field, rows, amount, expense, colors, parts, error, onChange } = p
   const filament = field === 'color'
-  const colorOf = new Map(colors.map((c) => [c.id, c]))
   const partOf = new Map(parts.map((x) => [x.id, x]))
   const parsed = parseRows(rows)
   const totals = splitTotals(category, amount ?? 0, parsed)
   const totalOf = new Map(parsed.map((r, i) => [r.row, totals[i]]))
-  const avg = averageEach(parsed, totals)
   const set = (i: number, patch: Partial<BuyRow>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
   const fils = [...new Set(colors.map((c) => c.fil))]
   const sortedParts = [...parts].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
   const usedTotal = rows.reduce((a, r) => a + r.used, 0)
 
-  // 항목 아래: 저장하면 바뀌는 것 (필라멘트면 스풀 수, 품목이면 남은 수량, 최근 구매면 단가)
+  // 항목 아래: 저장하면 바뀌는 것 (필라멘트면 스풀 수 — 원가 단가는 보유 스풀 평균이라 저절로, 품목이면 남은 수량 · 평균 단가)
   const effect = (r: BuyRow) => {
     const total = totalOf.get(r)
     const q = Number(r.qty)
     if (r.pick == null || total == null || !(q > 0)) return null
     const each = total / q
-    const latest = isLatest(all, expense, field, r.pick, date)
-    const next = avg.get(r.pick) ?? each
     if (filament) {
-      const cur = colorOf.get(r.pick)?.price ?? null
       const d = spoolDiff(r)
       const spool = d > 0 ? `스풀 +${d}개` : d < 0 ? `스풀 −${-d}개` : expense && r.id != null ? '스풀 그대로' : ''
-      return latest ? (
+      return (
         <>
           롤당 <b>{won(each)}</b>
-          {spool && <> · {d ? <b>{spool}</b> : spool}</>} · 단가 {cur == null ? '미입력' : won(cur)} →{' '}
-          <b>{won(next)}</b>
+          {spool && <> · {d ? <b>{spool}</b> : spool}</>}
         </>
-      ) : (
-        <span className="hint">
-          롤당 {won(each)}
-          {spool && ` · ${spool}`} · 최근 구매 아님 · 단가 그대로
-        </span>
       )
     }
     const part = partOf.get(r.pick)
     const stock = `재고 +${qtyText(q)}${part?.unit ?? ''}`
-    return latest ? (
+    // 이미 저장된 항목을 고치면 지난 날짜부터 다시 계산하므로 미리보기 없이
+    if (r.id != null) return <span className="hint">{stock} · 평균 단가 다시 계산</span>
+    const cur = part?.unit_price ?? null
+    return (
       <>
-        <b>{stock}</b> · 단가 {unitWon(part?.unit_price)} → <b>{unitWon(next)}</b>
+        <b>{stock}</b> · 평균 {cur == null ? '미입력' : unitWon(cur)} →{' '}
+        <b>{unitWon(nextAverage(part?.stock ?? 0, cur, q, each))}</b>
       </>
-    ) : (
-      <span className="hint">{stock} · 최근 구매 아님 · 단가 그대로</span>
     )
   }
 
@@ -96,8 +76,8 @@ export default function BuyLines(p: Props) {
         <Help
           tip={
             filament
-              ? '산 색상과 롤 수. 저장하면 롤 수만큼 스풀이 재고로 생겨요(구매가 = 롤당 금액). 고치면 바뀐 롤 수만큼만 스풀이 생기거나 지워져요. 금액을 비우면 총액(배송비 포함)을 롤 수대로 나눠요. 같은 색상이 값이 다르면 항목을 나눠 적어요'
-              : '산 품목과 수량. 저장하면 재고 관리의 남은 수량이 늘고, 최근 구매면 묶음 가격 · 수량이 이 값으로 바뀌어요. 한 가지면 금액을 비워도 돼요(총액), 여러 가지면 항목마다 금액을 적어요'
+              ? '산 색상과 롤 수. 저장하면 롤 수만큼 스풀이 재고로 생겨요(구매가 = 롤당 금액 — 원가 계산은 보유 스풀 평균이라 저절로 반영). 고치면 바뀐 롤 수만큼만 스풀이 생기거나 지워져요. 금액을 비우면 총액(배송비 포함)을 롤 수대로 나눠요. 같은 색상이 값이 다르면 항목을 나눠 적어요'
+              : '산 품목과 수량. 저장하면 재고 관리의 남은 수량이 늘고, 평균 단가(남은 재고와 섞은 값)가 다시 계산돼요 — 원가 계산 · 판매 · 손익에 써요. 한 가지면 금액을 비워도 돼요(총액), 여러 가지면 항목마다 금액을 적어요'
           }
         />
       </span>

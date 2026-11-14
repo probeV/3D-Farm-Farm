@@ -92,6 +92,10 @@ class Part(ShrinkImageMixin):
     unit = models.CharField('단위', max_length=10, default='개')
     # 0 아래로도 내려갈 수 있다 (판매를 먼저 넣고 구매를 나중에 넣을 때 — 경고만)
     stock = qty_field('남은 수량', default=0)
+    # 평균 단가 (이동평균, v2 PL). 들어온 것(지출 구매 · 처음 수량)을 남은 수량과 섞어 다시 낸 값
+    # — 원가 계산 · 판매 · 손익에 쓴다.
+    # 직접 고치지 않고 services.recalc() 가 입출고 기록을 날짜순으로 다시 따라가며 계산한다. NULL = 들어온 값이 없음
+    avg_price = models.DecimalField('평균 단가', max_digits=14, decimal_places=4, null=True, blank=True, editable=False)
     # 남은 수량이 이 값 이하면 `부족`, 0 이하면 `없음` (STOCK-04)
     alert = qty_field('부족 알림 기준', default=0, validators=[MinValueValidator(0)])
     note = models.TextField('메모', blank=True)
@@ -109,9 +113,14 @@ class Part(ShrinkImageMixin):
             raise ValidationError({'category': '같은 탭의 카테고리를 고르세요.'})
 
     @property
+    def base_price(self):
+        """직접 넣은 구매가 ÷ 묶음 수량 — 지출로 산 적이 없는 품목의 단가 (처음 수량). 구매가가 없으면 None"""
+        return None if self.price is None else Decimal(self.price) / Decimal(self.pack_qty)
+
+    @property
     def unit_price(self):
-        """개당 단가. 구매가가 없으면 None"""
-        return None if self.price is None else self.price / self.pack_qty
+        """개당 단가 = 평균 단가 (원가 계산 · 판매 포장 줄 · 손익). 평균이 없으면 직접 넣은 구매가, 둘 다 없으면 None"""
+        return self.avg_price if self.avg_price is not None else self.base_price
 
 
 class StockHistory(models.Model):
@@ -148,6 +157,9 @@ class StockHistory(models.Model):
         related_name='stock_history',
         verbose_name='지출',
     )
+    # 이 기록 때의 개당 단가 = 그때의 평균 단가 (v2 PL — 손익 기준의 부속품 · 포장재 `쓴 만큼`).
+    # services.recalc() 가 맞춘다. 처음 수량은 등록할 때의 구매가. NULL = 단가를 알 수 없음 (0원으로 계산)
+    unit_price = models.DecimalField('개당 단가', max_digits=14, decimal_places=4, null=True, blank=True)
     created_at = models.DateTimeField('추가일', auto_now_add=True)
 
     class Meta:
