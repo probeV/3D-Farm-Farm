@@ -205,7 +205,7 @@ function SettingsForm({ saved, tab, onTab }: Props & { saved: CostSetting }) {
                 <h4>
                   {g.icon} {g.title}
                 </h4>
-                <span className="calc">{calc[g.calc]}</span>
+                {g.calc && <span className="calc">{calc[g.calc]}</span>}
               </div>
               {g.items.map(row)}
             </section>

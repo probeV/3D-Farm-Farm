@@ -45,7 +45,6 @@ export interface Part {
   unit_price: number | null // 개당 단가 = 평균 단가 (원가 계산 · 판매 포장 줄 · 손익). 평균이 없으면 직접 넣은 구매가 ÷ 묶음 수량
   avg_price: number | null // 평균 단가 (이동평균 — 지출 구매 · 처음 수량을 남은 수량과 섞은 값, v2 PL)
   stock: number // 남은 수량 (0 아래 가능). 바꿀 때는 adjustPart · usePart
-  alert: number // 부족 알림 기준
   note: string
   product_count: number // 쓰는 제품 수 (부속품)
   set_count: number // 쓰는 포장 세트 수 (포장재)
@@ -119,6 +118,10 @@ export interface CostSetting {
   fee_sales: number
   shipping_cost: number
   target_margin: number
+  // 재고 관리 탭마다 부족 알림 기준 (v2.1.0). 남은 수량이 이 값 이하면 `부족`
+  alert_part: number
+  alert_pack: number
+  alert_supply: number
 }
 
 export const keys = {
@@ -183,7 +186,6 @@ export interface PartInput {
   kind: PartKind
   name: string
   category: number | null
-  alert: number
   stock?: number
   shop: string
   buy_url: string

@@ -14,7 +14,6 @@ import Dialog from '../../components/Dialog'
 import Field from '../../components/Field'
 import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
-import Help from '../../components/Help'
 import { dotDate, unitWon, won } from '../../format'
 import { useForm } from '../../useForm'
 import StatusBadge from '../products/StatusBadge'
@@ -64,7 +63,6 @@ export default function PartDialog({ kind, part, copyOf, shop, category, categor
     price: src?.price != null ? String(src.price) : '',
     pack_qty: String(src?.pack_qty ?? 1),
     unit: src?.unit ?? '개',
-    alert: String(src?.alert ?? 0),
     stock: '0',
     note: src?.note ?? '',
   })
@@ -324,17 +322,6 @@ export default function PartDialog({ kind, part, copyOf, shop, category, categor
               </div>
             </Field>
           )}
-          <label className="field">
-            <span>
-              부족 알림 기준
-              <Help tip="남은 수량이 이 값 이하면 `부족` · 0 이하면 `없음`" />
-            </span>
-            <div className="with-suffix">
-              <input inputMode="decimal" value={values.alert} onChange={(e) => change('alert', e.target.value)} />
-              <em>이하</em>
-            </div>
-            {errors.alert && <span className="err">{errors.alert}</span>}
-          </label>
           <Field label="비고" error={errors.note} full>
             <textarea
               rows={2}

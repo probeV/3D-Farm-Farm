@@ -17,9 +17,10 @@ export const KIND_LABEL: Record<PartKind, string> = { part: '부속품', pack: '
 export const CATEGORY_EXAMPLE: Record<PartKind, string> = { part: '전자 부품', pack: '박스', supply: '접착 · 마감' }
 
 // 남은 수량 상태 (STOCK-04): 0 이하 = 없음(빨강), 알림 기준 이하 = 부족(주황)
+// 알림 기준은 탭마다 하나 — 설정 › 재고 관리 (v2.1.0)
 export type Level = 'ok' | 'low' | 'out'
-export const levelOf = (p: Pick<Part, 'stock' | 'alert'>): Level =>
-  p.stock <= 0 ? 'out' : p.stock <= p.alert ? 'low' : 'ok'
+export const levelOf = (p: Pick<Part, 'stock'>, alert: number): Level =>
+  p.stock <= 0 ? 'out' : p.stock <= alert ? 'low' : 'ok'
 
 // 수량 표시: 소수는 2자리까지 (완충재 cm 등)
 export const qty = (n: number) => n.toLocaleString('ko-KR', { maximumFractionDigits: 2 })
