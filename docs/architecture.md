@@ -111,16 +111,18 @@ frontend/src/
   api/          서버 호출 함수 + TanStack Query 훅 (filaments.ts, products.ts …)
                 client.ts — fetch 공통 (/api/v0 주소, 오류 응답 → ApiError)
   pages/        사이드바 메뉴 하나 = 폴더 하나 (filaments/, products/, parts/, expenses/, settings/)
+                scan/ — 폰 스풀 화면 /s/{코드} (QR 라벨을 찍으면, 사이드바 없음, TBD-18)
   components/   여러 화면에서 같이 쓰는 것 (Dialog, Toast, Pager, Field, Swatch, Help, LinkBadge …)
   styles/       app.css — 목업 CSS. 색상 토큰은 여기서만 정의
                 products.css — 제품 원가 목업 CSS 중 app.css 에 없는 것
-                stock.css · settings.css · expenses.css · sales.css — 재고 관리 · 설정 · 지출 · 판매 목업 CSS 중 위 파일들에 없는 것
+                stock.css · settings.css · expenses.css · sales.css · qr.css — 재고 관리 · 설정 · 지출 · 판매 · QR 목업 CSS 중 위 파일들에 없는 것
   format.ts     화면 표시용 숫자 모양 (원, kg, 날짜)
   csv.ts        CSV 만들기(UTF-8 BOM) · 파일로 내려받기 (제품 원가 · 지출)
   validation.ts 입력 검증 공통 규칙 (금액, 정수 범위, 소수, 글자, 날짜) + 오류 정리 함수
   useForm.ts    폼 공통 흐름 훅: 입력 → 스키마 검사 → 저장 → 서버 오류 표시
   App.tsx       레이아웃(사이드바) + 화면 전환
-  main.tsx      시작점: TanStack Query, 테마 적용
+  nav.ts        다른 화면으로 바로 가기 (알림의 `라벨 인쇄` → QR 화면). App.tsx 가 값을 넣는다
+  main.tsx      시작점: TanStack Query, 테마 적용. 주소가 /s/{코드} 면 폰 스풀 화면, 그 밖은 App
   theme.ts      테마: 시스템 / 라이트 / 다크 고르기, 고른 값은 브라우저에 기억
 ```
 ### 화면 폴더 안 (`pages/<화면>/`)
@@ -135,6 +137,7 @@ pages/filaments/
   list/                목록 (screens 1.2~1.4): BrandSummary(회사별 요약), FilamentCard(필라멘트 묶음 · 색상 타일), TileMenu
   spools/              스풀 동작 (PRD 3.4 · 3.5): PurchaseDialog, PickDialog, SpoolTable(스풀 조정 표),
                        spoolActions.ts(동작 + 되돌리기), schemas.ts(재고 추가 검증)
+  qr/                  QR 스풀 관리 (TBD-18, screens 1.10): LabelsPage(라벨 인쇄 · 인쇄용 라벨), labels.ts(라벨 없음 · 골라 둘 스풀 · QR 주소)
   ColorManageDialog.tsx  색상 · 스풀 관리 (TBD-13): 색상 정보 탭(catalog) + 스풀 탭(spools/SpoolTable) — 두 기능 폴더를 써서 여기에
   catalog/             회사 · 재질 · 필라멘트 · 색상 편집 (PRD 3.1): ManageDialog(필라멘트 관리),
                        BrandDialog, MaterialDialog, FilamentDialog, ColorDialog(색상 추가 + 입력칸 · 머리 띠),
