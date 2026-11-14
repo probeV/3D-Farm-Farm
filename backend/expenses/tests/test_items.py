@@ -1,6 +1,7 @@
-"""지출 구매 항목 (v2 TBD-31 · 33) — 항목 금액 나누기 · 남은 수량 · 최근 구매가 · 필라멘트 스풀 자동 생성"""
+"""지출 구매 항목 (v2 TBD-31 · 33) — 항목 금액 나누기 · 남은 수량 · 평균 단가 · 필라멘트 스풀 자동 생성"""
 
 import datetime
+from decimal import Decimal
 from unittest import mock
 
 from rest_framework.test import APITestCase
@@ -58,8 +59,10 @@ class ExpenseItemApiTests(APITestCase):
             {(s.status, s.price, s.purchased_at) for s in made}, {('sealed', 18000, datetime.date(2026, 9, 22))}
         )
         self.assertEqual([s.color_id for s in made], [self.white.pk] * 4 + [self.black.pk] * 2)
+        # 원가 계산의 스풀 가격 = 보유 스풀 평균. 등록 가격(색상 가격)은 지출이 바꾸지 않음
         self.refresh(self.white, self.black)
-        self.assertEqual((self.white.price, self.black.price), (18000, 18000))
+        self.assertEqual((self.white.spool_price, self.black.spool_price), (18000, 18000))
+        self.assertEqual((self.white.price, self.black.price), (14400, None))
 
     def test_fixed_amount_and_rest(self, _):
         """금액 적은 항목은 그대로, 남은 금액을 비운 항목에"""
@@ -69,7 +72,7 @@ class ExpenseItemApiTests(APITestCase):
         self.assertEqual([r['total'] for r in res.data['items']], [30000, 20000])
 
     def test_same_color_items_average_price(self, _):
-        """같은 색상 여러 항목 (화이트 9롤 + 할인 1롤) → 스풀은 항목마다 그 값, 색상 가격은 평균"""
+        """같은 색상 여러 항목 (화이트 9롤 + 할인 1롤) → 스풀은 항목마다 그 값, 원가 계산의 스풀 가격은 평균"""
         res = self.post(
             'filament',
             190000,
@@ -78,7 +81,7 @@ class ExpenseItemApiTests(APITestCase):
         self.assertEqual(res.status_code, 201, res.data)
         self.assertEqual(sorted(s.price for s in self.spools()), [10000] + [20000] * 9)
         self.refresh(self.white)
-        self.assertEqual(self.white.price, 19000)
+        self.assertEqual(self.white.spool_price, 19000)
 
     def test_edit_syncs_spools_by_difference(self, _):
         """지출 → 스풀 한 방향, 차이만: 늘리면 새로, 줄이면 `재고` 스풀을 큰 번호부터 지움. 금액 · 날짜 · 색상도 맞춤"""
@@ -157,11 +160,11 @@ class ExpenseItemApiTests(APITestCase):
 
     # ---- 부속품 · 포장재 · 소모품
     def test_part_stock_and_price(self, _):
-        """저장하면 남은 수량 + 수량 (입출고 기록 `지출`), 묶음 가격 · 수량 = 항목 금액 · 수량"""
+        """저장하면 남은 수량 + 수량 (입출고 기록 `지출`), 평균 단가 = 항목 단가 (직접 넣은 구매가는 그대로)"""
         res = self.post('part', 9000, [{'part': self.magnet.pk, 'qty': 100}], date='2026-10-03', name='자석 100개')
         pk = res.data['id']
         self.refresh(self.magnet)
-        self.assertEqual((self.magnet.stock, self.magnet.price, self.magnet.pack_qty), (100, 9000, 100))
+        self.assertEqual((self.magnet.stock, self.magnet.avg_price, self.magnet.price), (100, 90, 12000))
         history = StockHistory.objects.get(part=self.magnet)
         self.assertEqual(
             (history.kind, history.qty, history.expense_id, history.note), ('buy', 100, pk, '지출 · 자석 100개')
@@ -170,53 +173,36 @@ class ExpenseItemApiTests(APITestCase):
         # 고치면 차이만
         res = self.patch(pk, items=[{'id': res.data['items'][0]['id'], 'part': self.magnet.pk, 'qty': 150}])
         self.refresh(self.magnet)
-        self.assertEqual((self.magnet.stock, self.magnet.pack_qty), (150, 150))
+        self.assertEqual((self.magnet.stock, self.magnet.avg_price), (150, 60))  # 9000 ÷ 150
 
         # 지우면 되돌림
         self.client.delete(f'{API}/expenses/{pk}/')
         self.refresh(self.magnet)
-        self.assertEqual(self.magnet.stock, 0)
+        self.assertEqual((self.magnet.stock, self.magnet.avg_price), (0, None))
         self.assertEqual(StockHistory.objects.filter(part=self.magnet).first().note, '지출 삭제 · 자석 100개')
 
     def test_same_part_items(self, _):
-        """같은 품목 여러 항목: 남은 수량은 합계만큼, 묶음 가격 · 수량은 합계"""
+        """같은 품목 여러 항목: 남은 수량은 합계만큼, 평균 단가는 합친 값"""
         self.post(
             'part',
             10000,
             [{'part': self.magnet.pk, 'qty': 100, 'amount': 6000}, {'part': self.magnet.pk, 'qty': 50, 'amount': 4000}],
         )
         self.refresh(self.magnet)
-        self.assertEqual((self.magnet.stock, self.magnet.price, self.magnet.pack_qty), (150, 10000, 150))
+        self.assertEqual(self.magnet.stock, 150)
+        self.assertAlmostEqual(self.magnet.avg_price, Decimal('66.6667'))  # 10000 ÷ 150
 
-    def test_latest_purchase_only(self, _):
-        """더 늦은 구매가 있으면 단가는 그대로. 최근 구매를 지우면 남은 최근 구매로 되돌림"""
-        old = self.post('part', 12000, [{'part': self.magnet.pk, 'qty': 200}], date='2026-06-03', name='6월')
+    def test_bought_flag_and_average_of_all_purchases(self, _):
+        """단가는 최근 구매가 아니라 평균 (6월 200개 12,000 + 10월 100개 8,000 → 66.67). 지운 구매는 빠짐"""
+        self.post('part', 12000, [{'part': self.magnet.pk, 'qty': 200}], date='2026-06-03', name='6월')
         new = self.post('part', 8000, [{'part': self.magnet.pk, 'qty': 100}], date='2026-10-03', name='10월')
-        self.refresh(self.magnet)
-        self.assertEqual((self.magnet.price, self.magnet.pack_qty), (8000, 100))
-
-        item = old.data['items'][0]['id']
-        self.patch(old.data['id'], amount=13000, items=[{'id': item, 'part': self.magnet.pk, 'qty': 200}])
-        self.refresh(self.magnet)
-        self.assertEqual(self.magnet.price, 8000)  # 6월 구매는 최근 구매가 아님
-
         part = self.client.get(f'{API}/parts/{self.magnet.pk}/').data
-        self.assertEqual(
-            part['last_buy'], {'expense': new.data['id'], 'date': datetime.date(2026, 10, 3), 'name': '10월'}
-        )
+        self.assertEqual((part['bought'], part['unit_price'], part['price']), (True, 66.67, 12000))
+        self.assertFalse(self.client.get(f'{API}/parts/{self.bolt.pk}/').data['bought'])
 
         self.client.delete(f'{API}/expenses/{new.data["id"]}/')
         self.refresh(self.magnet)
-        self.assertEqual((self.magnet.price, self.magnet.pack_qty), (13000, 200))
-
-    def test_unchanged_items_keep_manual_price(self, _):
-        """구매 항목이 그대로면 손으로 고친 단가는 그대로 (다음 구매 때 덮어씀)"""
-        res = self.post('filament', 72000, [{'color': self.white.pk, 'qty': 4}])
-        Color.objects.filter(pk=self.white.pk).update(price=17000)
-        item = res.data['items'][0]['id']
-        self.patch(res.data['id'], note='메모만', items=[{'id': item, 'color': self.white.pk, 'qty': 4}])
-        self.refresh(self.white)
-        self.assertEqual(self.white.price, 17000)
+        self.assertEqual(self.magnet.avg_price, 60)
 
     def test_empty_items_and_category_change(self, _):
         """구매 항목은 비워도 저장. 분류를 바꾸면 구매 항목은 지워지고 늘린 수량은 되돌림"""

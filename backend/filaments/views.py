@@ -8,8 +8,6 @@ from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404  # 숫자가 아닌 id 도 404 (Django 것은 500)
 from rest_framework.response import Response
 
-from expenses.models import last_buy_annotations
-
 from .models import Brand, Color, Filament, Material, Spool
 from .serializers import (
     BrandSerializer,
@@ -36,7 +34,8 @@ def colors_with_counts():
             sealed_count=Count('spools', filter=Q(spools__status=Spool.Status.SEALED)),
             open_count=Count('spools', filter=Q(spools__status=Spool.Status.OPEN)),
             empty_count=Count('spools', filter=Q(spools__status=Spool.Status.EMPTY)),
-            **last_buy_annotations('color'),
+            # 원가 계산의 스풀 가격 = 보유 스풀 구매가 평균 (Color.held_price)
+            held_avg=Avg('spools__price', filter=Q(spools__status__in=[Spool.Status.SEALED, Spool.Status.OPEN])),
         )
         .order_by('filament_id', 'id')
     )

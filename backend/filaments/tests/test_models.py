@@ -126,6 +126,16 @@ class FilamentModelTests(TestCase):
         self.assertEqual(color.spool_price, Decimal('25000'))
         self.assertEqual(color.price_per_g, Decimal('25'))
 
+    def test_spool_price_is_held_spools_average(self):
+        color = Color.objects.create(filament=self.filament, name='블랙', hex='#000000', price=Decimal('25000'))
+        Spool.objects.create(color=color, price=Decimal('18000'))
+        Spool.objects.create(color=color, price=Decimal('21001'), status=Spool.Status.OPEN)
+        Spool.objects.create(color=color, price=Decimal('90000'), status=Spool.Status.EMPTY)  # 다 쓴 것은 빼고
+        Spool.objects.create(color=color)  # 구매가 없는 것은 빼고
+        self.assertEqual(color.spool_price, Decimal('19501'))  # 19500.5 → 원 단위 반올림
+        Spool.objects.filter(color=color).update(status=Spool.Status.EMPTY)
+        self.assertEqual(color.spool_price, Decimal('25000'))  # 보유 스풀이 없으면 등록 가격
+
     def test_price_per_g_is_none_without_any_price(self):
         self.filament.price = None
         color = Color(filament=self.filament, name='블랙', hex='#000000')

@@ -9,7 +9,6 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from expenses.models import last_buy
 from filaments.models import LOGO_VALIDATORS
 from filaments.serializers import BaseModelSerializer, NumberField, RelativeImageField
 
@@ -62,13 +61,15 @@ class PartSerializer(BaseModelSerializer):
     )
     photo = RelativeImageField(required=False, allow_null=True, validators=LOGO_VALIDATORS)
     stock = NumberField(**QTY, required=False, default=Decimal(0))
+    # 개당 단가 = 평균 단가(이동평균, 원가 계산 · 판매 · 손익). 평균이 없으면 직접 넣은 구매가 ÷ 묶음 수량
     unit_price = serializers.SerializerMethodField()
+    avg_price = serializers.SerializerMethodField()
     # 뷰의 queryset 이 붙인 값 (아래 views.parts_with_counts)
     product_count = serializers.IntegerField(read_only=True, default=0)
     set_count = serializers.IntegerField(read_only=True, default=0)
     last_used = serializers.DateField(read_only=True, default=None)
-    # 최근 구매 (지출 장부, TBD-31). 있으면 묶음 가격 · 수량은 그 구매 줄 값 — 다음 구매 때 다시 바뀜
-    last_buy = serializers.SerializerMethodField()
+    # 지출로 산 적이 있는지 (뷰의 queryset 이 붙인 값). 있으면 구매가 · 묶음 수량은 잠김 — 단가는 평균만
+    bought = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = Part
@@ -84,25 +85,29 @@ class PartSerializer(BaseModelSerializer):
             'pack_qty',
             'unit',
             'unit_price',
+            'avg_price',
             'stock',
             'alert',
             'note',
             'product_count',
             'set_count',
             'last_used',
-            'last_buy',
+            'bought',
         ]
         extra_kwargs = {
             'kind': {'error_messages': {'invalid_choice': '없는 종류입니다.'}},
             'buy_url': {'error_messages': {'invalid': 'https:// 로 시작하는 주소로 입력하세요.'}},
         }
 
-    def get_last_buy(self, obj):
-        return last_buy(obj)
+    @staticmethod
+    def money(value):
+        return None if value is None else round(float(value), 2)
 
     def get_unit_price(self, obj):
-        value = obj.unit_price
-        return None if value is None else round(float(value), 2)
+        return self.money(obj.unit_price)
+
+    def get_avg_price(self, obj):
+        return self.money(obj.avg_price)
 
     def validate_kind(self, value):
         return check_kind_unchanged(self, value)
@@ -118,18 +123,31 @@ class PartSerializer(BaseModelSerializer):
         category = attrs.get('category', getattr(self.instance, 'category', None))
         if category and category.kind != kind:
             raise serializers.ValidationError({'category': ['같은 탭의 카테고리를 고르세요.']})
+        # 지출로 산 품목의 구매가 · 묶음 수량은 못 고침 — 단가는 지출 기록으로 계산한 평균 (직접 넣은 값은 쓰지 않음)
+        if self.instance and self.instance.buy_items.exists():
+            locked = {
+                k: '지출로 산 품목은 지출에서 바꾸세요.'
+                for k in ('price', 'pack_qty')
+                if k in attrs and attrs[k] != getattr(self.instance, k)
+            }
+            if locked:
+                raise serializers.ValidationError({k: [v] for k, v in locked.items()})
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
         stock = validated_data.pop('stock', 0)
         part = super().create(validated_data)
-        services.move(part, StockHistory.Kind.ADJUST, stock, '처음 수량')
+        services.move(part, StockHistory.Kind.ADJUST, stock, services.START_NOTE)
         return part
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         validated_data.pop('stock', None)
-        return super().update(instance, validated_data)
+        part = super().update(instance, validated_data)
+        # 지출로 산 적이 없는 품목은 직접 넣은 구매가가 처음 수량의 단가 → 평균도 다시
+        services.recalc(part)
+        return part
 
 
 class AdjustSerializer(serializers.Serializer):

@@ -13,7 +13,7 @@ from filaments.models import Spool
 from filaments.views import BaseViewSet
 from stock import services as stock
 
-from .models import Expense, ExpenseItem, RecurringExpense, item_key, refresh_buy_prices
+from .models import Expense, ExpenseItem, RecurringExpense
 from .serializers import ExpenseSerializer, RecurringExpenseSerializer
 
 
@@ -52,13 +52,13 @@ class ExpenseViewSet(BaseViewSet):
     @transaction.atomic
     def perform_destroy(self, instance):
         # 구매 항목으로 늘린 남은 수량을 되돌리고(입출고 기록에 `지출 삭제` 줄), 만든 `재고` 스풀을 지우고,
-        # 지운 뒤 단가를 남은 최근 구매로
-        keys = {item_key(item) for item in instance.items.all()}
+        # 지운 뒤 그 품목의 평균 단가를 다시
+        parts = {item.part_id for item in instance.items.all() if item.part_id}
         stock.revert_expense(instance)
         for item in instance.items.filter(color__isnull=False):
             spool_sync.drop(item)
         instance.delete()
-        refresh_buy_prices(keys)
+        stock.recalc_parts(parts)
 
 
 class RecurringExpenseViewSet(BaseViewSet):

@@ -9,6 +9,7 @@ from rest_framework import serializers
 from filaments import services as spool_sync
 from filaments.serializers import BaseModelSerializer, NumberField
 from stock import services as stock
+from stock.services import recalc_parts
 
 from .models import (
     BUY_CATEGORIES,
@@ -17,8 +18,6 @@ from .models import (
     ExpenseCategory,
     ExpenseItem,
     RecurringExpense,
-    item_key,
-    refresh_buy_prices,
     split_totals,
     won,
 )
@@ -112,7 +111,8 @@ class ExpenseSerializer(BaseModelSerializer):
     3. 저장하면 —
        - 품목: 남은 수량 + 수량 (고치면 차이만, stock.sync_expense)
        - 필라멘트: 롤 수만큼 스풀을 만든다 (고치면 차이만, 색상 · 구매가 · 구매일도 맞춤 — filaments.services)
-       - 바뀐 색상 · 품목은 최근 구매가로 단가를 다시 맞춘다 (models.refresh_buy_prices)
+       - 품목은 평균 단가(이동평균)를 다시 계산한다 (stock.services.recalc — 금액 · 날짜만 바뀌어도).
+         필라멘트 원가 단가는 보유 스풀 평균이라 스풀 구매가가 바뀌면 저절로
        지울 때는 뷰가 되돌린다
     4. 사용한(사용 중 · 사용 완료) 스풀이 있는 필라멘트 항목은 색상 변경 · 빼기를 막고,
        롤 수는 `재고` 스풀이 있는 만큼만 줄일 수 있다
@@ -206,13 +206,13 @@ class ExpenseSerializer(BaseModelSerializer):
     def create(self, validated_data):
         rows = validated_data.pop('items', [])
         expense = super().create(validated_data)
-        self._save_items(expense, rows, before={}, old_qty={})
+        self._save_items(expense, rows, before=set(), old_qty={})
         return expense
 
     @transaction.atomic
     def update(self, instance, validated_data):
         rows = validated_data.pop('items', None)
-        before = snapshot(instance)
+        before = bought_parts(instance)
         old_qty = {item.pk: item.qty for item in instance.items.all() if item.color_id}
         expense = super().update(instance, validated_data)
         self._save_items(expense, rows, before, old_qty)
@@ -220,7 +220,7 @@ class ExpenseSerializer(BaseModelSerializer):
 
     @staticmethod
     def _save_items(expense, rows, before, old_qty):
-        """구매 항목 맞추기(rows 가 None 이면 그대로) → 항목 금액 다시 → 남은 수량 · 스풀 · 최근 구매가"""
+        """구매 항목 맞추기(rows 가 None 이면 그대로) → 항목 금액 다시 → 남은 수량 · 스풀 · 품목 평균 단가"""
         if rows is not None:
             keep = {row['id'] for row in rows if 'id' in row}
             for item in expense.items.exclude(pk__in=keep):
@@ -245,15 +245,10 @@ class ExpenseSerializer(BaseModelSerializer):
                 spool_sync.sync_item(item, old_qty.get(item.pk, 0), won(item.each), expense.date)
             elif item.pk in old_qty:
                 spool_sync.drop(item)  # 필라멘트 항목이 품목 항목으로 바뀜 (분류 변경)
-        after = snapshot(expense)
-        refresh_buy_prices({key for key in before.keys() | after.keys() if before.get(key) != after.get(key)})
+        # 저장 전후에 이 지출에 있던 품목 전부 — 수량이 그대로여도 금액 · 날짜가 바뀌면 평균이 달라짐
+        recalc_parts(before | bought_parts(expense))
 
 
-def snapshot(expense):
-    """최근 구매가에 쓰는 값 {('color'|'part', id): (날짜, 수량 합계, 금액 합계)}.
-    저장 전후를 비교해 바뀐 것만 다시 맞춘다"""
-    out = {}
-    for item in expense.items.all():
-        _, qty, total = out.get(item_key(item), (None, Decimal(0), Decimal(0)))
-        out[item_key(item)] = (expense.date, qty + item.qty, total + item.total)
-    return out
+def bought_parts(expense):
+    """이 지출의 구매 항목에 있는 품목 id"""
+    return {item.part_id for item in expense.items.all() if item.part_id}
