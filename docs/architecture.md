@@ -173,7 +173,7 @@ pages/expenses/
   categories.ts        분류 7개 (이름 · 예시 · v2 에서 쓰이는 곳), CategoryPick.tsx 분류 버튼
   expenseList.ts       기간 · 검색 · 정렬 · 요약 · 분류별 합계 · 넣을 반복 지출 · CSV
   ExpenseDialog.tsx    지출 추가 · 복제 · 수정, RecurringDialog.tsx 반복 지출 관리 (+ RecurringFormDialog.tsx),
-                       DueDialog.tsx 이번 달 반복 지출 넣기, schemas.ts
+                       DueDialog.tsx 반복 지출 넣기 (빠진 달마다), schemas.ts
 
 pages/settings/
   SettingsPage.tsx     설정 (screens 4장): 왼쪽 분류 · 설정 묶음 · 분류별 저장 줄. schemas.ts 에 분류 · 항목 목록 · 검증 · 계산 예시

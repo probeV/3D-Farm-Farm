@@ -65,7 +65,7 @@
 | GET · PATCH · DELETE | `/api/v0/pack-sets/{id}/` | 포장 세트 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/products/` | **제품 원가 화면의 제품 데이터 전부** / 제품 추가 |
 | GET · PATCH · DELETE | `/api/v0/products/{id}/` | 제품 하나 / 수정 / 삭제 |
-| GET · PATCH | `/api/v0/cost-setting/` | 원가 설정 (항상 1개) |
+| GET · PATCH | `/api/v0/cost-setting/` | 설정 (원가 · 스마트스토어 · 재고 부족 알림 기준, 항상 1개) |
 | GET · POST | `/api/v0/expenses/` | **지출 화면 데이터 전부** / 지출 추가 (목록을 보내면 여러 줄 한 번에) |
 | GET · PATCH · DELETE | `/api/v0/expenses/{id}/` | 지출 하나 / 수정 / 삭제 |
 | GET · POST | `/api/v0/recurring-expenses/` | 반복 지출 목록 / 추가 |
@@ -256,7 +256,7 @@
   "id": 1, "kind": "part", "name": "네오디뮴 자석 6×3mm", "category": 1,
   "photo": "/media/parts/magnet.png", "shop": "알리", "buy_url": "https://…",
   "price": 12000, "pack_qty": 200, "unit": "개", "unit_price": 60.0, "avg_price": 60.0,
-  "stock": 1240, "alert": 200, "note": "N52",
+  "stock": 1240, "note": "N52",
   "product_count": 2, "set_count": 0, "last_used": null, "bought": true
 }
 ```
@@ -272,7 +272,6 @@
 | `pack_qty` | 선택 | 묶음 수량, 기본 1. 0 보다 커야 함 |
 | `unit` | 선택 | 단위, 기본 `개` |
 | `stock` | 추가할 때만 | 지금 남은 수량, 기본 0 (소수 2자리). 0 이 아니면 입출고 기록 `조정 · 처음 수량`. 그 뒤로는 조정 · 다 씀으로만 — 수정에서 보내면 400 `남은 수량은 조정으로 바꾸세요.` 0 아래도 될 수 있다 (판매를 먼저 넣었을 때) |
-| `alert` | 선택 | 부족 알림 기준, 기본 0. 남은 수량 ≤ 이 값이면 `부족`, ≤ 0 이면 `없음` (화면에서 계산) |
 | `unit_price` | — | 개당 단가 = **평균 단가** (원가 계산 · 판매 포장 줄 · 손익, 소수 2자리). 평균이 없으면 직접 넣은 `price ÷ pack_qty`, 둘 다 없으면 `null` |
 | `avg_price` | — | 평균 단가(이동평균, PRD EXP-08 아래). 없으면 `null` |
 | `product_count` · `set_count` | — | 이 품목을 쓰는 제품 수 (부속품) · 포장 세트 수 (포장재) |
@@ -353,7 +352,7 @@
 세트 원가           = Σ lines.qty × 품목.unit_price           (가격 없는 포장재는 0 + 경고)
 바로 쌀 수 있는 수   = min( ⌊max(0, 품목.stock) ÷ lines.qty⌋ )   (가장 모자란 포장재 기준)
 남은 금액           = Σ max(0, stock) × unit_price
-상태               = stock ≤ 0 → 없음, stock ≤ alert → 부족
+상태               = stock ≤ 0 → 없음, stock ≤ 그 탭의 부족 알림 기준(cost-setting alert_<kind>) → 부족
 ```
 
 ---
@@ -395,7 +394,7 @@
 ## 제품 `products`
 ```json
 {
-  "id": 1, "no": 1,
+  "id": 1,
   "category": 1, "subcategory": 1,
   "name": "분수 원판 세트", "status": "on_sale",
   "print_minutes": 200, "sale_price": 18900, "default_pack": 1, "note": "",
@@ -409,7 +408,6 @@
 ```
 | 칸 | 쓰기 | 설명 |
 |---|---|---|
-| `no` | 선택 | No. (1 이상). 비우면 지금 가장 큰 번호 + 1. 중복 → 400 `No. 3 는 이미 있습니다.` |
 | `category` · `subcategory` | 선택 | id, `null` = 미분류 / 세부 분류 없음. 세부 분류는 그 카테고리 안의 것만 → 400 (`subcategory` 칸에 `세부 분류는 고른 카테고리 안에서 골라야 합니다.`) |
 | `name` | ✅ 필수 | 제품명 |
 | `status` | 선택 | `on_sale`(판매중) / `developing`(개발중, 기본) / `discontinued`(판매중지) |
@@ -422,9 +420,9 @@
 
 - **줄 저장**: `filaments` · `parts` 를 보내면 그 목록으로 통째로 바꾼다 (기존 줄을 지우고 새로 만들어서 줄 `id` 가 바뀐다).
   보내지 않으면 줄은 그대로 (`PATCH {"status": "discontinued"}` 처럼). 하나라도 틀리면 400, 아무것도 바뀌지 않음
-- **복제** (PRD-04a): 서버 기능 없음. 화면이 원본을 복사해 추가 창에 채우고(`no` 는 비우거나 다음 번호, 이름 `(복사)`, 상태 `developing`) 저장할 때 `POST /products/`
+- **복제** (PRD-04a): 서버 기능 없음. 화면이 원본을 복사해 추가 창에 채우고(이름 `(복사)`, 상태 `developing`) 저장할 때 `POST /products/`
 - 삭제: 줄도 함께 삭제 (204). 팔린 적 있는 제품도 지울 수 있다 — 판매 줄은 남고 `product: null`, 팔 때 저장한 `product_name` 으로 보인다
-- 목록 순서: No. 순 (숫자 순서)
+- 목록 순서: 추가한 순서 (`id`). 제품 No. 는 v2.1.0 에서 지웠다 (보내도 무시)
 
 ### 화면에서 계산하는 값 (참고)
 ```
@@ -437,10 +435,11 @@
 ```
 
 ## 원가 설정 `cost-setting`
-항상 1개라서 id 없이 주소 하나 (`GET` · `PATCH`, 처음 읽을 때 기본값으로 만들어짐). 바꾸면 모든 제품 원가에 바로 반영 (화면 계산).
+항상 1개라서 id 없이 주소 하나 (`GET` · `PATCH`, 처음 읽을 때 기본값으로 만들어짐). 바꾸면 모든 제품 원가 · 재고 부족 표시에 바로 반영 (화면 계산).
 ```json
 {
-  "power_kw": 0.36, "elec_rate": 215, "fee_order": 1.98, "fee_sales": 2.73, "shipping_cost": 0, "target_margin": 40
+  "power_kw": 0.36, "elec_rate": 215, "fee_order": 1.98, "fee_sales": 2.73, "shipping_cost": 0, "target_margin": 40,
+  "alert_part": 0, "alert_pack": 0, "alert_supply": 0
 }
 ```
 | 칸 | 설명 (PRD 3.8) |
@@ -449,6 +448,7 @@
 | `elec_rate` | 전기료 단가(원/kWh). 0 이상, 소수 1자리 |
 | `fee_order` · `fee_sales` · `target_margin` | % 숫자 그대로 (`1.98` = 1.98%), 0 ~ 100, 소수 2자리 |
 | `shipping_cost` | 건당 판매자 부담 배송비. 0 이상 정수 |
+| `alert_part` · `alert_pack` · `alert_supply` | 재고 관리 탭(부속품 · 포장재 · 소모품)마다 부족 알림 기준 (v2.1.0). 0 이상, 소수 2자리. 남은 수량 ≤ 이 값이면 `부족` (화면에서 계산) |
 
 - `PUT` · `DELETE` 는 405
 - 프린터 구매가 · 예상 수명 · 출력 실패율(`printer_price` · `printer_life_hours` · `failure_rate`)은 뺐다 (PRD 3.8). 보내도 무시한다
@@ -517,7 +517,7 @@
   - 필라멘트가 아닌데 금액을 비운 항목이 둘 이상 `여러 가지면 항목마다 금액을 적으세요.` · 금액 적은 항목 합계 > 지출 금액 `항목 금액 합계가 지출 금액보다 큽니다.`
 
 - 목록 순서: 날짜 최근순 (같은 날이면 나중에 넣은 것 먼저)
-- **여러 줄 한 번에** (이번 달 반복 지출 넣기): `POST /api/v0/expenses/` 에 목록 `[{...}, {...}]` 을 보내면 201 + 만든 지출 목록.
+- **여러 줄 한 번에** (반복 지출 넣기): `POST /api/v0/expenses/` 에 목록 `[{...}, {...}]` 을 보내면 201 + 만든 지출 목록.
   하나라도 틀리면 아무것도 넣지 않는다 (400 은 줄마다 `[{}, {"category": [...]}]`). 같은 반복 지출을 한 번에 같은 달로 두 줄 보내도 400
 - 삭제 (204): 구매 항목으로 늘린 남은 수량은 되돌리고, 필라멘트 항목으로 만든 `재고` 스풀은 지운다.
   사용한(사용 중 · 사용 완료) 스풀이 있으면 409 `{"detail": "사용한 스풀 2개가 있어 삭제할 수 없습니다."}`

@@ -93,7 +93,6 @@ erDiagram
         varchar unit "단위, 기본 개"
         decimal avg_price "평균 단가 (이동평균, 계산값), NULL=들어온 값 없음"
         decimal stock "남은 수량 (0 아래 가능)"
-        decimal alert "부족 알림 기준, 기본 0"
         text note
     }
     STOCK_HISTORY {
@@ -131,7 +130,6 @@ erDiagram
     }
     PRODUCT {
         bigint id PK
-        int no UK "No. 1, 2, 3 ... 비우면 다음 번호"
         bigint category_id FK "NULL=미분류"
         bigint subcategory_id FK "NULL=세부 분류 없음"
         varchar name
@@ -251,6 +249,9 @@ erDiagram
         decimal fee_sales
         decimal shipping_cost
         decimal target_margin
+        decimal alert_part "부속품 부족 알림 기준, 기본 0"
+        decimal alert_pack "포장재 부족 알림 기준, 기본 0"
+        decimal alert_supply "소모품 부족 알림 기준, 기본 0"
     }
 ```
 
@@ -276,7 +277,7 @@ erDiagram
 | `Spool` | 스풀 1개 = 1행. 스풀 번호, 상태, 날짜, 실제 구매가, 주문(지출 구매 항목 — 필라멘트 지출을 저장하면 생긴 스풀), QR 라벨을 뽑았는지(TBD-18 — 라벨 인쇄 화면의 `라벨 없음`) |
 | `SpoolNumber` | 지금까지 쓴 가장 큰 스풀 번호 1행 (TBD-33). 새 번호는 `Spool.take_code_nos()` 로만 받아서 지운 번호를 다시 쓰지 않는다 |
 | `PartCategory` | 품목 카테고리. 탭(`kind`)마다 따로 (부속품: 부품 · 키링 / 포장재: 박스 · 봉투 / 소모품: 접착 · 마감 …) |
-| `Part` | 재고 품목 (v2 STOCK). `kind` 로 재고 관리 탭을 나눈다 — 부속품(제품 1개당 수량 → 원가) · 포장재(포장 세트 → 포장비) · 소모품(원가에 안 넣음). `price ÷ pack_qty` 가 개당 단가. 남은 수량 · 부족 알림 기준 · 사진 |
+| `Part` | 재고 품목 (v2 STOCK). `kind` 로 재고 관리 탭을 나눈다 — 부속품(제품 1개당 수량 → 원가) · 포장재(포장 세트 → 포장비) · 소모품(원가에 안 넣음). `price ÷ pack_qty` 가 개당 단가. 남은 수량 · 사진 (부족 알림 기준은 탭마다 `CostSetting.alert_*`) |
 | `StockHistory` | 입출고 기록 한 줄 (STOCK-05). 지출 구매 · 판매 · 다 씀 · 조정. 남은 수량을 바꿀 때 항상 함께 만든다 (`stock/services.py`) |
 | `PackSet` | 포장 세트 (봉투 포장 · 작은 박스 …, STOCK-06). 제품의 기본 포장 · 판매 주문의 포장 줄을 채운다 |
 | `PackSetLine` | 포장 세트에 들어가는 포장재 + 수량 |
@@ -285,7 +286,7 @@ erDiagram
 | `Product` | 판매 제품. 카테고리 · 세부 분류는 비워도 됨 (미분류) |
 | `ProductFilament` | 제품 ↔ 필라멘트 (다대다) + 사용량 + 색상(선택). 같은 필라멘트를 색상별로 여러 줄 둘 수 있음 |
 | `ProductPart` | 제품 ↔ 부속품 (다대다) + 수량. 포장재는 `Product.default_pack` 으로 따로 |
-| `CostSetting` | 원가 계산 설정값. 항상 1개 행만 존재 (기본값은 PRD 3.8) |
+| `CostSetting` | 설정값 (원가 계산 · 스마트스토어 수수료 · 배송비 · 재고 탭별 부족 알림 기준). 항상 1개 행만 존재 (기본값은 PRD 3.8) |
 | `Expense` | 지출 한 줄 = 주문 하나 (PRD 3.10). 분류는 고정 9개 (`ExpenseCategory`) |
 | `ExpenseItem` | 지출의 구매 항목 (PRD EXP-08, v2 TBD-31 · 33). 필라멘트 지출은 색상 · 롤 수, 부속품 · 포장재 · 소모품 지출은 그 탭의 품목 · 수량 + 금액(비우면 나눠 넣음). 같은 색상 · 품목 여러 항목 가능 |
 | `RecurringExpense` | 반복 지출 (구독 · 월정액). 지출을 저절로 만들지 않고, 화면에서 확인하고 넣는다 |
@@ -341,7 +342,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 
 포장 세트 원가 (STOCK-06) = Σ PackSetLine.qty × 포장재 개당 단가 → 제품 원가의 포장비 (Product.default_pack)
 바로 쌀 수 있는 수 = 세트 줄마다 ⌊max(0, Part.stock) ÷ qty⌋ 중 가장 작은 값
-남은 수량 상태 (STOCK-04) = stock ≤ 0 이면 없음, stock ≤ alert 이면 부족
+남은 수량 상태 (STOCK-04) = stock ≤ 0 이면 없음, stock ≤ CostSetting.alert_<kind> 이면 부족 (탭마다 하나)
 판매로 빠지는 수량 = Σ SalePart.qty + Σ SalePack.qty  (품목별, 서버는 화면이 보낸 줄을 그대로)
   SalePart 처음 값 = Σ 제품 줄의 ProductPart.qty × SaleItem.qty (sales.models.default_parts) — 추가할 때 안 보내면 · 스마트스토어 가져오기
   판매를 저장할 때마다 이미 그 판매로 기록된 수량과 비교해 차이만 기록 (`services.sync_sale`), 지우기 전에 되돌리는 기록 (`services.revert_sale`)
@@ -400,7 +401,6 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 | `PackSet.name` | UNIQUE | 포장 세트 이름 중복 방지 |
 | `Category.name` | UNIQUE | 카테고리 이름 중복 방지 |
 | `Subcategory (category, name)` | UNIQUE | 같은 카테고리 안 세부 분류 이름 중복 방지 |
-| `Product.no` | UNIQUE | 제품 No. 중복 방지 |
 | `Product.subcategory` | 검사 | 세부 분류는 그 제품의 카테고리에 속해야 함 (`Product.clean`) |
 | `ProductFilament.color` | 검사 | 색상은 그 줄의 필라멘트에 속해야 함 (`ProductFilament.clean`) |
 | `Expense.category` · `RecurringExpense.category` | CHOICES | 고정 8개 (PRD EXP-03). 키는 v1.2.0 그대로 (`invest` = 장비, `part` = 부속품 — 기존 `부자재` 지출) + `pack`(포장재) |
@@ -436,7 +436,7 @@ g당 가격        = 색상의 스풀 가격 ÷ Filament.spool_g
 - v2 STOCK 마이그레이션(`products 0007`)이 기존 데이터를 옮긴다: `포장재` 카테고리와 그 품목 → 포장재(kind=pack),
   제품의 포장재 줄 → 기본 포장 세트 `{제품명} 포장` (구성이 같은 제품은 세트 하나). 그 밖의 품목은 부속품 그대로.
 - `Filament.series` 는 빈 문자열 허용 (NULL 대신 `""`) — UNIQUE 조합에서 시리즈 없는 필라멘트도 중복 검사되도록.
-- `Product.no`(No.)는 숫자로 저장하고 화면에도 `1, 2, 3 …` 그대로 보여 준다 (글자로 저장하면 자릿수가 다를 때 `10` 이 `2` 보다 앞에 정렬되므로).
-  비우면 지금 있는 가장 큰 번호 + 1 (`Product.next_no`), 원하면 직접 지정. 1 이상, 중복 불가.
+- 제품 기본 순서는 추가한 순서(`id`). 예전 `Product.no`(No.)는 v2.1.0 에서 지웠다 (`products 0008`) — 목록의 No. 는 화면이 보이는 순서대로 매긴다.
+- v2.1.0 `products 0009` 가 품목마다 있던 `Part.alert` 를 탭마다 `CostSetting.alert_<kind>` 로 옮긴다 (그 탭에서 가장 큰 값), `stock 0005` 가 `Part.alert` 를 지운다.
 - `CostSetting` 의 % 값(수수료 · 목표 마진율)은 퍼센트 숫자 그대로 저장한다 (`1.98` = 1.98%). 0 ~ 100.
   `CostSetting.load()` 로 읽고, 행이 없으면 기본값(PRD 3.8)으로 만든다.
