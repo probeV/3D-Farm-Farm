@@ -3,12 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>제품 원가 설정 — 3D Farm Farm 목업</title>
+<title>설정 — 3D Farm Farm 목업</title>
 <!--
-  제품 원가 설정 탭 HTML 목업 (docs/PRD.md 3.8, docs/screens.md 4 기준)
-  - 더미 데이터로 동작하며 새로고침하면 초기화된다. 저장된 값은 products.html 의 설정 더미 값과 같다.
-  - 입력 범위는 서버(backend/products/models.py CostSetting)와 같다.
-  - 스크린샷용: ?state=changed | error,  ?theme=dark | light
+  설정 HTML 목업 (v2 TBD-16 설정을 한곳에 모으기. 이전: 제품 원가 설정 — docs/PRD.md 3.8, docs/screens.md 4)
+  - 사이드바 맨 아래 '설정' 하나. 안에서 왼쪽 분류로 나눈다: 제품 원가 · 스마트스토어 (앞으로 프린터 · 손익 등이 생기면 분류 추가)
+  - 각 화면의 ⚙ 버튼은 자기 분류로 바로 온다: settings.html?tab=cost | store
+  - 저장은 분류마다 (분류 아래 저장 줄). 저장 안 한 채 다른 분류로 가면 확인
+  - 더미 데이터로 동작하며 새로고침하면 초기화된다. 입력 범위는 서버(CostSetting)와 같다.
+  - 스크린샷용: ?tab=cost | store,  ?state=changed | error,  ?conn=nokey | fail,  ?theme=dark | light
 -->
 <style>
 :root {
@@ -28,7 +30,7 @@
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
 button, input, select, textarea { font: inherit; color: inherit; }
 
-/* 사이드바: 접으면 아이콘만, 펼치면 이름까지 */
+/* 사이드바: 접으면 아이콘만, 펼치면 이름까지. 설정은 맨 아래 */
 .layout { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; --side-w: 220px; transition: grid-template-columns .15s; }
 .layout.collapsed { --side-w: 64px; }
 .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; background: var(--surface); border-right: 1px solid var(--border); overflow: hidden; }
@@ -44,34 +46,47 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mock-tag { font-size: 11px; color: var(--muted); padding: 0 10px; white-space: nowrap; }
 .layout.collapsed .mock-tag { display: none; }
 /* 입력 화면이라 다른 화면(1280px)보다 좁게 */
-main { width: 100%; max-width: 960px; margin: 0 auto; padding: 24px 24px 32px; }
+main { width: 100%; max-width: 1080px; margin: 0 auto; padding: 24px 24px 32px; }
 .page-title { margin: 0 0 14px; font-size: 20px; }
 
 /* 공통 */
 .muted { color: var(--muted); }
-.btn { border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
+.hint { color: var(--muted); font-size: 13px; }
+.btn { border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 .btn:hover { background: var(--surface-2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { filter: brightness(1.08); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
 .btn:disabled { opacity: .4; cursor: default; }
 .btn.link { border: 0; background: none; padding: 0; color: var(--accent); font-size: 12px; font-weight: 600; }
-input { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
-input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+input, select { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input { text-align: right; font-variant-numeric: tabular-nums; }
+input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 /* 바꾼 칸은 파란 배경, 틀린 칸은 빨간 테두리 */
-input.changed { border-color: var(--accent); background: var(--accent-soft); }
+input.changed, select.changed { border-color: var(--accent); background: var(--accent-soft); }
 input.invalid { border-color: var(--bad); }
+.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; }
+.help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: 0; }
+.help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; text-align: left; }
+.help:hover::after, .help:focus::after { opacity: 1; }
 
-/* 맨 위 요약: 다른 화면처럼 작은 글씨 한 줄 */
-.top-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
-.stats { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
-.stats b { color: var(--text); font-variant-numeric: tabular-nums; margin-left: 4px; }
-.stats .info b { color: var(--accent); }
+/* 설정 2단: 왼쪽 분류 | 오른쪽 내용 */
+.settings { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
+.cats { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.cat { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; background: none; border-radius: 8px; color: var(--muted); font-weight: 600; text-align: left; cursor: pointer; }
+.cat:hover { background: var(--surface-2); color: var(--text); }
+.cat.on { background: var(--accent-soft); color: var(--accent); }
+.cat .ico { width: 22px; text-align: center; }
+.cat .dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.cat .warn-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); }
+.cat-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.cat-head h3 { margin: 0; font-size: 17px; }
 
-/* 설정 묶음 */
+/* 설정 묶음 (이전 제품 원가 설정과 같은 모양) */
 .groups { display: flex; flex-direction: column; gap: 14px; }
 .group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-.group-head h3 { margin: 0; font-size: 15px; }
+.group-head h4 { margin: 0; font-size: 15px; }
 .group-head .calc { font-size: 13px; color: var(--muted); }
 .group-head .calc b { color: var(--text); font-variant-numeric: tabular-nums; }
 .group-head .calc .warn { color: var(--warn); font-weight: 600; }
@@ -81,12 +96,23 @@ input.invalid { border-color: var(--bad); }
 .setting .desc { display: block; font-size: 12.5px; color: var(--muted); font-weight: 400; }
 .setting .desc .btn.link { margin-left: 6px; }
 .setting .err { grid-column: 2; color: var(--bad); font-size: 12px; text-align: right; }
+.setting select { width: 100%; }
 .with-suffix { display: flex; align-items: center; gap: 6px; }
 .with-suffix input { flex: 1; width: 100%; }
 .with-suffix em { font-style: normal; color: var(--muted); font-size: 13px; white-space: nowrap; min-width: 48px; }
+.uses { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: 1px; }
+.uses span { padding: 0 6px; border-radius: 99px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 600; }
 
+/* 스마트스토어 연결 상태 (키는 backend/.env — 화면은 확인만) */
+.conn-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; flex-wrap: wrap; }
+.conn-row .dot { flex: none; width: 9px; height: 9px; margin-top: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+.conn-row .dot.off { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+.conn-row .spacer { flex: 1; }
+.note-box { margin: 0 18px 14px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; color: var(--muted); }
+.note-box code { padding: 0 4px; border-radius: 4px; background: var(--surface); font-size: 12px; }
+.env { margin: 6px 0 0; padding: 8px 10px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); font-size: 12px; color: var(--text); white-space: pre-wrap; }
 
-/* 저장 줄: 화면 아래에 붙어 있고, 바뀐 값이 있으면 파란 테두리 */
+/* 저장 줄: 분류 아래에 붙어 있고, 바뀐 값이 있으면 파란 테두리 */
 .save-bar { position: sticky; bottom: 16px; margin-top: 16px; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0,0,0,.14); }
 .save-bar .spacer { flex: 1; }
 .save-bar.dirty { border-color: var(--accent); }
@@ -95,12 +121,23 @@ input.invalid { border-color: var(--bad); }
 .save-bar.dirty .msg { color: var(--text); font-weight: 600; }
 .save-bar.invalid .msg { color: var(--bad); }
 
+/* 확인 대화상자 (common.html TBD-09) */
+dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(420px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+.dlg-head { padding: 14px 20px 4px; font-weight: 700; font-size: 16px; }
+.dlg-body { padding: 4px 20px 12px; }
+.dlg-foot { display: flex; gap: 8px; padding: 4px 20px 16px; }
+.dlg-foot .spacer { flex: 1; }
+
 /* 알림 */
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 600; z-index: 100; }
 .toast[hidden] { display: none; }
 
 @media (max-width: 760px) {
   main { padding: 16px; } .layout { --side-w: 64px; } .layout .label { display: none; } .layout .nav-item, .layout .side-brand { justify-content: center; padding-left: 0; padding-right: 0; } .mock-tag, [data-act="toggle-side"] { display: none; }
+  .settings { grid-template-columns: 1fr; }
+  .cats { position: static; flex-direction: row; overflow-x: auto; }
+  .cat { white-space: nowrap; }
   .setting { grid-template-columns: 1fr; } .setting .err { grid-column: 1; }
 }
 </style>
@@ -111,63 +148,78 @@ input.invalid { border-color: var(--bad); }
     <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
     <a class="nav-item" href="products.html" title="제품 원가">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
-    <a class="nav-item" href="filaments.html" title="필라멘트">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
-    <a class="nav-item" href="parts.html" title="부자재">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></a>
+    <a class="nav-item" href="filaments.html" title="재고 관리 (필라멘트 · 부속품 · 포장 · 소모품)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span class="label">재고 관리</span></a>
+    <a class="nav-item" href="sales.html" title="판매">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
     <a class="nav-item" href="expenses.html" title="지출">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
-    <a class="nav-item active" href="settings.html" title="제품 원가 설정">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="label">제품 원가 설정</span></a>
+    <a class="nav-item" href="pl.html" title="손익">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="label">손익</span></a>
     <div class="side-bottom">
       <span class="mock-tag">목업 · 더미 데이터</span>
+      <a class="nav-item active" href="settings.html" title="설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="label">설정</span></a>
       <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
     </div>
   </aside>
   <main>
-    <h2 class="page-title">제품 원가 설정</h2>
-    <div class="top-row"><div class="stats" id="stats"></div></div>
-    <form id="form" class="groups" autocomplete="off" novalidate></form>
+    <h2 class="page-title">설정</h2>
+    <div class="settings">
+      <nav class="cats" id="cats" aria-label="설정 분류"></nav>
+      <section id="pane"></section>
+    </div>
   </main>
 </div>
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
 <div id="toast" class="toast" hidden></div>
 
 <script>
 "use strict";
-// ---------------------------------------------------------------- 더미 데이터
-// 설정 항목 (PRD 3.8). def = 기본값, min · max · places = 서버(CostSetting)와 같은 입력 범위
+const params = new URLSearchParams(location.search);
+// ---------------------------------------------------------------- 분류 · 설정 항목
+// def = 기본값, min · max · places = 서버(CostSetting)와 같은 입력 범위. uses = 이 값을 쓰는 화면
 const PCT = { unit: "%", min: 0, max: 100, places: 2 };
-const GROUPS = [
-  { icon: "⚡", title: "전기료", items: [
-    { key: "power_kw", name: "프린터 소비 전력", desc: "출력 중 평균 소비 전력", unit: "kW", min: 0, places: 3, def: 0.36 },
-    { key: "elec_rate", name: "전기료 단가", desc: "1kWh 당 전기 요금", unit: "원/kWh", min: 0, places: 1, def: 215 },
+const CATS = [
+  { key: "cost", icon: "🧮", label: "제품 원가", desc: "제품 원가 · 권장 판매가 계산에 쓰는 값", groups: [
+    { icon: "⚡", title: "전기료", calc: "elec", items: [
+      { key: "power_kw", name: "프린터 소비 전력", desc: "출력 중 평균 소비 전력", unit: "kW", min: 0, places: 3, def: 0.36 },
+      { key: "elec_rate", name: "전기료 단가", desc: "1kWh 당 전기 요금", unit: "원/kWh", min: 0, places: 1, def: 215 },
+    ] },
+    { icon: "🏷️", title: "판매가", calc: "rec", items: [
+      { key: "target_margin", name: "목표 마진율", desc: "제품 창의 권장 판매가 계산에만 써요", ...PCT, def: 40 },
+    ] },
   ] },
-  // 프린터(감가상각 · 실패율)는 뺌 — 나중에 투자 장비 · 이윤 계산 화면에서 다룬다
-  { icon: "🛒", title: "스마트스토어", items: [
-    { key: "fee_order", name: "네이버페이 주문관리 수수료", desc: "판매가 대비", ...PCT, def: 1.98 },
-    { key: "fee_sales", name: "스마트스토어 판매 수수료", desc: "판매가 대비 (유입 경로에 따라 다를 수 있음)", ...PCT, def: 2.73 },
-    { key: "shipping_cost", name: "건당 판매자 부담 배송비", desc: "무료배송이면 실제 택배비를 입력", unit: "원", min: 0, places: 0, def: 0 },
-    { key: "target_margin", name: "목표 마진율", desc: "제품 창의 권장 판매가 계산에만 써요", ...PCT, def: 40 },
+  { key: "store", icon: "🛒", label: "스마트스토어", desc: "연결 상태와 수수료 · 배송비", groups: [
+    { icon: "🔌", title: "연결", conn: true, items: [] },
+    { icon: "💳", title: "수수료 · 배송비", calc: "fee", items: [
+      { key: "fee_order", name: "네이버페이 주문관리 수수료", desc: "판매가 대비", ...PCT, def: 1.98, uses: ["제품 원가", "판매"] },
+      { key: "fee_sales", name: "스마트스토어 판매 수수료", desc: "판매가 대비 (유입 경로에 따라 다를 수 있음)", ...PCT, def: 2.73, uses: ["제품 원가", "판매"] },
+      { key: "shipping_cost", name: "건당 판매자 부담 배송비", desc: "무료배송이면 실제 택배비를 입력", unit: "원", min: 0, places: 0, def: 0, uses: ["제품 원가", "판매"] },
+    ] },
   ] },
 ];
-const ITEMS = GROUPS.flatMap((g) => g.items);
-// 저장된 값 (products.html 의 설정 더미 값과 같음)
-const saved = { power_kw: 0.36, elec_rate: 215, fee_order: 1.98, fee_sales: 2.73, shipping_cost: 0, target_margin: 40 };
+const catOf = (k) => CATS.find((c) => c.key === k);
+const itemsOf = (c) => c.groups.flatMap((g) => g.items);
+const ALL_ITEMS = CATS.flatMap(itemsOf);
+// 저장된 값 (products.html · sales.html 의 설정 더미 값과 같음)
+const saved = { power_kw: 0.36, elec_rate: 215, target_margin: 40, fee_order: 1.98, fee_sales: 2.73, shipping_cost: 0 };
+// 스마트스토어 연결 (store.html 과 같음). 키는 backend/.env 에서 — 화면에서 넣지 않음
+const conn = { state: ["nokey", "fail"].includes(params.get("conn")) ? params.get("conn") : "ok", store: "쓰리디팜팜", appId: "4Xk9…aE2", checkedAt: "2026-10-28 09:10" };
 
 // ---------------------------------------------------------------- 유틸
 const $ = (s, r = document) => r.querySelector(s);
 const won = (n) => Math.round(n).toLocaleString("ko-KR") + "원";
 const fmt = (n) => Number(n).toLocaleString("ko-KR", { maximumFractionDigits: 3 });
 const unitText = (it) => (it.unit === "원" ? "원" : it.unit === "%" ? "%" : ` ${it.unit}`);
+const help = (tip) => `<span class="help" tabindex="0" data-tip="${tip}">?</span>`;
 let toastTimer;
-function toast(msg) {
-  const t = $("#toast"); t.textContent = msg; t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200);
-}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200); }
 
 // 입력칸 글자 → 숫자 + 오류 (앱의 src/validation.ts 와 같은 문구). 천 단위 쉼표 허용
 function parse(it, raw) {
+  if (it.type === "select") return { value: raw };
   const text = raw.trim().replace(/,/g, "");
   if (text === "") return { error: "입력하세요" };
   const v = Number(text);
@@ -180,81 +232,155 @@ function parse(it, raw) {
 }
 
 // ---------------------------------------------------------------- 화면
-const form = $("#form");
+const TABS = CATS.map((c) => c.key);
+let tab = TABS.includes(params.get("tab")) ? params.get("tab") : "cost";
+let form = null;
+
+function renderCats(dirty = false) {
+  $("#cats").innerHTML = CATS.map((c) => `<button type="button" class="cat ${c.key === tab ? "on" : ""}" data-tab="${c.key}" ${c.key === tab ? 'aria-current="page"' : ""}>
+    <span class="ico">${c.icon}</span>${c.label}${c.key === tab && dirty ? '<span class="dot" title="저장 안 한 변경"></span>' : ""}${c.key === "store" && conn.state !== "ok" ? '<span class="warn-dot" title="연결 안 됨"></span>' : ""}</button>`).join("");
+}
+
 function render() {
-  form.innerHTML = GROUPS.map((g, i) => `
-    <section class="group">
-      <div class="group-head"><h3>${g.icon} ${g.title}</h3><span class="calc" id="calc-${i}"></span></div>
-      ${g.items.map((it) => `<label class="setting">
-        <span class="name">${it.name}<span class="desc">${it.desc} · <span data-default="${it.key}"></span></span></span>
-        <span class="with-suffix"><input name="${it.key}" inputmode="decimal" value="${fmt(saved[it.key])}"><em>${it.unit}</em></span>
-        <span class="err" data-err="${it.key}" hidden></span>
-      </label>`).join("")}
-    </section>`).join("") + `
-    <div class="save-bar" id="save-bar"><span class="msg" id="save-msg"></span><div class="spacer"></div>
-      <button type="button" class="btn" id="reset" disabled>되돌리기</button><button type="submit" class="btn primary" id="save" disabled>저장</button></div>`;
+  const c = catOf(tab);
+  $("#pane").innerHTML = `<div class="cat-head"><h3>${c.icon} ${c.label}</h3><span class="hint">${c.desc}</span></div>
+    <form id="form" class="groups" autocomplete="off" novalidate>
+      ${c.groups.map((g, i) => `<section class="group">
+        <div class="group-head"><h4>${g.icon} ${g.title}</h4><span class="calc" id="calc-${i}"></span></div>
+        ${g.conn ? connBlock() : ""}
+        ${g.items.map(itemRow).join("")}
+      </section>`).join("")}
+      ${itemsOf(c).length ? `<div class="save-bar" id="save-bar"><span class="msg" id="save-msg"></span><div class="spacer"></div>
+        <button type="button" class="btn" id="reset" disabled>되돌리기</button><button type="submit" class="btn primary" id="save" disabled>저장</button></div>` : ""}
+    </form>`;
+  form = $("#form");
+  bindForm();
   update();
+  // 주소에 지금 분류를 남겨 새로고침해도 그대로 (미리보기 등에서 안 되면 무시)
+  try { history.replaceState(null, "", `?tab=${tab}${params.get("theme") ? `&theme=${params.get("theme")}` : ""}`); } catch { /* 주소 못 바꿈 */ }
+}
+
+function itemRow(it) {
+  const uses = it.uses ? `<span class="uses">${it.uses.map((u) => `<span>${u}</span>`).join("")}</span>` : "";
+  const ctl = it.type === "select"
+    ? `<select name="${it.key}">${it.options.map(([v, l]) => `<option value="${v}" ${saved[it.key] === v ? "selected" : ""}>${l}</option>`).join("")}</select>`
+    : `<span class="with-suffix"><input name="${it.key}" inputmode="decimal" value="${fmt(saved[it.key])}"><em>${it.unit}</em></span>`;
+  return `<label class="setting">
+    <span class="name">${it.name}${uses}<span class="desc">${it.desc} · <span data-default="${it.key}"></span></span></span>
+    ${ctl}
+    <span class="err" data-err="${it.key}" hidden></span>
+  </label>`;
+}
+
+function connBlock() {
+  const envBlock = `<pre class="env"># backend/.env\nNAVER_COMMERCE_CLIENT_ID=발급받은 애플리케이션 ID\nNAVER_COMMERCE_CLIENT_SECRET=발급받은 애플리케이션 시크릿</pre>`;
+  const s = {
+    ok: [`<span class="dot"></span><div><b>연결됨</b> · ${conn.store}<div class="hint">애플리케이션 ID ${conn.appId} · 마지막 확인 ${conn.checkedAt.replace(/-/g, ".")}</div></div>`,
+      `ID · 시크릿은 <code>backend/.env</code> 에서 읽어요. 바꾸려면 파일을 고치고 서버를 다시 켜세요. 화면 · DB · 백업에는 저장되지 않아요.`],
+    nokey: [`<span class="dot off"></span><div><b>연결 안 됨</b><div class="hint">backend/.env 에 애플리케이션 ID · 시크릿이 없어요</div></div>`,
+      `커머스API센터 › 애플리케이션 등록 › <b>내스토어 애플리케이션</b> 을 발급받아 <code>backend/.env</code> 에 넣고 서버를 다시 켜세요.${envBlock}`],
+    fail: [`<span class="dot off"></span><div><b>연결 실패</b><div class="hint">네이버가 인증을 거절했어요 (401)</div></div>`,
+      `<code>backend/.env</code> 의 값이 커머스API센터의 값과 같은지 확인하세요.${envBlock}`],
+  }[conn.state];
+  return `<div class="conn-row">${s[0]}<div class="spacer"></div>
+      <a class="btn small" href="store.html">주문 가져오기 화면</a><button type="button" class="btn small" data-conn-test>연결 확인</button></div>
+    <div class="note-box">${s[1]}</div>`;
 }
 
 // 입력값 읽기: { values, errors }. 틀린 칸은 계산 예시에 저장된 값을 쓴다
 function read() {
-  const values = {}, errors = {};
-  ITEMS.forEach((it) => {
+  const values = { ...saved }, errors = {};
+  itemsOf(catOf(tab)).forEach((it) => {
     const r = parse(it, form.elements[it.key].value);
     if (r.error) errors[it.key] = r.error;
     values[it.key] = r.error ? saved[it.key] : r.value;
   });
   return { values, errors };
 }
+const isDirty = () => form && itemsOf(catOf(tab)).some((it) => { const r = parse(it, form.elements[it.key].value); return r.error || r.value !== saved[it.key]; });
 
-// 입력할 때마다: 묶음별 계산 예시, 바뀐 칸 · 틀린 칸 표시, 기본값 안내, 요약 줄 · 저장 줄 갱신
+// 입력할 때마다: 묶음별 계산 예시, 바뀐 칸 · 틀린 칸 표시, 기본값 안내, 저장 줄 갱신
 function update() {
+  const c = catOf(tab), items = itemsOf(c);
   const { values: v, errors } = read();
   const feeRate = (v.fee_order + v.fee_sales) / 100;
   const denom = 1 - feeRate - v.target_margin / 100;
   const rec10k = denom > 0 ? Math.ceil((10000 + v.shipping_cost) / denom / 100) * 100 : null;
-  $("#calc-0").innerHTML = `1시간 출력 전기료 <b>${won(v.power_kw * v.elec_rate)}</b>`;
-  $("#calc-1").innerHTML = `수수료 합계 <b>${fmt(feeRate * 100)}%</b> · 원가 1만원 제품 권장 판매가 `
-    + (rec10k ? `<b>${won(rec10k)}</b>` : '<span class="warn">계산 불가 (수수료 + 목표 마진율이 100% 이상)</span>');
+  const recText = rec10k ? `<b>${won(rec10k)}</b>` : '<span class="warn">계산 불가 (수수료 + 목표 마진율이 100% 이상)</span>';
+  c.groups.forEach((g, i) => {
+    const el = $(`#calc-${i}`); if (!el) return;
+    el.innerHTML = {
+      elec: `1시간 출력 전기료 <b>${won(v.power_kw * v.elec_rate)}</b>`,
+      rec: `원가 1만원 제품 권장 판매가 ${recText}${help("권장 판매가 = (원가 + 배송비) ÷ (1 − 수수료율 − 목표 마진율). 수수료 · 배송비는 스마트스토어 분류의 값")}`,
+      fee: `수수료 합계 <b>${fmt(feeRate * 100)}%</b> · 2만원 판매 시 수수료 <b>${won(20000 * feeRate)}</b>`,
+    }[g.calc] ?? "";
+  });
+  if (!items.length) return renderCats(false);
 
-  let changed = 0, offDefault = 0;
-  ITEMS.forEach((it) => {
+  let changed = 0;
+  items.forEach((it) => {
     const input = form.elements[it.key], err = $(`[data-err="${it.key}"]`);
     const bad = it.key in errors;
     const diff = bad || v[it.key] !== saved[it.key];
     changed += diff;
-    offDefault += !bad && v[it.key] !== it.def;
     input.classList.toggle("changed", diff && !bad);
     input.classList.toggle("invalid", bad);
     err.hidden = !bad; err.textContent = errors[it.key] ?? "";
-    $(`[data-default="${it.key}"]`).innerHTML = `기본 ${fmt(it.def)}${unitText(it)}${!bad && v[it.key] === it.def ? "" : ` <button type="button" class="btn link" data-def="${it.key}">기본값으로</button>`}`;
+    const defText = it.type === "select" ? it.options.find(([k]) => k === it.def)[1] : `${fmt(it.def)}${unitText(it)}`;
+    $(`[data-default="${it.key}"]`).innerHTML = `기본 ${defText}${!bad && v[it.key] === it.def ? "" : ` <button type="button" class="btn link" data-def="${it.key}">기본값으로</button>`}`;
   });
   const nErr = Object.keys(errors).length;
-  $("#stats").innerHTML = `<span class="${offDefault ? "info" : ""}">기본값과 다른 항목<b>${offDefault}</b></span>`;
   $("#save-bar").classList.toggle("dirty", changed > 0 && !nErr);
   $("#save-bar").classList.toggle("invalid", nErr > 0);
+  const effect = { cost: "모든 제품 원가에 바로 반영돼요", store: "제품 원가와 새로 넣는 판매의 수수료에 반영돼요 (이미 넣은 판매는 그대로)" }[tab];
   $("#save-msg").textContent = nErr ? `${nErr}개 항목을 고쳐야 저장할 수 있어요`
-    : changed ? `${changed}개 항목을 바꿨어요 · 저장하면 모든 제품 원가에 바로 반영돼요` : "바뀐 내용 없음";
+    : changed ? `${c.label} ${changed}개 항목을 바꿨어요 · 저장하면 ${effect}` : "바뀐 내용 없음";
   $("#save").disabled = !changed || nErr > 0;
   $("#reset").disabled = !changed;
+  renderCats(changed > 0);
 }
 
-form.oninput = update;
-form.onclick = (e) => {
-  const d = e.target.closest("[data-def]");
-  if (d) { e.preventDefault(); const it = ITEMS.find((x) => x.key === d.dataset.def); form.elements[it.key].value = fmt(it.def); return update(); }
-  if (e.target.closest("#reset")) { render(); toast("저장된 값으로 되돌렸어요"); }
-};
-form.onsubmit = (e) => {
-  e.preventDefault();
-  if ($("#save").disabled) return;
-  Object.assign(saved, read().values); render(); toast("저장했어요 · 모든 제품 원가에 반영됐어요");
-};
+function bindForm() {
+  form.oninput = form.onchange = update;
+  form.onclick = (e) => {
+    if (e.target.closest(".help")) return e.preventDefault();
+    const d = e.target.closest("[data-def]");
+    if (d) { e.preventDefault(); const it = ALL_ITEMS.find((x) => x.key === d.dataset.def); form.elements[it.key].value = it.type === "select" ? it.def : fmt(it.def); return update(); }
+    if (e.target.closest("#reset")) { render(); toast("저장된 값으로 되돌렸어요"); }
+    if (e.target.closest("[data-conn-test]")) { e.preventDefault(); toast(conn.state === "ok" ? `연결돼 있어요 · ${conn.store}` : conn.state === "nokey" ? "아직 .env 에 값이 없어요" : "연결 실패 · ID · 시크릿을 확인하세요"); }
+  };
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    if ($("#save").disabled) return;
+    Object.assign(saved, read().values); render(); toast(`${catOf(tab).label} 설정을 저장했어요`);
+  };
+}
+
+// 분류 바꾸기: 저장 안 한 변경이 있으면 확인
+const dlg = $("#dlg"), dlgForm = $("#dlg-form");
+function go(next) {
+  if (next === tab) return;
+  if (!isDirty()) { tab = next; return render(); }
+  const hasErr = Object.keys(read().errors).length > 0;
+  dlgForm.innerHTML = `<div class="dlg-head">저장하지 않은 변경</div>
+    <div class="dlg-body"><b>${catOf(tab).label}</b> 에서 바꾼 값을 저장하지 않았어요.</div>
+    <div class="dlg-foot"><button type="button" class="btn" data-x="stay">취소</button><div class="spacer"></div>
+      <button type="button" class="btn" data-x="drop">저장 안 하고 이동</button>
+      <button type="button" class="btn primary" data-x="save" ${hasErr ? 'disabled title="틀린 칸이 있어요"' : ""}>저장하고 이동</button></div>`;
+  dlg.showModal();
+  dlgForm.onclick = (e) => {
+    const x = e.target.closest("[data-x]")?.dataset.x; if (!x) return;
+    dlg.close();
+    if (x === "stay") return;
+    if (x === "save") { Object.assign(saved, read().values); toast(`${catOf(tab).label} 설정을 저장했어요`); }
+    tab = next; render();
+  };
+}
+$("#cats").onclick = (e) => { const b = e.target.closest("[data-tab]"); if (b) go(b.dataset.tab); };
 // 저장하지 않고 나가려 하면 브라우저 확인
-addEventListener("beforeunload", (e) => { if (!$("#reset").disabled) e.preventDefault(); });
+addEventListener("beforeunload", (e) => { if (isDirty()) e.preventDefault(); });
 
 // ---------------------------------------------------------------- 시작
-const params = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = params.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 // 사이드바 접힘 상태는 브라우저에 기억 (filaments.html 과 같은 키)
 function toggleSide(force) {
@@ -268,10 +394,10 @@ let savedSide = null;
 try { savedSide = localStorage.getItem("pff-side-collapsed"); } catch { /* 저장 불가 */ }
 if (params.get("side") === "collapsed" || savedSide === "1") toggleSide(true);
 render();
-// 스크린샷용 상태
+// 스크린샷용 상태 (제품 원가 분류)
 ({
-  changed: () => { form.elements.elec_rate.value = "230"; form.elements.shipping_cost.value = "3,000"; update(); },
-  error: () => { form.elements.fee_sales.value = "120"; form.elements.elec_rate.value = "-5"; update(); },
+  changed: () => { if (tab !== "cost") return; form.elements.elec_rate.value = "230"; update(); },
+  error: () => { if (tab !== "cost") return; form.elements.target_margin.value = "120"; form.elements.elec_rate.value = "-5"; update(); },
 })[params.get("state")]?.();
 </script>
 </body>

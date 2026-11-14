@@ -1,8 +1,9 @@
 """필라멘트 JSON API (/api/v0/, docs/api.md). 스풀 하나로 끝나는 규칙은 모델에, 여러 행을 함께 바꾸는 동작은 여기서."""
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Avg, Count, Prefetch, ProtectedError, Q
-from rest_framework import serializers, status, viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404  # 숫자가 아닌 id 도 404 (Django 것은 500)
 from rest_framework.response import Response
@@ -12,8 +13,10 @@ from .serializers import (
     BrandSerializer,
     ColorSerializer,
     FilamentSerializer,
+    LabelsSerializer,
     MaterialSerializer,
     PurchaseSerializer,
+    ScanSpoolSerializer,
     SpoolCodeSerializer,
     SpoolFilterSerializer,
     SpoolIdsSerializer,
@@ -31,6 +34,8 @@ def colors_with_counts():
             sealed_count=Count('spools', filter=Q(spools__status=Spool.Status.SEALED)),
             open_count=Count('spools', filter=Q(spools__status=Spool.Status.OPEN)),
             empty_count=Count('spools', filter=Q(spools__status=Spool.Status.EMPTY)),
+            # 원가 계산의 스풀 가격 = 보유 스풀 구매가 평균 (Color.held_price)
+            held_avg=Avg('spools__price', filter=Q(spools__status__in=[Spool.Status.SEALED, Spool.Status.OPEN])),
         )
         .order_by('filament_id', 'id')
     )
@@ -120,40 +125,27 @@ class ColorViewSet(BaseViewSet):
 
     # POST /colors/{id}/spools/  (이 색상에 스풀들을 만든다 = 재고 추가)
     @action(detail=True, methods=['post'], url_path='spools')
-    @transaction.atomic  # 번호 확인 ~ 저장을 한 트랜잭션으로
+    @transaction.atomic  # 번호 받기 ~ 저장을 한 트랜잭션으로
     def purchase(self, request, pk=None):
-        """재고 추가 (PRD INV-02) → 만든 스풀 목록"""
+        """재고 추가 (PRD INV-02) → 만든 스풀 목록. 지출 없이 들어온 스풀(선물 · 예전 재고)용 —
+        산 스풀은 필라멘트 지출을 저장하면 생긴다 (TBD-33). 번호는 항상 다음 번호부터 (지운 번호는 다시 안 씀)"""
         # 개수는 필요 없음. 색상 가격이 비면 필라멘트 가격을 쓰므로 필라멘트만 같이
         color = get_object_or_404(Color.objects.select_related('filament'), pk=pk)
         data = PurchaseSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        quantity = data.validated_data['quantity']
-        purchased_at = data.validated_data['purchased_at']
         price = data.validated_data.get('price')
-        chosen = data.validated_data['code_nos']
-
-        # 가격을 비우면 색상 가격 (없으면 필라멘트 가격)
-        if price is None:
+        if price is None:  # 가격을 비우면 색상 가격 (없으면 필라멘트 가격)
             price = color.spool_price
-
-        # 지정한 번호 중 하나라도 이미 있으면 400, 아무것도 만들지 않음
-        taken = list(Spool.objects.filter(code_no__in=chosen).order_by('code_no').values_list('code_no', flat=True))
-        if taken:
-            codes = ', '.join(Spool(code_no=n).code for n in taken[:5])
-            more = f' 외 {len(taken) - 5}개' if len(taken) > 5 else ''
-            raise serializers.ValidationError({'code_nos': [f'{codes}{more} 는 이미 있습니다.']})
-
-        # 번호: 지정한 것 먼저, 모자란 만큼은 다음 번호부터 자동 (지정한 번호와 겹치면 건너뜀)
-        numbers = list(chosen)
-        next_no = Spool.next_code_no()
-        while len(numbers) < quantity:
-            if next_no not in chosen:
-                numbers.append(next_no)
-            next_no += 1
-
+        numbers = Spool.take_code_nos(data.validated_data['quantity'])
         # bulk_create 는 save() 를 거치지 않으므로 번호를 직접 넣는다
         Spool.objects.bulk_create(
-            Spool(color=color, code_no=n, status=Spool.Status.SEALED, price=price, purchased_at=purchased_at)
+            Spool(
+                color=color,
+                code_no=n,
+                status=Spool.Status.SEALED,
+                price=price,
+                purchased_at=data.validated_data['purchased_at'],
+            )
             for n in numbers
         )
         spools = Spool.objects.filter(code_no__in=numbers).order_by('code_no')
@@ -186,7 +178,23 @@ class SpoolViewSet(BaseViewSet):
 
     @action(detail=False, methods=['get'], url_path=r'code/(?P<code>[^/]+)')
     def by_code(self, request, code=None):
-        """스풀 코드로 찾기 (PRD INV-09): S00012. 형식이 틀리면 400, 없으면 404"""
+        """스풀 코드로 찾기 (PRD INV-09): S00012. 형식이 틀리면 400, 없으면 404.
+        폰 스풀 화면(QR 라벨을 찍으면, TBD-18)도 이것 — 색상 · 필라멘트 이름 · 주문(지출)을 함께 준다"""
         params = SpoolCodeSerializer(data={'code': code})
         params.is_valid(raise_exception=True)
-        return Response(SpoolSerializer(get_object_or_404(Spool, code_no=params.validated_data['code'])).data)
+        spools = Spool.objects.select_related('color__filament__brand', 'color__filament__material', 'buy__expense')
+        return Response(ScanSpoolSerializer(get_object_or_404(spools, code_no=params.validated_data['code'])).data)
+
+    # GET · POST /spools/labels/
+    @action(detail=False, methods=['get', 'post'])
+    def labels(self, request):
+        """QR 라벨 (v2 TBD-18). GET: QR 안의 주소 앞부분 {public_url} (backend/.env 의 PUBLIC_URL, 없으면 "").
+        POST {ids, printed}: 인쇄한 스풀을 `라벨 뽑음` 으로 (printed=false 는 되돌리기) → {updated}"""
+        if request.method == 'GET':
+            return Response({'public_url': settings.PUBLIC_URL})
+        data = LabelsSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        updated = Spool.objects.filter(pk__in=data.validated_data['ids']).update(
+            label_printed=data.validated_data['printed']
+        )
+        return Response({'updated': updated})

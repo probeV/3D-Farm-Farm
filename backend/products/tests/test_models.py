@@ -6,8 +6,9 @@ from django.db.models import ProtectedError
 from django.test import TestCase
 
 from filaments.models import Brand, Color, Filament, Material
+from stock.models import Part
 
-from ..models import Category, CostSetting, Part, Product, ProductFilament, ProductPart, Subcategory
+from ..models import Category, CostSetting, Product, ProductFilament, ProductPart, Subcategory
 
 
 class CategoryTests(TestCase):
@@ -159,18 +160,6 @@ class ProductMaterialTests(TestCase):
         self.assertFalse(ProductFilament.objects.exists())
         self.assertFalse(ProductPart.objects.exists())
 
-    def test_part_unit_price(self):
-        self.assertEqual(self.magnet.unit_price, Decimal('60'))
-        self.assertIsNone(Part(name='에어캡').unit_price)
-
-    def test_part_name_unique(self):
-        with self.assertRaises(IntegrityError):
-            Part.objects.create(name=self.magnet.name)
-
-    def test_part_defaults(self):
-        part = Part.objects.create(name='에어캡')
-        self.assertEqual((part.pack_qty, part.unit), (1, '개'))
-
 
 class CostSettingTests(TestCase):
     def test_load_creates_defaults(self):
@@ -203,7 +192,7 @@ class AdminPagesTests(TestCase):
         self.math = Subcategory.objects.create(category=self.edu, name='수학')
 
     def test_changelist_and_add_pages_render(self):
-        for model in ['category', 'subcategory', 'part', 'product', 'costsetting']:
+        for model in ['category', 'subcategory', 'product', 'costsetting']:
             for page in ['', 'add/']:
                 with self.subTest(model=model, page=page):
                     res = self.client.get(f'/admin/products/{model}/{page}')

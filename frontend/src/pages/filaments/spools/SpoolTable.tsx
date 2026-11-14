@@ -3,7 +3,7 @@ import { useSpools, type Color, type Spool, type SpoolStatus } from '../../../ap
 import Pager, { PAGE_SIZE } from '../../../components/Pager'
 import { useConfirm } from '../../../components/useConfirm'
 import { useToast } from '../../../components/useToast'
-import { dateText } from '../../../format'
+import { dateText, won } from '../../../format'
 import { money } from '../../../validation'
 import { useSpoolActions } from './spoolActions'
 import { STATUSES, STATUS_LABEL } from '../stock'
@@ -129,9 +129,17 @@ interface PriceInputProps {
   onInvalid: (message: string) => void
 }
 
-// 구매가: 입력을 마치면(칸을 벗어나거나 Enter) 바로 저장. 비우면 미입력(null)
+// 구매가: 입력을 마치면(칸을 벗어나거나 Enter) 바로 저장. 비우면 미입력(null). 지출로 생긴 스풀은 보기만
 // 검사는 재고 추가 창과 같은 money 규칙. 줄 안에 오류 글씨 자리가 없어서, 틀리면 원래 값으로 되돌리고 알림으로 표시
 function PriceInput({ spool, onSave, onInvalid }: PriceInputProps) {
+  // 지출로 생긴 스풀은 구매가를 여기서 못 고침 — 지출에서 (현금 기준 지출과 손익 기준 스풀 구매가가 어긋나지 않게, TBD-33)
+  if (spool.buy != null)
+    return (
+      <div className="price-cell locked" title="지출로 생긴 스풀 · 구매가는 지출에서 고쳐요">
+        <span>{won(spool.price)}</span>
+        <span className="tag">지출</span>
+      </div>
+    )
   return (
     <div className="with-suffix price-cell">
       <input

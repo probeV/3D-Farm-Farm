@@ -42,11 +42,12 @@ class ColorAdmin(admin.ModelAdmin):
 
 @admin.register(Spool)
 class SpoolAdmin(admin.ModelAdmin):
-    list_display = ['code', 'color', 'status', 'price', 'purchased_at', 'opened_at', 'finished_at']
-    list_filter = ['status', 'color__filament__brand', 'purchased_at']
+    list_display = ['code', 'color', 'status', 'price', 'purchased_at', 'opened_at', 'finished_at', 'label_printed']
+    list_filter = ['status', 'label_printed', 'color__filament__brand', 'purchased_at']
     search_fields = ['color__name']
     list_select_related = ['color__filament__brand', 'color__filament__material']
     autocomplete_fields = ['color']
+    raw_id_fields = ['buy']
 
     @admin.display(description='스풀 코드', ordering='code_no')
     def code(self, obj):

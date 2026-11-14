@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>필라멘트 — 3D Farm Farm 목업</title>
+<title>재고 관리 · 필라멘트 — 3D Farm Farm 목업</title>
 <!--
   필라멘트 탭 HTML 목업 (docs/PRD.md 3.1~3.5, docs/screens.md 기준)
   - 더미 데이터로 동작하며 새로고침하면 초기화된다.
@@ -208,7 +208,7 @@ button.fil-head:hover .fil-edit { display: inline-block; }
 .tile-menu .act:hover:not(:disabled) svg { color: var(--accent); }
 .tile-menu .act:disabled { opacity: .4; cursor: default; }
 .tile-menu .act small { font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
-.only-list .page-title, .only-list .top-row, .only-list .brand-slider { display: none; }
+.only-list .page-title, .only-list .stock-tabs, .only-list .top-row, .only-list .brand-slider { display: none; }
 .only-list .list-toolbar { margin-top: 0; }
 .empty { padding: 40px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
 
@@ -338,6 +338,8 @@ input[type=color] { width: 44px; height: 36px; padding: 2px; cursor: pointer; }
 .spool-id { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
 .spool-id small { font-size: 11px; }
 .price-cell input { width: 100px; flex: none; padding: 3px 8px; }
+.price-cell.locked { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.price-cell.locked .tag { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; }
 .status-btns { display: flex; gap: 8px; justify-content: flex-end; }
 .status-btns button { min-width: 70px; padding: 4px 0; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; border: 1px solid var(--border); background: var(--surface); }
 .status-btns button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
@@ -373,6 +375,12 @@ input[type=color] { width: 44px; height: 36px; padding: 2px; cursor: pointer; }
 .icon-btn.edit { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; }
 .icon-btn.edit svg { width: 16px; height: 16px; }
 .icon-btn.edit:hover { color: var(--accent); background: var(--surface-2); }
+
+/* v2 재고 관리 탭 (필라멘트 | 부속품 | 포장) — packaging.html 과 같음 */
+.stock-tabs { display: flex; gap: 2px; margin: -4px 0 16px; border-bottom: 1px solid var(--border); }
+.stock-tabs a { padding: 8px 16px; color: var(--muted); font-weight: 600; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.stock-tabs a:hover { color: var(--text); }
+.stock-tabs a.on { color: var(--accent); border-bottom-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -381,16 +389,18 @@ input[type=color] { width: 44px; height: 36px; padding: 2px; cursor: pointer; }
     <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
     <a class="nav-item" href="products.html" title="제품 원가">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
-    <a class="nav-item active" href="filaments.html" title="필라멘트">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 4v5.5M12 14.5V20"/></svg><span class="label">필라멘트</span></a>
-    <a class="nav-item" href="parts.html" title="부자재">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg><span class="label">부자재</span></a>
+    <a class="nav-item active" href="filaments.html" title="재고 관리 (필라멘트 · 부속품 · 포장 · 소모품)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span class="label">재고 관리</span></a>
+    <a class="nav-item" href="sales.html" title="판매">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
     <a class="nav-item" href="expenses.html" title="지출">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
-    <a class="nav-item" href="settings.html" title="제품 원가 설정">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="label">제품 원가 설정</span></a>
+    <a class="nav-item" href="pl.html" title="손익">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="label">손익</span></a>
     <div class="side-bottom">
       <span class="mock-tag">목업 · 더미 데이터</span>
+      <a class="nav-item" href="settings.html" title="설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="label">설정</span></a>
       <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
     </div>
@@ -446,6 +456,13 @@ const db = {
 };
 // 제품에서 쓰는 색상 (색상 id → 제품 이름). 제품 원가 목업의 사용 필라멘트 줄과 같은 역할
 const COLOR_USED_BY = { 1: ["DNA 모형"], 8: ["분수 원판 세트", "소마 큐브"], 12: ["키링"] };
+// v2 TBD-31 · 33: 지출 장부의 필라멘트 주문 (expenses.html 구매 항목). 색상별 [롤 수, 롤당 구매가(배송비 나눠 넣음)]
+// 지출을 저장하면 스풀이 롤 수만큼 바로 생긴다 (구매가 · 구매일은 주문에서). 최근 구매면 색상 가격 = 롤당 구매가
+const FIL_ORDERS = [
+  { date: "2026-09-22", name: "PLA 필라멘트 6롤", lines: { 2: [2, 15000], 1: [4, 14400] } },
+  { date: "2026-10-27", name: "Esun PLA 5롤", lines: { 7: [5, 8000] } },
+];
+const lastBuyOf = (cid) => FIL_ORDERS.filter((o) => o.lines[cid]).sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
 // 색상: [필라멘트, 이름, hex, 색상 가격, 재고, 사용 중, 사용 완료]
 [
   [1, "화이트", "#F5F5F5", null, 3, 1, 2], [1, "블랙", "#1A1A1A", 15000, 2, 1, 4], [1, "그레이", "#8E9196", null, 0, 0, 1],
@@ -469,6 +486,8 @@ const COLOR_USED_BY = { 1: ["DNA 모형"], 8: ["분수 원판 세트", "소마 �
       db.spools.push({
         id, color: c.id, code: "S" + String(id).padStart(5, "0"), status,
         price: base ? base - (k % 2) * 1000 : null,
+        // 주문(지출)으로 생긴 스풀이면 그 주문 — 구매가는 지출에서만 고침 (TBD-33). 없으면 재고 추가(지출 없이)로 넣은 스풀
+        buy: k % 2 === 0 ? { date: "2026-09-22", name: "PLA 필라멘트 6롤" } : null,
         purchased_at: `2026-${String(8 + (id % 3)).padStart(2, "0")}-${String(1 + (id * 7) % 27).padStart(2, "0")}`,
         opened_at: status !== "sealed" ? `2026-10-${String(1 + (id * 3) % 17).padStart(2, "0")}` : null,
         finished_at: status === "empty" ? `2026-10-${String(2 + (id * 5) % 16).padStart(2, "0")}` : null,
@@ -522,9 +541,10 @@ const ORDER = { sealed: 0, open: 1, empty: 2 };
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/;
 const normHex = (v) => "#" + v.replace("#", "").toUpperCase();
 let toastTimer;
-function toast(msg, undo) {
+// link: 오른쪽 바로가기 (재고 추가 뒤 `라벨 인쇄` → QR 화면, 그 스풀이 골라진 채로)
+function toast(msg, undo, link) {
   const t = $("#toast");
-  t.innerHTML = `<span>${esc(msg)}</span>${undo ? "<button type='button'>되돌리기</button>" : ""}`;
+  t.innerHTML = `<span>${esc(msg)}</span>${link ? `<a href="${link.href}" style="color:var(--accent);font-weight:700;filter:brightness(1.2)">${esc(link.label)}</a>` : ""}${undo ? "<button type='button'>되돌리기</button>" : ""}`;
   if (undo) t.querySelector("button").onclick = () => { t.hidden = true; toast("되돌렸어요 (목업)"); };
   t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), undo ? 7000 : 2200);
 }
@@ -569,7 +589,8 @@ function render() {
     .sort(sorters[state.sort]);
 
   $("#view").innerHTML = `
-    <h2 class="page-title">필라멘트</h2>
+    <h2 class="page-title">재고 관리</h2>
+    <nav class="stock-tabs"><a class="on" href="filaments.html">필라멘트</a><a href="parts.html">부속품</a><a href="packaging.html">포장</a><a href="consumables.html">소모품</a></nav>
     <div class="top-row">
       <div class="stats">
         <span>재고 스풀<b>${sealed}</b></span><span>사용 중<b>${open}</b></span>
@@ -577,6 +598,7 @@ function render() {
         <span class="${usedUp ? "bad" : ""}" title="재고도 사용 중인 스풀도 없는 색상">소진된 색상<b>${usedUp}</b></span>
       </div>
       <div class="spacer"></div>
+      <a class="btn" href="qr.html" title="QR 라벨 인쇄 · 폰으로 찍어서 등록 (TBD-18)" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg>QR</a>
       <button class="btn" data-act="manage">필라멘트 관리</button>
     </div>
 
@@ -923,7 +945,9 @@ function openColor(c, preset) {
   const form = dlg.form;
   const priceHint = () => {
     const f = byId(db.filaments, form.elements.filament.value) || f0;
-    $("#price-hint").textContent = `비우면 필라멘트 가격 ${f.price == null ? "(미입력)" : won(f.price)} 사용`;
+    const lb = c ? lastBuyOf(c.id) : null;
+    $("#price-hint").textContent = lb ? `최근 구매가 · ${lb.date.replaceAll("-", ".")} ${lb.name} (지출) · 다음에 이 색상을 지출에 넣으면 자동으로 바뀌어요`
+      : `비우면 필라멘트 가격 ${f.price == null ? "(미입력)" : won(f.price)} 사용 · 지출에 이 색상을 넣으면 최근 구매가로 자동`;
     $("#price-in").placeholder = f.price ?? "";
   };
   priceHint();
@@ -973,13 +997,14 @@ function openPurchase(c) {
     <label class="field"><span>구매일</span><input type="date" name="date" value="2026-10-19"></label>
     <label class="field full"><span>스풀 1개 구매가</span><div class="with-suffix"><input type="number" name="price" min="0" step="100" value="${colorPrice(c) ?? ""}"><em>원</em></div>
       <span class="hint">기본값은 ${c.price != null ? "색상" : "필라멘트"} 가격이에요. 할인받았다면 실제 가격을 입력하세요.</span></label>
+    <p class="hint" style="margin:0;grid-column:1 / -1">지출 없이 들어온 스풀용 (선물 · 예전 재고). 산 스풀은 <b>지출</b>에 적으면 자동으로 생겨요</p>
   </div></div>${foot("", "재고에 추가")}`);
   onClose(dlg);
   dlg.form.onsubmit = (e) => {
     e.preventDefault(); const fd = new FormData(dlg.form); const qty = Math.max(1, Math.min(100, Number(fd.get("qty")) || 1)); const codes = [];
     for (let i = 0; i < qty; i++) { const id = db.spools.length + 1; const code = "S" + String(id).padStart(5, "0"); codes.push(code);
       db.spools.push({ id, color: c.id, code, status: "sealed", price: fd.get("price") ? Number(fd.get("price")) : null, purchased_at: fd.get("date"), opened_at: null, finished_at: null }); }
-    close(dlg); render(); toast(`${qty}개 추가했어요 (${codes[0]}${qty > 1 ? " ~ " + codes.at(-1) : ""})`, true);
+    close(dlg); render(); toast(`${qty}개 추가했어요 (${codes[0]}${qty > 1 ? " ~ " + codes.at(-1) : ""})`, true, { label: "라벨 인쇄", href: `qr.html?pick=${codes[0]}-${codes.at(-1)}&from=${encodeURIComponent("방금 재고 추가한 스풀")}` });
   };
 }
 
@@ -1019,7 +1044,10 @@ function openAdjust(c, page = 1, view = "simple") {
   const list = spoolsOf(c).sort((a, b) => a.id - b.id);
   const pages = Math.max(1, Math.ceil(list.length / PAGE)); page = Math.min(page, pages);
   const rows = list.slice((page - 1) * PAGE, page * PAGE);
-  const price = (s) => `<div class="with-suffix price-cell"><input type="number" min="0" step="100" data-price="${s.id}" value="${s.price ?? ""}" placeholder="미입력"><em>원</em></div>`;
+  // 주문(지출)으로 생긴 스풀은 구매가를 여기서 못 고침 — 지출에서 (현금 기준 지출과 손익 기준 스풀 구매가가 어긋나지 않게)
+  const price = (s) => s.buy
+    ? `<div class="price-cell locked" title="주문 ${s.buy.date.replaceAll("-", ".")} ${esc(s.buy.name)} · 구매가는 지출에서 고쳐요"><span>${won(s.price)}</span><span class="tag">지출</span></div>`
+    : `<div class="with-suffix price-cell"><input type="number" min="0" step="100" data-price="${s.id}" value="${s.price ?? ""}" placeholder="미입력"><em>원</em></div>`;
   const simple = (s) => `<div class="spool-row simple" data-spool="${s.id}"><div class="spool-id"><code>${s.code}</code><small class="muted">${s.purchased_at}</small></div>${price(s)}
     <div class="status-btns">${Object.entries(STATUS).map(([k, v]) => `<button type="button" data-set="${k}" class="${k === s.status ? "current" : ""}" ${k === s.status ? "disabled" : ""}>${v}</button>`).join("")}</div></div>`;
   const detail = (s) => `<div class="spool-row detail" data-spool="${s.id}"><code>${s.code}</code><span class="status-tag s-${s.status}">${STATUS[s.status]}</span>

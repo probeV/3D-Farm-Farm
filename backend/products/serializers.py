@@ -5,8 +5,9 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from filaments.serializers import BaseModelSerializer
+from stock.models import Part, PartKind
 
-from .models import Category, CostSetting, Part, PartCategory, Product, ProductFilament, ProductPart, Subcategory
+from .models import Category, CostSetting, Product, ProductFilament, ProductPart, Subcategory
 
 
 class SubcategorySerializer(BaseModelSerializer):
@@ -48,48 +49,6 @@ class CategorySerializer(BaseModelSerializer):
         fields = ['id', 'name', 'product_count', 'subcategories']
 
 
-class PartCategorySerializer(BaseModelSerializer):
-    name = serializers.CharField(
-        max_length=50,
-        validators=[UniqueValidator(queryset=PartCategory.objects.all(), message='이미 있는 카테고리 이름입니다.')],
-    )
-    part_count = serializers.IntegerField(read_only=True, default=0)
-
-    class Meta:
-        model = PartCategory
-        fields = ['id', 'name', 'part_count']
-
-
-class PartSerializer(BaseModelSerializer):
-    name = serializers.CharField(
-        max_length=100,
-        validators=[UniqueValidator(queryset=Part.objects.all(), message='이미 있는 품목입니다.')],
-    )
-    unit_price = serializers.SerializerMethodField()
-    product_count = serializers.IntegerField(read_only=True, default=0)
-
-    class Meta:
-        model = Part
-        fields = [
-            'id',
-            'name',
-            'category',
-            'shop',
-            'buy_url',
-            'price',
-            'pack_qty',
-            'unit',
-            'unit_price',
-            'note',
-            'product_count',
-        ]
-        extra_kwargs = {'buy_url': {'error_messages': {'invalid': 'https:// 로 시작하는 주소로 입력하세요.'}}}
-
-    def get_unit_price(self, obj):
-        value = obj.unit_price
-        return None if value is None else round(float(value), 2)
-
-
 class ReplacePartSerializer(serializers.Serializer):
     """제품의 부자재 바꾸기 입력: 바꿀 부자재 + 바꿀 제품 (비우면 이 부자재를 쓰는 제품 전부)"""
 
@@ -101,6 +60,8 @@ class ReplacePartSerializer(serializers.Serializer):
     def validate_to(self, value):
         if value == self.context['part']:
             raise serializers.ValidationError('다른 부자재를 고르세요.')
+        if value.kind != PartKind.PART:
+            raise serializers.ValidationError('부속품만 고를 수 있습니다.')
         return value
 
     def validate_products(self, value):
@@ -127,9 +88,15 @@ class ProductPartSerializer(BaseModelSerializer):
         model = ProductPart
         fields = ['id', 'part', 'qty']
 
+    def validate_part(self, value):
+        # 포장재는 기본 포장(default_pack)으로, 소모품은 원가에 넣지 않음 (v2 STOCK)
+        if value.kind != PartKind.PART:
+            raise serializers.ValidationError('부속품만 고를 수 있습니다.')
+        return value
+
 
 class ProductSerializer(BaseModelSerializer):
-    """제품 + 사용 필라멘트 · 부자재 줄.
+    """제품 + 사용 필라멘트 · 부속품 줄 + 기본 포장(포장 세트 id, null = 입력 필요).
 
     줄(filaments · parts)을 보내면 그 목록으로 통째로 바꾼다 (기존 줄은 지우고 새로 만듦 → 줄 id 가 바뀜).
     보내지 않으면(PATCH) 줄은 그대로.
@@ -150,12 +117,14 @@ class ProductSerializer(BaseModelSerializer):
             'status',
             'print_minutes',
             'sale_price',
+            'default_pack',
             'note',
             'filaments',
             'parts',
             'created_at',
             'updated_at',
         ]
+        extra_kwargs = {'default_pack': {'error_messages': {'does_not_exist': '없는 포장 세트입니다.'}}}
 
     def validate_no(self, value):
         same = Product.objects.filter(no=value)

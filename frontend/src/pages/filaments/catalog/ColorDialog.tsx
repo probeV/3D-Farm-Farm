@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { Filament } from '../../../api/filaments'
+import type { Color, Filament } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
 import { won } from '../../../format'
@@ -19,8 +19,19 @@ export function ColorHero({ title, filament, hex }: { title: string; filament: F
   )
 }
 
-// 색상 입력칸: 회사 · 필라멘트(고정) · 이름 · 색상 코드 · 가격
-export function ColorFields({ filament, editor: ed }: { filament: Filament; editor: ColorEditor }) {
+// 색상 입력칸: 회사 · 필라멘트(고정) · 이름 · 색상 코드 · 가격.
+// 가격 아래: 보유 스풀이 있으면 원가에 쓰는 보유 스풀 평균, 없으면 비울 때 쓰는 필라멘트 가격 (v2 PL)
+export function ColorFields({
+  filament,
+  color,
+  editor: ed,
+}: {
+  filament: Filament
+  color?: Color
+  editor: ColorEditor
+}) {
+  const fallback = `비우면 필라멘트 가격 ${filament.price == null ? '(미입력)' : won(filament.price)} 사용`
+  const held = color?.held_price ?? null
   return (
     <div className="form-grid">
       <Field label="회사 *">
@@ -61,7 +72,11 @@ export function ColorFields({ filament, editor: ed }: { filament: Filament; edit
       <Field
         label="가격"
         error={ed.errors.price}
-        hint={`비우면 필라멘트 가격 ${filament.price == null ? '(미입력)' : won(filament.price)} 사용`}
+        hint={
+          held != null
+            ? `원가 계산은 보유 스풀 평균 ${won(held)} · 이 가격은 보유 스풀이 없을 때`
+            : `${fallback} · 보유 스풀이 생기면 원가는 그 구매가 평균으로`
+        }
       >
         <div className="with-suffix">
           <input

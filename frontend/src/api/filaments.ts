@@ -1,6 +1,7 @@
 // 필라멘트 화면 API — 회사 · 재질 · 필라멘트 · 색상 · 스풀 (docs/api.md)
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, send } from './client'
+import { keys as expenseKeys } from './expenses'
 
 export type SpoolStatus = 'sealed' | 'open' | 'empty'
 
@@ -25,8 +26,9 @@ export interface Color {
   filament: number
   name: string
   hex: string
-  price: number | null
-  spool_price: number | null
+  price: number | null // 등록 가격 (비우면 필라멘트 가격). 보유 스풀이 없을 때만 원가에 씀
+  spool_price: number | null // 원가 계산의 스풀 가격 = 보유 스풀 평균(held_price), 없으면 등록 가격 (v2 PL)
+  held_price: number | null // 보유(재고 · 사용 중) 스풀 구매가 평균, 없으면 null
   price_per_g: number | null
   counts: ByStatus
 }
@@ -56,6 +58,16 @@ export interface Spool {
   opened_at: string | null
   finished_at: string | null
   note: string
+  buy: number | null // 주문(지출 구매 항목) id — 필라멘트 지출을 저장하면 정해짐. 있으면 구매가는 지출에서만 (TBD-33)
+  label_printed: boolean // QR 라벨을 뽑았는지 (TBD-18). 라벨 인쇄 화면의 `라벨 없음` 목록
+}
+
+// 폰 스풀 화면 (QR 라벨을 찍으면, TBD-18): 스풀 + 색상 · 필라멘트 이름 · 주문(지출)
+export interface ScanSpool extends Spool {
+  color_name: string
+  color_hex: string
+  filament_name: string
+  order: { expense: number; date: string; name: string } | null // 재고 추가로 넣은 스풀이면 null
 }
 
 export const keys = {
@@ -63,6 +75,7 @@ export const keys = {
   materials: ['materials'] as const,
   filaments: ['filaments'] as const,
   spools: ['spools'] as const,
+  labels: ['spool-labels'] as const,
 }
 
 export const useBrands = () => useQuery({ queryKey: keys.brands, queryFn: () => api<Brand[]>('/brands/') })
@@ -73,10 +86,13 @@ export const useMaterials = () => useQuery({ queryKey: keys.materials, queryFn: 
 export const useFilaments = () => useQuery({ queryKey: keys.filaments, queryFn: () => api<Filament[]>('/filaments/') })
 
 // 저장한 뒤 다시 불러오기. 이름 · 개수 · 가격이 여러 목록(회사 카드, 관리 창, 타일, 스풀 창)에 함께 나오므로
-// 필라멘트 쪽 목록을 모두 무효화한다 (@CacheEvict(allEntries))
+// 필라멘트 쪽 목록을 모두 무효화한다 (@CacheEvict(allEntries)). 지출 목록도 — 구매 항목의 스풀 수 · 사용한 수가 바뀌어서 (TBD-33)
 export function useRefreshFilaments() {
   const queryClient = useQueryClient()
-  return () => Promise.all(Object.values(keys).map((queryKey) => queryClient.invalidateQueries({ queryKey })))
+  return () =>
+    Promise.all(
+      [...Object.values(keys), expenseKeys.expenses].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    )
 }
 
 // 한 색상의 스풀 목록 (번호 순서). status 를 주면 그 상태만 — 스풀 선택 · 조정 창
@@ -85,6 +101,17 @@ export const useSpools = (color: number, status?: SpoolStatus) =>
     queryKey: [...keys.spools, { color, status }],
     queryFn: () => api<Spool[]>(`/spools/?color=${color}${status ? `&status=${status}` : ''}`),
   })
+
+// 모든 스풀 (번호 순서) — QR 라벨 인쇄 화면. keys.spools 아래라 스풀이 바뀌면 함께 다시 불러옴
+export const useAllSpools = () =>
+  useQuery({ queryKey: [...keys.spools, 'all'], queryFn: () => api<Spool[]>('/spools/') })
+
+// QR 안의 주소 앞부분 (backend/.env 의 PUBLIC_URL, 없으면 "")
+export const useLabelInfo = () =>
+  useQuery({ queryKey: keys.labels, queryFn: () => api<{ public_url: string }>('/spools/labels/') })
+
+// 폰 스풀 화면. 없는 코드(지운 스풀)는 404, 형식이 틀리면 400
+export const getScanSpool = (code: string) => api<ScanSpool>(`/spools/code/${encodeURIComponent(code)}/`)
 
 // ---------------------------------------------------------------- 쓰기: 회사 · 재질 · 필라멘트 · 색상
 // 삭제할 수 없으면 409 `{"detail": "필라멘트가 있어서 삭제할 수 없습니다."}` (PRD FIL-09)
@@ -127,7 +154,6 @@ export interface PurchaseInput {
   quantity: number
   purchased_at: string
   price?: number // 비우면 색상의 spool_price
-  code_nos?: number[] // 쓰고 싶은 스풀 번호. 모자란 만큼은 자동
 }
 
 // 재고 추가 → 만든 스풀 목록 (번호 순서)
@@ -138,9 +164,13 @@ export const addSpools = (color: number, input: PurchaseInput) =>
 export const updateSpool = (id: number, patch: Partial<Omit<Spool, 'id' | 'code' | 'code_no'>>) =>
   send<Spool>('PATCH', `/spools/${id}/`, patch)
 
-// 지운 스풀 되살리기: 내용(code_no 포함)을 그대로 보내면 같은 코드로 다시 생김
+// 지운 스풀 되살리기: 내용(code_no · buy 포함)을 그대로 보내면 같은 코드 · 주문으로 다시 생김
 export const createSpool = (spool: Omit<Spool, 'id' | 'code'>) => send<Spool>('POST', '/spools/', spool)
 
 export const deleteSpool = (id: number) => send<null>('DELETE', `/spools/${id}/`)
 
 export const deleteSpools = (ids: number[]) => send<{ deleted: number }>('DELETE', `/spools/?ids=${ids.join(',')}`)
+
+// 인쇄한 스풀을 `라벨 뽑음` 으로 (printed=false 는 되돌리기)
+export const markLabels = (ids: number[], printed = true) =>
+  send<{ updated: number }>('POST', '/spools/labels/', { ids, printed })

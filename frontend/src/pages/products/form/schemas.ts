@@ -22,11 +22,12 @@ export const productSchema = z
     hours: optionalInt(0, 9999),
     minutes: optionalInt(0, 59),
     sale_price: money,
+    default_pack: optionalId, // 빈칸 = 입력 필요
     note: z.string(),
     filaments: z.array(
       z.object({ filament: selectedId('필라멘트를 고르세요'), color: optionalId, grams: lineAmount(999_999.99, 2) }),
     ),
-    parts: z.array(z.object({ part: selectedId('부자재를 고르세요'), qty: lineAmount(99_999_999.99, 2) })),
+    parts: z.array(z.object({ part: selectedId('부속품을 고르세요'), qty: lineAmount(99_999_999.99, 2) })),
   })
   // 출력 시간: 시 + 분 → 분. 둘 다 비우면 미입력(null)
   .transform(({ hours, minutes, ...rest }) => ({

@@ -91,10 +91,16 @@ export default function CostPanel({
       </h4>
       <Line label="필라멘트비" sub={c.grams ? `${gramsText(c.grams)}g` : ''} value={won(c.filament)} />
       <Line label="전기료" tip={f.electricity} sub={minutes ? minutesText(minutes) : ''} value={won(c.electricity)} />
-      <Line label="부자재비" value={won(c.parts)} />
+      <Line label="부속품비" value={won(c.parts)} />
       {byCategory.length > 1 && (
         <div className="cost-sub">{byCategory.map((x) => `${x.name} ${won(x.amount)}`).join(' · ')}</div>
       )}
+      <Line
+        label="포장비"
+        tip="기본 포장 세트 원가 (1개 보낼 때). 묶음 포장은 판매 창에서 주문마다"
+        sub={preview.default_pack == null ? '기본 포장 없음' : catalog.packSets.get(preview.default_pack)?.name}
+        value={won(c.pack)}
+      />
       <div className="cost-total">
         <span className="label">
           원가

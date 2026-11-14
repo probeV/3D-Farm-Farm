@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>재고 관리 · 소모품 — 3D Farm Farm 목업</title>
+<!--
+  재고 관리 › 소모품 탭 HTML 목업 (v2 STOCK 초안)
+  - 소모품 = 접착제 · 사포 · 노즐 · 베드 시트처럼 여러 제품에 조금씩 써서 제품마다 셀 수 없는 것
+  - 제품 원가에는 넣지 않는다. 돈은 지출 장부 `소모품 · 유지` 분류로 손익에 들어감 (지금 구조 그대로)
+  - 여기서는 남은 개수 · 부족 알림만: 구매(지출 장부 '산 것')로 늘고, 다 쓰면 `1개 다 씀` 으로 줄이고, 그 밖은 조정
+  - 카드는 부속품 탭(parts.html)과 같은 모양 (카테고리별 묶음 + 사진 타일)
+  - 더미 데이터로 동작하며 새로고침하면 초기화된다
+  - 스크린샷용: ?open=item | item-new | adjust,  ?view=table,  ?theme=dark | light
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f1f3f6; --border: #e2e5ea;
+  --text: #1c2026; --muted: #6b7380; --accent: #2f6fed; --accent-soft: #e8efff;
+  --good: #1f9254; --warn: #b7791f; --bad: #d64545; --good-soft: #e6f5ec; --warn-soft: #fff6e5; --bad-soft: #fdecec;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
+  --radius: 10px; color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #14161a; --surface: #1c1f24; --surface-2: #24282e; --border: #30353d;
+  --text: #e8eaee; --muted: #9aa2ad; --accent: #6b9bff; --accent-soft: #1f2a44;
+  --good: #4cc38a; --warn: #e5b04a; --bad: #ff6b6b; --good-soft: #1b3127; --warn-soft: #3a3020; --bad-soft: #3d2224;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* 사이드바: 접으면 아이콘만, 펼치면 이름까지 */
+.layout { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; --side-w: 220px; transition: grid-template-columns .15s; }
+.layout.collapsed { --side-w: 64px; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; padding: 14px 10px; background: var(--surface); border-right: 1px solid var(--border); overflow: hidden; }
+.side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; font-weight: 700; font-size: 15px; white-space: nowrap; }
+.side-brand .mark { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: -.5px; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border: 0; background: none; border-radius: 8px; color: var(--muted); font-weight: 600; white-space: nowrap; cursor: pointer; text-align: left; text-decoration: none; }
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); }
+.nav-item svg { width: 20px; height: 20px; flex: none; }
+.side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.layout.collapsed .label { display: none; }
+.layout.collapsed .nav-item, .layout.collapsed .side-brand { justify-content: center; padding-left: 0; padding-right: 0; }
+.mock-tag { font-size: 11px; color: var(--muted); padding: 0 10px; white-space: nowrap; }
+.layout.collapsed .mock-tag { display: none; }
+main { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px; }
+.page-title { margin: 0 0 14px; font-size: 20px; }
+
+/* 공통 */
+h4 { margin: 0; font-size: 14px; }
+.hint { color: var(--muted); font-size: 13px; }
+.muted { color: var(--muted); }
+.btn { border: 1px solid var(--border); background: var(--surface); cursor: pointer; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); }
+.btn.small { padding: 3px 9px; font-size: 13px; }
+.btn:disabled { opacity: .4; cursor: default; }
+input, select, textarea { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+input[type=number] { text-align: right; }
+textarea { resize: vertical; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.badge.good { background: var(--good-soft); color: var(--good); }
+.badge.info { background: var(--accent-soft); color: var(--accent); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+
+.icon-btn { border: 0; background: none; cursor: pointer; color: var(--muted); border-radius: 6px; font-size: 15px; width: 32px; height: 32px; }
+.icon-btn:hover { background: var(--surface-2); color: var(--bad); }
+
+/* 요약 카드 (제품 원가 화면과 같은 모양) */
+/* 사용 여부 개수: 맨 위 작은 글씨 한 줄 */
+.stats { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--text); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.top-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.top-row .spacer { flex: 1; }
+.sum-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 4px; padding: 2px; }
+.sum-card { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); text-align: left; }
+.sum-card > span { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.sum-card strong { display: block; font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.sum-card strong small { font-size: 13px; color: var(--muted); font-weight: 600; margin-left: 2px; }
+button.sum-card { cursor: pointer; transition: border-color .1s; }
+button.sum-card:hover { border-color: var(--accent); }
+button.sum-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.sum-card.warn strong { color: var(--warn); }
+/* 설명 문구는 (?) 에 마우스를 올리면 위로 (아래 숫자를 가리지 않게) */
+.help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border); font-size: 10px; font-weight: 700; color: var(--muted); cursor: help; vertical-align: 1px; }
+.help:hover, .help:focus { color: var(--accent); border-color: var(--accent); outline: 0; }
+.help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); width: max-content; max-width: 240px; padding: 6px 10px; border-radius: 6px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .1s; z-index: 10; }
+.help:hover::after, .help:focus::after { opacity: 1; }
+
+/* 목록 제목 줄: 제품 원가 화면의 "제품 목록" 줄과 같은 모양 */
+.section-head { display: flex; align-items: center; gap: 12px; margin: 22px 0 10px; flex-wrap: wrap; }
+.section-head .spacer { flex: 1; }
+.section-head h3 { margin: 0; font-size: 15px; }
+.section-head input[type=search] { width: 220px; }
+
+/* 부자재 표 */
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--surface-2); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--surface-2); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.pname { font-weight: 700; font-size: 14px; }
+.unit-price { font-weight: 700; }
+.note { max-width: 240px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.used { cursor: help; }
+.empty { padding: 40px; text-align: center; color: var(--muted); }
+
+/* 대화상자 */
+dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(10,14,20,.45); }
+dialog.wide { width: min(760px, calc(100vw - 32px)); }
+.dlg-head { padding: 14px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+.dlg-body { padding: 16px 20px; overflow-y: auto; flex: 1; min-height: 0; }
+/* 머리 · 아래는 그대로 두고 본문만 스크롤 (common.html TBD-01) */
+dialog > form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
+.dlg-head, .dlg-foot { flex: none; }
+dialog.fixed { height: min(640px, calc(100vh - 32px)); }
+dialog.fixed > form { height: 100%; max-height: none; }
+dialog.narrow { width: min(400px, calc(100vw - 32px)); }
+.dlg-foot { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+.dlg-foot .spacer { flex: 1; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field.full { grid-column: 1 / -1; }
+.field > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.with-suffix { display: flex; align-items: center; gap: 6px; }
+.with-suffix input, .with-suffix select { flex: 1; }
+.with-suffix em { font-style: normal; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.qty-unit { display: grid; grid-template-columns: 1fr 76px; gap: 6px; }
+.qty-unit input:last-child { text-align: center; }
+/* 개당 단가 미리보기: 구매가 ÷ 묶음 수량 */
+.unit-preview { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
+.unit-preview b { font-size: 16px; }
+.unit-preview .was { color: var(--muted); font-size: 12px; margin-right: 6px; text-decoration: line-through; }
+/* 사용하는 제품: 제품마다 수량과 이 부자재 금액 (가격을 바꾸면 바뀐 금액도) */
+.used-head { display: flex; justify-content: space-between; align-items: baseline; }
+.used-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.used-row:last-child { border-bottom: 0; }
+.used-row .badge { margin-left: 6px; }
+.used-row .qty { color: var(--muted); font-variant-numeric: tabular-nums; }
+.used-row .amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.used-row .amt .was { color: var(--muted); }
+.used-row .amt .up { color: var(--bad); font-weight: 700; } .used-row .amt .down { color: var(--good); font-weight: 700; }
+.foot-note { font-size: 12.5px; color: var(--muted); }
+
+/* 부자재 관리: 왼쪽 구매처 목록, 오른쪽 선택한 구매처의 부자재 (제품 관리 창과 같은 모양) */
+.manage { display: grid; grid-template-columns: 220px 1fr; gap: 16px; min-height: 340px; }
+.list { display: flex; flex-direction: column; gap: 4px; }
+.list-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; }
+.list-item:hover { background: var(--surface-2); }
+.list-item.active { border-color: var(--accent); background: var(--accent-soft); }
+.list-item .grow { flex: 1; min-width: 0; }
+.list-item small { display: block; color: var(--muted); font-size: 12px; }
+.list-item.no-shop strong { color: var(--muted); font-weight: 600; }
+.manage-right { border-left: 1px solid var(--border); padding-left: 16px; }
+.manage-right h4 { margin: 2px 0 10px; font-size: 14px; }
+.row-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.row-item:last-of-type { border-bottom: 0; }
+.row-item strong { font-size: 14px; }
+.row-item .price { text-align: right; font-variant-numeric: tabular-nums; }
+/* v1.2.0: 관리 창 줄 오른쪽 아이콘 묶음 (복제 · 수정) — 모든 관리 창이 같은 크기 · 간격. 삭제는 수정 창 왼쪽 아래에서 */
+.row-btns { display: flex; align-items: center; gap: 2px; }
+/* 관리 창 목록 칸: 제목 줄(제목 · 개수 · 추가 버튼) + 따로 스크롤 (filaments.html 과 같음) */
+.col { display: flex; flex-direction: column; min-height: 0; }
+.col-head { display: flex; align-items: center; gap: 8px; min-height: 30px; margin-bottom: 8px; }
+.col-head h4 { margin: 0; font-size: 14px; }
+.col-head .count { font-size: 12px; color: var(--muted); }
+.col-head .spacer { flex: 1; }
+.col-scroll { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 0 6px 4px; }
+.btn.add { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.btn.add:hover { background: var(--accent); color: #fff; }
+dialog.fixed .dlg-body.cols { display: flex; overflow: hidden; }
+dialog.fixed .cols > .manage { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.view-tabs { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 3px; }
+.view-tabs button { white-space: nowrap; border: 0; background: none; cursor: pointer; padding: 5px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.view-tabs button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+
+/* TBD-20 구매 링크: 품목 옆 링크 아이콘 (누르면 새 탭, 행 클릭과 겹치지 않게) */
+.buy-link { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--border); border-radius: 6px; color: var(--accent); background: var(--surface); font-size: 11.5px; font-weight: 600; vertical-align: 1px; text-decoration: none; }
+.buy-link:hover { border-color: var(--accent); background: var(--accent-soft); }
+.buy-link svg { width: 12px; height: 12px; }
+.field .err { color: var(--bad); font-size: 12px; }
+/* TBD-17 카테고리 배지 */
+.cat { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--surface-2); color: var(--text); font-size: 12px; font-weight: 600; }
+.cat.none { color: var(--muted); font-weight: 500; }
+
+/* TBD-23 다른 부자재로 바꾸기 */
+.used-head .btn { margin-left: auto; }
+.rep-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.rep-row .qty { color: var(--muted); font-variant-numeric: tabular-nums; }
+.rep-row .amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rep-row .amt .was { color: var(--muted); }
+.rep-row .amt .up { color: var(--bad); font-weight: 700; } .rep-row .amt .down { color: var(--good); font-weight: 700; }
+.rep-row .merge { display: block; color: var(--accent); font-size: 12px; }
+.rep-row.off { opacity: .5; }
+.notice { margin: 10px 0 0; padding: 9px 12px; border-left: 3px solid var(--warn); background: var(--warn-soft); border-radius: 0 8px 8px 0; font-size: 13px; }
+
+/* 확인 대화상자 (common.html TBD-09) */
+.btn.danger-line { color: var(--bad); border-color: var(--bad); }
+.btn.danger-line:hover { background: var(--bad-soft); }
+.btn.danger-fill { background: var(--bad); border-color: var(--bad); color: #fff; }
+.confirm .dlg-head { border-bottom: 0; padding-bottom: 4px; }
+.confirm .dlg-body { padding-top: 4px; }
+.confirm .dlg-foot { border-top: 0; padding-top: 4px; }
+.confirm .lead { margin: 0; }
+dialog.confirm.has-effects { width: min(460px, calc(100vw - 32px)); }
+.confirm .effects { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.confirm .effect { padding: 9px 12px; border-left: 3px solid var(--bad); background: var(--bad-soft); border-radius: 0 8px 8px 0; }
+.confirm .effect.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.confirm .effect.info { border-left-color: var(--accent); background: var(--accent-soft); }
+.confirm .effect .t { font-weight: 700; }
+.confirm .effect .d { margin-top: 2px; font-size: 13px; }
+.confirm .again { margin-top: 10px; color: var(--bad); font-size: 13px; font-weight: 600; }
+
+/* 알림 */
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 600; z-index: 100; }
+.toast[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  main { padding: 16px; } .layout { --side-w: 64px; } .layout .label { display: none; } .layout .nav-item, .layout .side-brand { justify-content: center; padding-left: 0; padding-right: 0; } .mock-tag, [data-act="toggle-side"] { display: none; }
+  .section-head input[type=search] { width: 100%; }
+  .sum-cards, .form-grid { grid-template-columns: 1fr; }
+  .manage { grid-template-columns: 1fr; } .manage-right { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
+}
+/* v1.2.0: 관리 창 줄의 수정 · 복제는 아이콘 (마우스를 올리면 파랑) */
+.icon-btn.edit { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; }
+.icon-btn.edit svg { width: 16px; height: 16px; }
+.icon-btn.edit:hover { color: var(--accent); background: var(--surface-2); }
+/* v2 부속품 카드: 카테고리별 묶음(왼쪽 위 제목 줄) + 사진 타일 */
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.cat-groups { display: flex; flex-direction: column; gap: 12px; }
+.cat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+/* 타일은 폭에 맞춰 늘어남: 1440px 화면에서 한 줄 6개 (고정 190px 이면 5개 + 빈자리) */
+.ptiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 12px; padding: 14px 16px 16px; }
+/* 카테고리 제목 띠: 묶음 맨 위, 옅은 바탕 + 왼쪽 파란 막대 + 큰 글씨, 개수는 알약 */
+.cat-title { display: flex; align-items: center; gap: 10px; padding: 11px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; }
+.cat-title::before { content: ""; width: 4px; height: 20px; border-radius: 2px; background: var(--accent); }
+.cat-title h4 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
+.cat-title .m { padding: 1px 9px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); }
+.cat-title .m b { color: var(--text); font-variant-numeric: tabular-nums; }
+.cat-title .m.warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.cat-title .m.warn b { color: var(--warn); }
+.cat-title.none::before { background: var(--border); }
+.cat-title.none h4 { color: var(--muted); }
+.ptile { position: relative; min-width: 0; height: 232px; display: flex; flex-direction: column; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; text-align: left; overflow: hidden; transition: border-color .1s, box-shadow .1s; }
+.ptile:hover { border-color: var(--accent); }
+.ptile .photo { flex: none; height: 112px; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; border-bottom: 1px solid var(--border); }
+.ptile .photo img { width: 100%; height: 100%; object-fit: cover; }
+.ptile .photo.none { color: var(--muted); font-size: 12px; text-align: center; line-height: 1.3; }
+.ptile .photo.none b { display: block; font-size: 26px; font-weight: 800; opacity: .35; }
+.ptile .flag { position: absolute; top: 8px; right: 8px; }
+.ptile .flag .badge { box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.ptile .body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 10px; }
+.ptile .pn { font-weight: 700; font-size: 14px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ptile .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ptile .foot { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.ptile .left { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.ptile .left small { font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 1px; }
+.ptile.low .left { color: var(--warn); } .ptile.out .left { color: var(--bad); }
+.ptile .uprice { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ptile .uprice.none { color: var(--warn); }
+.ptile .buy-link { position: absolute; top: 8px; left: 0; margin-left: 8px; }
+.ptile.add { align-items: center; justify-content: center; gap: 4px; font-size: 12px; border-style: dashed; color: var(--muted); font-weight: 600; background: transparent; }
+.ptile.add span { font-size: 26px; line-height: 1; }
+.ptile.add:hover { color: var(--accent); }
+/* 부속품 창: 사진 */
+.photo-field { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 14px; align-items: center; }
+.photo-box { width: 120px; height: 120px; border-radius: 10px; border: 1px dashed var(--border); background: var(--surface-2); display: grid; place-items: center; overflow: hidden; color: var(--muted); font-size: 12px; text-align: center; }
+.photo-box img { width: 100%; height: 100%; object-fit: cover; }
+.photo-btns { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.photo-btns label.btn { display: inline-block; }
+.photo-btns input[type=file] { display: none; }
+.stock-now { display: flex; align-items: center; gap: 10px; }
+.stock-now b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.adj-preview { display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 3px; }
+.seg label { cursor: pointer; } .seg input { display: none; }
+.seg span { display: block; padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg input:checked + span { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+@media (max-width: 760px) { .ptiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* v2 재고 관리 탭 (필라멘트 | 부속품 | 포장) — packaging.html 과 같음 */
+.stock-tabs { display: flex; gap: 2px; margin: -4px 0 16px; border-bottom: 1px solid var(--border); }
+.stock-tabs a { padding: 8px 16px; color: var(--muted); font-weight: 600; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.stock-tabs a:hover { color: var(--text); }
+.stock-tabs a.on { color: var(--accent); border-bottom-color: var(--accent); }
+/* ---------------------------------------------------------------- 이 화면에만 */
+.ptile { cursor: pointer; }
+.ptile .use { position: absolute; right: 8px; top: 80px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 11.5px; font-weight: 700; color: var(--text); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.ptile .use:hover { border-color: var(--accent); color: var(--accent); }
+.ptile .use:disabled { opacity: .4; cursor: default; }
+.ptile .last { font-size: 11.5px; color: var(--muted); }
+.moves { font-size: 13px; }
+.move { display: grid; grid-template-columns: 82px minmax(0, 1fr) 60px 60px; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.move:last-child { border-bottom: 0; }
+.move .d { color: var(--muted); }
+.move .q { text-align: right; font-weight: 700; }
+.move .q.plus { color: var(--good); } .move .q.minus { color: var(--bad); }
+.move .left { text-align: right; color: var(--muted); }
+.info-note { margin: 0 0 12px; padding: 9px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; font-size: 13px; }
+.info-note a { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="layout" id="layout">
+  <aside class="sidebar">
+    <div class="side-brand"><span class="mark">3D</span><span class="label">3D Farm Farm</span></div>
+    <a class="nav-item" href="products.html" title="제품 원가">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M8 7V5h8v2"/><path d="M12 11v4M10 13h4"/></svg><span class="label">제품 원가</span></a>
+    <a class="nav-item active" href="filaments.html" title="재고 관리 (필라멘트 · 부속품 · 포장 · 소모품)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span class="label">재고 관리</span></a>
+    <a class="nav-item" href="sales.html" title="판매">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/><path d="M12 11v5M9.5 13.5h5"/></svg><span class="label">판매</span></a>
+    <a class="nav-item" href="expenses.html" title="지출">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span class="label">지출</span></a>
+    <a class="nav-item" href="pl.html" title="손익">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="label">손익</span></a>
+    <div class="side-bottom">
+      <span class="mock-tag">목업 · 더미 데이터</span>
+      <a class="nav-item" href="settings.html" title="설정">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="label">설정</span></a>
+      <button class="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onclick="toggleSide()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg><span class="label">접기</span></button>
+    </div>
+  </aside>
+  <main id="view"></main>
+</div>
+<dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+<dialog id="dlg2"><form method="dialog" id="dlg2-form"></form></dialog>
+<div id="toast" class="toast" hidden></div>
+<datalist id="units"><option value="개"><option value="병"><option value="장"><option value="롤"><option value="통"></datalist>
+
+<script>
+"use strict";
+const params = new URLSearchParams(location.search);
+// ---------------------------------------------------------------- 목업용 사진 (부속품 탭과 같은 방식)
+const svgPhoto = (bg, body) => "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 112"><rect width="190" height="112" fill="${bg}"/>${body}</svg>`);
+const PHOTOS = {
+  glue: svgPhoto("#eef1f6", '<rect x="78" y="34" width="34" height="56" rx="6" fill="#e4572e"/><rect x="84" y="20" width="22" height="16" rx="3" fill="#f1f1f1" stroke="#ccc"/><path d="M95 6l5 14h-10z" fill="#f1f1f1" stroke="#ccc"/><rect x="82" y="50" width="26" height="18" fill="#fff" opacity=".85"/>'),
+  sand: svgPhoto("#f3efe6", '<rect x="44" y="30" width="62" height="54" rx="3" fill="#c79a5b" transform="rotate(-8 75 57)"/><rect x="84" y="28" width="62" height="54" rx="3" fill="#a87b3f" transform="rotate(6 115 55)"/><g fill="#7a5524" opacity=".5"><circle cx="100" cy="45" r="1.5"/><circle cx="112" cy="60" r="1.5"/><circle cx="125" cy="50" r="1.5"/><circle cx="118" cy="70" r="1.5"/></g>'),
+  nozzle: svgPhoto("#eceff3", '<g fill="#d4a93a"><path d="M70 30h50v20l-10 10H80L70 50z"/><path d="M85 60h20l-6 22h-8z"/></g><path d="M70 40h50" stroke="#a88426" stroke-width="2"/><g fill="#d4a93a" opacity=".6"><path d="M136 70h16v8l-4 4h-8l-4-4z"/><path d="M141 82h6l-2 8h-2z"/></g>'),
+  sheet: svgPhoto("#e9ecef", '<rect x="40" y="26" width="110" height="64" rx="4" fill="#2c2f33"/><rect x="40" y="26" width="110" height="64" rx="4" fill="url(#g)"/><defs><pattern id="g" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1" fill="#555"/></pattern></defs><rect x="52" y="22" width="86" height="8" rx="2" fill="#b5bcc5"/>'),
+  ipa: svgPhoto("#eaf2f6", '<rect x="74" y="28" width="42" height="64" rx="8" fill="#cfe6f3" stroke="#8fb9cf"/><rect x="86" y="16" width="18" height="14" rx="3" fill="#2f6fed"/><rect x="80" y="50" width="30" height="20" fill="#fff"/><text x="95" y="64" font-size="9" text-anchor="middle" fill="#2f6fed" font-family="sans-serif">IPA</text>'),
+};
+
+// ---------------------------------------------------------------- 더미 데이터
+const db = {
+  // 소모품 카테고리: 직접 추가 · 수정 (부속품 카테고리와 따로)
+  categories: [{ id: 1, name: "접착 · 마감" }, { id: 2, name: "프린터 부품" }, { id: 3, name: "청소" }],
+  // price · pack_qty: 최근 구매가 (참고용 · 원가에는 안 씀). stock: 남은 개수, alert: 부족 알림 기준
+  items: [
+    { id: 1, name: "순간접착제 20g", category: 1, shop: "다이소", buy_url: "", price: 3000, pack_qty: 3, unit: "개", stock: 2, alert: 1, note: "록타이트 · 젤 타입", photo: PHOTOS.glue },
+    { id: 2, name: "사포 #400", category: 1, shop: "쿠팡", buy_url: "https://example.com/sand", price: 6900, pack_qty: 20, unit: "장", stock: 14, alert: 5, note: "서포트 자국 정리", photo: PHOTOS.sand },
+    { id: 3, name: "황동 노즐 0.4mm", category: 2, shop: "알리", buy_url: "", price: 8000, pack_qty: 10, unit: "개", stock: 1, alert: 2, note: "Bambu 용 아님 · Kingroon", photo: PHOTOS.nozzle },
+    { id: 4, name: "PEI 베드 시트", category: 2, shop: "알리", buy_url: "", price: 24000, pack_qty: 1, unit: "장", stock: 0, alert: 0, note: "교체 주기 약 6개월", photo: PHOTOS.sheet },
+    { id: 5, name: "이소프로필 알코올 1L", category: 3, shop: "쿠팡", buy_url: "", price: 9800, pack_qty: 1, unit: "병", stock: 1, alert: 0, note: "베드 닦기", photo: PHOTOS.ipa },
+    { id: 6, name: "마스킹 테이프", category: null, shop: "", buy_url: "", price: null, pack_qty: 1, unit: "롤", stock: 3, alert: 1, note: "", photo: null },
+  ],
+  // 입출고 기록. kind: buy(지출 장부 '소모품 · 유지' 의 산 것) · use(다 씀) · adjust(조정)
+  moves: [
+    { item: 1, date: "2026-08-20", kind: "buy", text: "지출 · 순간접착제 3개입", qty: 3 },
+    { item: 1, date: "2026-10-28", kind: "use", text: "다 씀", qty: -1 },
+    { item: 3, date: "2026-05-11", kind: "buy", text: "지출 · 황동 노즐 10개", qty: 10 },
+    { item: 3, date: "2026-07-02", kind: "use", text: "다 씀 (막힘)", qty: -1 },
+    { item: 3, date: "2026-09-15", kind: "adjust", text: "조정 · 재고 실사", qty: -7 },
+    { item: 3, date: "2026-11-04", kind: "use", text: "다 씀", qty: -1 },
+    { item: 4, date: "2026-04-02", kind: "buy", text: "지출 · PEI 베드 시트", qty: 1 },
+    { item: 4, date: "2026-10-30", kind: "use", text: "다 씀 (코팅 벗겨짐)", qty: -1 },
+  ],
+  monthSpend: 33800, // 이번 달 지출 장부 `소모품 · 유지` 합계 (expenses.html)
+};
+
+// ---------------------------------------------------------------- 유틸
+const $ = (s, r = document) => r.querySelector(s);
+const byId = (list, id) => list.find((x) => x.id === Number(id));
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const won = (n) => (n == null ? "-" : Math.round(n).toLocaleString("ko-KR") + "원");
+const num = (n) => Number(n).toLocaleString("ko-KR");
+const help = (tip) => `<span class="help" tabindex="0" data-tip="${esc(tip)}">?</span>`;
+const dot = (d) => d.replaceAll("-", ".");
+const TODAY = "2026-11-13";
+const LINK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
+const buyLink = (p) => (p.buy_url ? `<a class="buy-link" href="${esc(p.buy_url)}" target="_blank" rel="noopener" data-link title="구매 페이지 열기 (새 탭)">${LINK_ICON}구매</a>` : "");
+let toastTimer;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200); }
+const level = (p) => (p.stock <= 0 ? "out" : p.stock <= p.alert ? "low" : "ok");
+const catName = (id) => byId(db.categories, id)?.name ?? "미분류";
+const lastUse = (p) => db.moves.filter((m) => m.item === p.id && m.kind === "use").sort((a, b) => b.date.localeCompare(a.date))[0];
+function addMove(it, kind, text, qty) { db.moves.push({ item: it.id, date: TODAY, kind, text, qty }); it.stock += qty; }
+
+// ---------------------------------------------------------------- 화면
+const state = { q: "", lowOnly: false, view: params.get("view") === "table" ? "table" : "card" };
+
+function render() {
+  const low = db.items.filter((p) => level(p) !== "ok");
+  if (!low.length) state.lowOnly = false;
+  const q = state.q.trim().toLowerCase();
+  const rows = db.items.filter((p) => (!state.lowOnly || level(p) !== "ok") && (!q || [p.name, p.shop, p.note].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  $("#view").innerHTML = `
+    <h2 class="page-title">재고 관리</h2>
+    <nav class="stock-tabs"><a href="filaments.html">필라멘트</a><a href="parts.html">부속품</a><a href="packaging.html">포장</a><a class="on" href="consumables.html">소모품</a></nav>
+    <div class="top-row">
+      <div class="stats"><span>소모품<b>${db.items.length}</b></span><span>카테고리<b>${db.categories.length}</b></span></div>
+      <div class="spacer"></div>
+      <button type="button" class="btn" data-act="add">+ 소모품 추가</button>
+    </div>
+    <div class="sum-cards">
+      <div class="sum-card"><span>등록 소모품</span><strong>${db.items.length}<small>개</small></strong></div>
+      <button type="button" class="sum-card ${low.length ? "warn" : ""} ${state.lowOnly ? "active" : ""}" data-act="low">
+        <span>부족 · 없음${help(state.lowOnly ? "부족한 소모품만 보는 중 · 다시 누르면 해제" : "남은 수량이 알림 기준 이하 · 누르면 그 소모품만")}</span><strong>${low.length}<small>개</small></strong></button>
+      <a class="sum-card" href="expenses.html" style="text-decoration:none;color:inherit"><span>이번 달 소모품 지출${help("지출 장부 `소모품 · 유지` 분류 합계 · 손익의 운영비로 들어가요. 누르면 지출 화면")}</span><strong>${won(db.monthSpend)}</strong></a>
+    </div>
+    <div class="section-head"><h3>소모품 목록</h3><span class="hint">${rows.length}개</span><div class="spacer"></div>
+      <input type="search" id="q" placeholder="품목 · 구매처 · 비고 검색" value="${esc(state.q)}">
+      ${state.q || state.lowOnly ? '<button type="button" class="btn small" data-act="clear">필터 지우기</button>' : ""}
+      <div class="view-tabs"><button type="button" data-view="card" class="${state.view === "card" ? "active" : ""}">카드</button><button type="button" data-view="table" class="${state.view === "table" ? "active" : ""}">표</button></div>
+    </div>
+    <p class="info-note">제품 원가에는 들어가지 않아요. 산 돈은 <a href="expenses.html">지출 장부</a> <b>소모품 · 유지</b> 로 손익에 들어가고, 여기서는 남은 개수만 챙겨요.</p>
+    ${state.view === "card" ? cards(rows) : table(rows)}`;
+  bindView();
+}
+
+function cards(rows) {
+  if (!rows.length) return '<div class="table-wrap"><div class="empty">조건에 맞는 소모품이 없어요.</div></div>';
+  const groups = [...db.categories.map((c) => ({ key: c.id, name: c.name })), { key: null, name: "미분류" }]
+    .map((g) => ({ ...g, items: rows.filter((p) => p.category === g.key) })).filter((g) => g.items.length);
+  return `<div class="cat-groups">${groups.map((g) => `<section class="cat-card">
+      <div class="cat-title ${g.key == null ? "none" : ""}"><h4>${esc(g.name)}</h4>
+        <span class="m">소모품 <b>${db.items.filter((p) => p.category === g.key).length}</b>개</span>
+        ${g.items.some((p) => level(p) !== "ok") ? `<span class="m warn">부족 · 없음 <b>${g.items.filter((p) => level(p) !== "ok").length}</b></span>` : ""}</div>
+      <div class="ptiles">
+      ${g.items.map(tile).join("")}
+      ${state.q || state.lowOnly ? "" : `<button type="button" class="ptile add" data-add-in="${g.key ?? ""}"><span>+</span>소모품</button>`}
+    </div></section>`).join("")}</div>`;
+}
+
+// 타일: 사진 · 상태 · 이름 · 구매처 · 남은 수량 · 마지막으로 다 쓴 날 · `1개 다 씀`
+function tile(p) {
+  const lv = level(p), lu = lastUse(p);
+  const flag = lv === "out" ? '<span class="badge bad">없음</span>' : lv === "low" ? '<span class="badge warn">부족</span>' : "";
+  return `<div class="ptile ${lv === "ok" ? "" : lv}" data-id="${p.id}" role="button" tabindex="0" title="${esc(p.name)} · 알림 기준 ${num(p.alert)}${esc(p.unit)}">
+    <span class="photo ${p.photo ? "" : "none"}">${p.photo ? `<img src="${p.photo}" alt="">` : `<span><b>${esc(p.name[0])}</b>사진 없음</span>`}</span>
+    ${buyLink(p)}<span class="flag">${flag}</span>
+    <button type="button" class="use" data-use="${p.id}" ${p.stock <= 0 ? "disabled" : ""} title="하나를 다 써서 남은 수량에서 1 빼기">1${esc(p.unit)} 다 씀</button>
+    <span class="body"><span class="pn">${esc(p.name)}</span>
+      <span class="sub">${esc(p.shop) || "구매처 없음"}</span>
+      <span class="last">${lu ? `마지막으로 다 씀 ${dot(lu.date)}` : "다 쓴 기록 없음"}</span>
+      <span class="foot"><span class="left">${num(p.stock)}<small>${esc(p.unit)}</small></span>
+        <span class="uprice ${p.price == null ? "none" : ""}">${p.price == null ? "가격 미입력" : `${won(p.price / p.pack_qty)}/${esc(p.unit)}`}</span></span></span>
+  </div>`;
+}
+
+function table(rows) {
+  if (!rows.length) return '<div class="table-wrap"><div class="empty">조건에 맞는 소모품이 없어요.</div></div>';
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>품목</th><th>카테고리</th><th>회사/구매처</th><th class="num">최근 구매가</th><th class="num">개당</th><th class="num">남은 수량</th><th>마지막으로 다 씀</th><th>비고</th><th></th></tr></thead>
+    <tbody>${rows.map((p) => { const lv = level(p), lu = lastUse(p); return `<tr data-id="${p.id}">
+      <td class="pname">${esc(p.name)}${buyLink(p)}</td><td><span class="cat ${p.category == null ? "none" : ""}">${esc(catName(p.category))}</span></td>
+      <td>${esc(p.shop) || '<span class="muted">-</span>'}</td>
+      <td class="num">${p.price == null ? '<span class="badge warn">미입력</span>' : `${won(p.price)} / ${num(p.pack_qty)}${esc(p.unit)}`}</td>
+      <td class="num">${p.price == null ? "-" : won(p.price / p.pack_qty)}</td>
+      <td class="num"><b style="color:${lv === "out" ? "var(--bad)" : lv === "low" ? "var(--warn)" : "inherit"}">${num(p.stock)}${esc(p.unit)}</b></td>
+      <td class="muted">${lu ? dot(lu.date) : "-"}</td><td class="note">${esc(p.note)}</td>
+      <td><button type="button" class="btn small" data-use="${p.id}" ${p.stock <= 0 ? "disabled" : ""}>1${esc(p.unit)} 다 씀</button></td></tr>`; }).join("")}</tbody></table></div>`;
+}
+
+function bindView() {
+  const q = $("#q");
+  q.oninput = () => { state.q = q.value; const pos = q.selectionStart; render(); const n = $("#q"); n.focus(); n.setSelectionRange(pos, pos); };
+  $("#view").onclick = (e) => {
+    if (e.target.closest(".help, [data-link]")) return;
+    const u = e.target.closest("[data-use]");
+    if (u) { const it = byId(db.items, u.dataset.use); addMove(it, "use", "다 씀", -1); render(); return toast(`${it.name} 1${it.unit} 다 씀 · 남은 ${num(it.stock)}${it.unit}${level(it) !== "ok" ? " · 살 때가 됐어요" : ""}`); }
+    const v = e.target.closest("[data-view]"); if (v) { state.view = v.dataset.view; return render(); }
+    const b = e.target.closest("[data-act]");
+    if (b) return ({
+      add: () => openItem(null),
+      low: () => { if (!db.items.some((p) => level(p) !== "ok")) return; state.lowOnly = !state.lowOnly; render(); },
+      clear: () => { Object.assign(state, { q: "", lowOnly: false }); render(); },
+    })[b.dataset.act]?.();
+    const add = e.target.closest("[data-add-in]"); if (add) return openItem(null, add.dataset.addIn ? Number(add.dataset.addIn) : null);
+    const t = e.target.closest("[data-id]"); if (t) openItem(byId(db.items, t.dataset.id));
+  };
+}
+
+// ---------------------------------------------------------------- 대화상자
+const dlg = { el: $("#dlg"), form: $("#dlg-form") };
+const dlg2 = { el: $("#dlg2"), form: $("#dlg2-form") };
+function show(dl, html, cls = "") {
+  dl.el.className = cls; dl.form.innerHTML = html;
+  dl.form.onclick = dl.form.onchange = dl.form.oninput = dl.form.onsubmit = null;
+  if (!dl.el.open) dl.el.showModal();
+}
+const catOpts = (sel) => `<option value="">미분류</option>${db.categories.map((c) => `<option value="${c.id}" ${c.id === sel ? "selected" : ""}>${esc(c.name)}</option>`).join("")}`;
+
+// 소모품 추가 / 수정 (+ 입출고 기록)
+function openItem(it, presetCat = null) {
+  const init = it ?? { category: presetCat, unit: "개", pack_qty: 1, alert: 1, stock: 0 };
+  let photo = init.photo ?? null;
+  const moves = it ? db.moves.filter((m) => m.item === it.id).sort((a, b) => b.date.localeCompare(a.date)) : [];
+  let left = it?.stock ?? 0;
+  const moveRows = moves.map((m) => { const r = `<div class="move"><span class="d">${dot(m.date)}</span><span>${esc(m.text)}</span><span class="q ${m.qty > 0 ? "plus" : "minus"}">${m.qty > 0 ? "+" : ""}${num(m.qty)}</span><span class="left">${num(left)}</span></div>`; left -= m.qty; return r; }).join("");
+  show(dlg, `<div class="dlg-head">${it ? "소모품 수정" : "소모품 추가"}</div>
+    <div class="dlg-body"><div class="form-grid">
+      <div class="field full"><span>사진</span><div class="photo-field"><div class="photo-box" id="photo-box"></div>
+        <div class="photo-btns"><label class="btn small"><input type="file" accept="image/*" id="photo-file"><span id="photo-pick"></span></label>
+          <button type="button" class="btn small danger" id="photo-clear">사진 빼기</button></div></div></div>
+      <label class="field full"><span>품목 *</span><input name="name" required value="${esc(init.name)}" placeholder="예: 순간접착제 20g"></label>
+      <label class="field"><span>카테고리</span><select name="category">${catOpts(init.category)}</select></label>
+      <label class="field"><span>회사/구매처</span><input name="shop" value="${esc(init.shop)}" placeholder="예: 다이소"></label>
+      <label class="field full"><span>구매 링크</span><input name="buy_url" type="url" value="${esc(init.buy_url)}" placeholder="https://…"></label>
+      <label class="field"><span>최근 구매가 (묶음 전체) ${help("참고용 · 제품 원가에는 안 써요. 지출 장부에서 이 소모품을 사면 자동으로 바뀌어요")}</span><div class="with-suffix"><input type="number" name="price" value="${init.price ?? ""}" placeholder="미입력"><em>원</em></div></label>
+      <div class="field"><span>묶음 수량 · 단위</span><div class="qty-unit"><input type="number" name="pack_qty" min="1" value="${init.pack_qty ?? 1}"><input name="unit" list="units" value="${esc(init.unit)}"></div></div>
+      <div class="field"><span>남은 수량</span>${it ? `<div class="stock-now"><b>${num(it.stock)}${esc(it.unit)}</b><button type="button" class="btn small" data-adjust>조정</button></div>
+        <span class="hint" style="font-size:12px">구매(지출)로 늘고, 목록의 <b>다 씀</b> 으로 줄어요</span>`
+        : `<div class="with-suffix"><input type="number" name="stock" min="0" value="0"><em>${esc(init.unit)}</em></div><span class="hint" style="font-size:12px">처음 등록할 때 지금 가진 수량</span>`}</div>
+      <label class="field"><span>부족 알림 기준 ${help("남은 수량이 이 값 이하면 `부족` · 0 이하면 `없음`. 떨어져도 괜찮으면 0")}</span><div class="with-suffix"><input type="number" name="alert" min="0" value="${init.alert ?? 1}"><em>이하</em></div></label>
+      <label class="field full"><span>비고</span><input name="note" value="${esc(init.note)}" placeholder="교체 주기 · 규격 등"></label>
+      ${it ? `<div class="field full"><span>입출고 기록 <span class="hint">· 최근 순 · 오른쪽은 그 뒤 남은 수량</span></span><div class="moves">${moveRows || '<span class="hint">기록 없음</span>'}</div></div>` : ""}
+    </div></div>
+    <div class="dlg-foot">${it ? '<button type="button" class="btn danger" data-del>삭제</button>' : ""}<div class="spacer"></div>
+      <button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div>`, "wide");
+  const f = dlg.form;
+  const drawPhoto = () => { $("#photo-box", f).innerHTML = photo ? `<img src="${photo}" alt="">` : "사진 없음"; $("#photo-pick", f).textContent = photo ? "사진 바꾸기" : "사진 넣기"; $("#photo-clear", f).hidden = !photo; };
+  drawPhoto();
+  $("#photo-file", f).onchange = (e) => { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = () => { photo = r.result; drawPhoto(); }; r.readAsDataURL(file); };
+  $("#photo-clear", f).onclick = () => { photo = null; drawPhoto(); };
+  f.onclick = (e) => {
+    if (e.target.closest(".help")) return e.preventDefault();
+    if (e.target.closest("[data-close]")) return dlg.el.close();
+    if (e.target.closest("[data-adjust]")) return openAdjust(it, () => openItem(it));
+    if (e.target.closest("[data-del]")) { dlg.el.close(); db.items = db.items.filter((x) => x !== it); render(); toast(`${it.name} 삭제했어요`); }
+  };
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    const el = f.elements, v = { name: el.name.value.trim(), category: el.category.value ? Number(el.category.value) : null, shop: el.shop.value.trim(), buy_url: el.buy_url.value.trim(),
+      price: el.price.value === "" ? null : Number(el.price.value), pack_qty: Math.max(1, Number(el.pack_qty.value) || 1), unit: el.unit.value.trim() || "개", alert: Math.max(0, Number(el.alert.value) || 0), note: el.note.value.trim(), photo };
+    if (it) Object.assign(it, v); else db.items.push({ id: Math.max(0, ...db.items.map((x) => x.id)) + 1, stock: Math.max(0, Number(el.stock.value) || 0), ...v });
+    dlg.el.close(); render(); toast("저장했어요");
+  };
+}
+
+// 남은 수량 조정 (부속품 · 포장 탭과 같음)
+function openAdjust(it, done) {
+  show(dlg2, `<div class="dlg-head">남은 수량 조정 <span class="hint" style="font-weight:400">${esc(it.name)}</span></div>
+    <div class="dlg-body"><div class="form-grid">
+      <div class="field full"><span>방식</span><div class="seg">
+        <label><input type="radio" name="mode" value="set" checked><span>실제 수량으로 맞추기</span></label>
+        <label><input type="radio" name="mode" value="minus"><span>빼기</span></label>
+        <label><input type="radio" name="mode" value="plus"><span>더하기</span></label></div></div>
+      <label class="field"><span id="adj-label">세어 본 수량</span><div class="with-suffix"><input type="number" name="qty" value="${it.stock}"><em>${esc(it.unit)}</em></div></label>
+      <label class="field"><span>사유</span><input name="reason" list="reasons" placeholder="예: 재고 실사"></label>
+      <div class="field full"><div class="adj-preview"><span>지금 <b>${num(it.stock)}${esc(it.unit)}</b> →</span><b id="adj-after"></b></div></div>
+    </div></div>
+    <datalist id="reasons"><option value="재고 실사"><option value="파손 · 버림"><option value="지출 없이 받음"></datalist>
+    <div class="dlg-foot"><div class="spacer"></div><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">조정</button></div>`);
+  const f = dlg2.form.elements;
+  const after = () => { const q = Number(f.qty.value) || 0; return f.mode.value === "set" ? q : f.mode.value === "plus" ? it.stock + q : it.stock - q; };
+  const upd = () => { const a = after(), x = a - it.stock; $("#adj-label", dlg2.form).textContent = f.mode.value === "set" ? "세어 본 수량" : "수량"; $("#adj-after", dlg2.form).textContent = `${num(a)}${it.unit} (${x >= 0 ? "+" : ""}${num(x)})`; };
+  let last = "set";
+  dlg2.form.onchange = dlg2.form.oninput = (e) => { if (e.target.name === "mode" && e.target.value !== last) { last = e.target.value; f.qty.value = last === "set" ? it.stock : 1; } upd(); };
+  upd();
+  dlg2.form.onclick = (e) => { if (e.target.closest("[data-close]")) dlg2.el.close(); };
+  dlg2.form.onsubmit = (e) => {
+    e.preventDefault();
+    const a = after(); if (a === it.stock) return toast("바뀐 수량이 없어요");
+    addMove(it, "adjust", `조정 · ${f.reason.value.trim() || "사유 없음"}`, a - it.stock);
+    dlg2.el.close(); render(); done?.(); toast(`${it.name} ${num(a)}${it.unit} 으로 조정했어요`);
+  };
+}
+
+// ---------------------------------------------------------------- 시작
+document.documentElement.dataset.theme = params.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+function toggleSide(force) {
+  const el = $("#layout"); const collapsed = force ?? !el.classList.contains("collapsed");
+  el.classList.toggle("collapsed", collapsed); $("[data-act='toggle-side'] .label").textContent = collapsed ? "펼치기" : "접기";
+  try { localStorage.setItem("pff-side-collapsed", collapsed ? "1" : "0"); } catch { /* 저장 불가 */ }
+}
+let savedSide = null; try { savedSide = localStorage.getItem("pff-side-collapsed"); } catch { /* 저장 불가 */ }
+if (savedSide === "1") toggleSide(true);
+render();
+({ item: () => openItem(db.items[2]), "item-new": () => openItem(null), adjust: () => openAdjust(db.items[2]) })[params.get("open")]?.();
+</script>
+</body>
+</html>

@@ -122,7 +122,7 @@ export function dueRecurring(recurring: RecurringExpense[], expenses: Expense[],
 
 // ---------------------------------------------------------------- CSV (EXP-07)
 
-const HEAD = ['날짜', '항목', '분류', '금액', '구매처', '주문 링크', '메모', '반복 지출']
+const HEAD = ['날짜', '항목', '분류', '금액', '구매처', '구매', '메모', '반복 지출']
 
 // 보이는 목록 그대로 (검색 · 필터 · 정렬)
 export function expensesCsv(rows: Expense[], recurring: RecurringExpense[]) {
@@ -134,7 +134,8 @@ export function expensesCsv(rows: Expense[], recurring: RecurringExpense[]) {
       categoryInfo(x.category).label,
       x.amount,
       x.shop,
-      x.url,
+      // 구매 항목: `Bambu Lab › PLA Basic · 화이트 4롤, …`
+      x.items.map((it) => `${it.name} ${it.qty}${it.unit}`).join(', '),
       x.note,
       x.recurring == null ? '' : (recurring.find((r) => r.id === x.recurring)?.name ?? ''),
     ]),

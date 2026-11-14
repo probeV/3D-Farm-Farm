@@ -1,14 +1,20 @@
 import { useState, type ReactNode } from 'react'
-import FilamentsPage from './pages/filaments/FilamentsPage'
+import { NavContext, type LabelPick, type Nav } from './nav'
 import ExpensesPage from './pages/expenses/ExpensesPage'
-import PartsPage from './pages/parts/PartsPage'
+import SalesPage from './pages/sales/SalesPage'
+import StorePage from './pages/sales/store/StorePage'
+import PlPage from './pages/pl/PlPage'
+import StockPage from './pages/stock/StockPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import type { CategoryKey } from './pages/settings/schemas'
 import ProductsPage from './pages/products/ProductsPage'
 import { applyTheme, loadTheme, saveTheme, THEMES, type ThemePref } from './theme'
 
-type Page = 'products' | 'filaments' | 'parts' | 'expenses' | 'settings'
+type Page = 'products' | 'stock' | 'sales' | 'expenses' | 'pl' | 'settings'
 
-const NAV: { page: Page; label: string; icon: ReactNode }[] = [
+type NavItem = { page: Page; label: string; icon: ReactNode }
+
+const NAV: NavItem[] = [
   {
     page: 'products',
     label: '제품 원가',
@@ -20,21 +26,28 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
       </>
     ),
   },
+  // v2 STOCK: 필라멘트 · 부자재 대신 하나 (화면 위 탭: 필라멘트 | 부속품 | 포장 | 소모품)
   {
-    page: 'filaments',
-    label: '필라멘트',
+    page: 'stock',
+    label: '재고 관리',
     icon: (
       <>
-        <circle cx="12" cy="12" r="8" />
-        <circle cx="12" cy="12" r="2.5" />
-        <path d="M12 4v5.5M12 14.5V20" />
+        <path d="M21 8l-9-5-9 5 9 5 9-5z" />
+        <path d="M3 8v8l9 5 9-5V8" />
+        <path d="M12 13v8" />
       </>
     ),
   },
   {
-    page: 'parts',
-    label: '부자재',
-    icon: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z" />,
+    page: 'sales',
+    label: '판매',
+    icon: (
+      <>
+        <path d="M3 7h18l-2 12H5z" />
+        <path d="M8 7a4 4 0 0 1 8 0" />
+        <path d="M12 11v5M9.5 13.5h5" />
+      </>
+    ),
   },
   {
     page: 'expenses',
@@ -46,19 +59,25 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
       </>
     ),
   },
+  // v2 PL: 판매 · 지출 · 스풀을 더해 현금 기준 / 손익 기준으로
   {
-    page: 'settings',
-    label: '제품 원가 설정',
-    icon: (
-      <>
-        <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
-        <circle cx="16" cy="6" r="2" />
-        <circle cx="10" cy="12" r="2" />
-        <circle cx="18" cy="18" r="2" />
-      </>
-    ),
+    page: 'pl',
+    label: '손익',
+    icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   },
 ]
+
+// 사이드바 맨 아래 (접기 위). 분류는 설정 화면 안에서 (TBD-16)
+const SETTINGS: NavItem = {
+  page: 'settings',
+  label: '설정',
+  icon: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+    </>
+  ),
+}
 
 function Icon({ children }: { children: ReactNode }) {
   return (
@@ -105,9 +124,44 @@ function loadCollapsed() {
 export default function App() {
   // 처음 여는 화면은 제품 원가 (v1.2.0)
   const [page, setPage] = useState<Page>('products')
+  const [settingsTab, setSettingsTab] = useState<CategoryKey>('cost')
+  // QR 라벨 인쇄 화면 (재고 관리 › 필라멘트 › QR, TBD-18). null 이면 재고 관리 탭 화면. key 는 열 때마다 새로 (고른 스풀 다시)
+  const [labels, setLabels] = useState<{ pick: LabelPick | null; key: number } | null>(null)
+  // 판매 › 스마트스토어 연동 (v2 STORE). false 면 판매 목록
+  const [storeOpen, setStoreOpen] = useState(false)
+  const nav: Nav = {
+    openLabels: (pick) => {
+      setLabels({ pick: pick ?? null, key: Date.now() })
+      setPage('stock')
+    },
+    openStore: () => {
+      setStoreOpen(true)
+      setPage('sales')
+    },
+  }
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [theme, setTheme] = useState(loadTheme)
-  const current = NAV.find((n) => n.page === page)!
+  const current = [...NAV, SETTINGS].find((n) => n.page === page)!
+  // 각 화면의 ⚙ 버튼: 설정의 자기 분류로 바로
+  const openSettings = (tab: CategoryKey) => {
+    setSettingsTab(tab)
+    setPage('settings')
+  }
+  const navButton = (n: NavItem) => (
+    <button
+      key={n.page}
+      className={n.page === page ? 'nav-item active' : 'nav-item'}
+      title={n.label}
+      onClick={() => {
+        setLabels(null)
+        setStoreOpen(false)
+        setPage(n.page)
+      }}
+    >
+      <Icon>{n.icon}</Icon>
+      <span className="label">{n.label}</span>
+    </button>
+  )
   const currentTheme = THEMES.find((t) => t.pref === theme)!
 
   const chooseTheme = (pref: ThemePref) => {
@@ -129,71 +183,69 @@ export default function App() {
   }
 
   return (
-    <div className={collapsed ? 'layout collapsed' : 'layout'}>
-      <aside className="sidebar">
-        <div className="side-brand">
-          <span className="mark">3D</span>
-          <span className="label">3D Farm Farm</span>
-        </div>
-        {NAV.map((n) => (
-          <button
-            key={n.page}
-            className={n.page === page ? 'nav-item active' : 'nav-item'}
-            title={n.label}
-            onClick={() => setPage(n.page)}
-          >
-            <Icon>{n.icon}</Icon>
-            <span className="label">{n.label}</span>
-          </button>
-        ))}
-        <div className="side-bottom">
-          <div className="theme-seg" role="radiogroup" aria-label="테마">
-            {THEMES.map((t) => (
-              <button
-                key={t.pref}
-                type="button"
-                role="radio"
-                aria-checked={t.pref === theme}
-                className={t.pref === theme ? 'on' : ''}
-                title={`테마: ${t.label}`}
-                onClick={() => chooseTheme(t.pref)}
-              >
-                <Icon>{THEME_ICON[t.pref]}</Icon>
-                {t.label}
-              </button>
-            ))}
+    <NavContext.Provider value={nav}>
+      <div className={collapsed ? 'layout collapsed' : 'layout'}>
+        <aside className="sidebar">
+          <div className="side-brand">
+            <span className="mark">3D</span>
+            <span className="label">3D Farm Farm</span>
           </div>
-          <button
-            className="nav-item theme-one"
-            title={`테마: ${currentTheme.label} (누르면 다음)`}
-            onClick={nextTheme}
-          >
-            <Icon>{THEME_ICON[theme]}</Icon>
-            <span className="label">{currentTheme.label}</span>
-          </button>
-          <button className="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onClick={toggleSide}>
-            <Icon>
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <path d="M9 4v16" />
-            </Icon>
-            <span className="label">{collapsed ? '펼치기' : '접기'}</span>
-          </button>
-        </div>
-      </aside>
-      <main>
-        <h1 className="page-title">{current.label}</h1>
-        {page === 'filaments' ? (
-          <FilamentsPage />
-        ) : page === 'products' ? (
-          <ProductsPage />
-        ) : page === 'parts' ? (
-          <PartsPage />
-        ) : page === 'expenses' ? (
-          <ExpensesPage />
-        ) : (
-          <SettingsPage />
-        )}
-      </main>
-    </div>
+          {NAV.map(navButton)}
+          <div className="side-bottom">
+            {navButton(SETTINGS)}
+            <div className="theme-seg" role="radiogroup" aria-label="테마">
+              {THEMES.map((t) => (
+                <button
+                  key={t.pref}
+                  type="button"
+                  role="radio"
+                  aria-checked={t.pref === theme}
+                  className={t.pref === theme ? 'on' : ''}
+                  title={`테마: ${t.label}`}
+                  onClick={() => chooseTheme(t.pref)}
+                >
+                  <Icon>{THEME_ICON[t.pref]}</Icon>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="nav-item theme-one"
+              title={`테마: ${currentTheme.label} (누르면 다음)`}
+              onClick={nextTheme}
+            >
+              <Icon>{THEME_ICON[theme]}</Icon>
+              <span className="label">{currentTheme.label}</span>
+            </button>
+            <button className="nav-item" data-act="toggle-side" title="사이드바 접기/펼치기" onClick={toggleSide}>
+              <Icon>
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M9 4v16" />
+              </Icon>
+              <span className="label">{collapsed ? '펼치기' : '접기'}</span>
+            </button>
+          </div>
+        </aside>
+        <main>
+          {/* 스마트스토어 연동은 `판매 ›` 와 자기 제목을 그림 */}
+          {!(page === 'sales' && storeOpen) && <h1 className="page-title">{current.label}</h1>}
+          {page === 'stock' ? (
+            <StockPage labels={labels} onCloseLabels={() => setLabels(null)} />
+          ) : page === 'products' ? (
+            <ProductsPage onSettings={() => openSettings('cost')} />
+          ) : page === 'sales' && storeOpen ? (
+            <StorePage onBack={() => setStoreOpen(false)} onSettings={() => openSettings('store')} />
+          ) : page === 'sales' ? (
+            <SalesPage onSettings={() => openSettings('store')} />
+          ) : page === 'expenses' ? (
+            <ExpensesPage />
+          ) : page === 'pl' ? (
+            <PlPage />
+          ) : (
+            <SettingsPage tab={settingsTab} onTab={setSettingsTab} />
+          )}
+        </main>
+      </div>
+    </NavContext.Provider>
   )
 }

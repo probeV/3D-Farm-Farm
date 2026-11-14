@@ -10,6 +10,8 @@ import { STATUS_LABEL, STATUSES } from '../status'
 import { useCostData, type CostData } from '../useCostData'
 import CostPanel from './CostPanel'
 import { initialValues, newKey, previewOf, type Start } from './draft'
+import { won } from '../../../format'
+import { setCost } from '../../stock/partList'
 import MaterialLines from './MaterialLines'
 import PartsFromDialog from './PartsFromDialog'
 import { productSchema } from './schemas'
@@ -28,7 +30,9 @@ export default function ProductDialog(props: Start & { onClose: () => void }) {
 }
 
 function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClose: () => void; data: CostData }) {
-  const { catalog, categories, filaments, parts, rows } = data
+  const { catalog, categories, filaments, parts, packSets, rows } = data
+  // 제품의 줄은 부속품만 (포장재는 기본 포장 세트로, 소모품은 원가에 안 들어감)
+  const partOptions = parts.filter((p) => p.kind === 'part')
   const refresh = useRefreshProducts()
   const toast = useToast()
 
@@ -36,6 +40,7 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
   const products = rows.map((r) => r.product)
   const form = useForm(productSchema, initialValues({ product, copyOf, preset }, products, filaments))
   const { values, errors, busy, change, update, submit } = form
+  const pickedPack = values.default_pack ? catalog.packSets.get(Number(values.default_pack)) : undefined
   const [addingCategory, setAddingCategory] = useState(false)
   const [pickingParts, setPickingParts] = useState(false) // `+ 다른 제품에서`
 
@@ -52,13 +57,9 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
   }
 
   const save = () =>
-    submit(async ({ no, filaments: lines, ...rest }) => {
-      const body = {
-        ...rest,
-        no: no ?? undefined, // 비우면 서버가 다음 번호 (수정이면 그대로)
-        // 사용량이 0 인 줄은 빼고 저장 (줄이 하나뿐이면 남김)
-        filaments: lines.filter((r) => r.grams || lines.length === 1),
-      }
+    submit(async ({ no, ...rest }) => {
+      // 사용량이 0 인 필라멘트 줄도 그대로 저장 — 색상만 먼저 골라 두고 g 은 나중에 넣을 수 있게 (TBD-32)
+      const body = { ...rest, no: no ?? undefined } // no 를 비우면 서버가 다음 번호 (수정이면 그대로)
       if (product) await updateProduct(product.id, body)
       else await createProduct(body)
       await refresh()
@@ -193,13 +194,40 @@ function ProductForm({ product, copyOf, preset, onClose, data }: Start & { onClo
               errors={errors}
               catalog={catalog}
               filaments={filaments}
-              parts={parts}
+              parts={partOptions}
               onPickFrom={() => setPickingParts(true)}
               filamentTotal={cost.filament}
               partTotal={cost.parts}
               onFilaments={(r) => change('filaments', r)}
               onParts={(r) => change('parts', r)}
             />
+            <div className="lines">
+              <div className="lines-head">
+                <h4>
+                  기본 포장<small>1개 보낼 때 · 판매에서 주문마다 바꿀 수 있어요</small>
+                </h4>
+              </div>
+              <div className="pack-pick">
+                <select value={values.default_pack} onChange={(e) => change('default_pack', e.target.value)}>
+                  <option value="">포장 고르기</option>
+                  {packSets.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} · {won(setCost(s, catalog.parts))}
+                    </option>
+                  ))}
+                </select>
+                <span className="pack-items">
+                  {pickedPack ? (
+                    pickedPack.lines
+                      .map((l) => `${catalog.parts.get(l.part)?.name ?? '?'} ${l.qty.toLocaleString('ko-KR')}`)
+                      .join(' · ')
+                  ) : (
+                    <span className="warn-t">고르지 않으면 포장비 0원 · 입력 필요</span>
+                  )}
+                </span>
+              </div>
+              {errors.default_pack && <span className="err">{errors.default_pack}</span>}
+            </div>
             <label className="field full" style={{ marginTop: 18 }}>
               <span>메모</span>
               <textarea rows={2} value={values.note} onChange={(e) => change('note', e.target.value)} />

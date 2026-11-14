@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Color, Filament } from '../../api/filaments'
-import type { CostSetting, Part } from '../../api/products'
+import type { CostSetting, PackSet, Part } from '../../api/products'
 import {
   calcCost,
   completeMargin,
@@ -30,6 +30,7 @@ const color = (
   spool_price,
   price_per_g: null,
   counts,
+  held_price: null,
 })
 const filament = (id: number, display_name: string, price: number | null, colors: Color[]): Filament => ({
   id,
@@ -46,6 +47,7 @@ const filament = (id: number, display_name: string, price: number | null, colors
 })
 const part = (id: number, name: string, unit_price: number | null): Part => ({
   id,
+  kind: 'part',
   name,
   category: null,
   shop: '',
@@ -54,8 +56,15 @@ const part = (id: number, name: string, unit_price: number | null): Part => ({
   pack_qty: 1,
   unit: '개',
   unit_price,
+  avg_price: unit_price,
   note: '',
   product_count: 0,
+  photo: null,
+  stock: 100,
+  alert: 0,
+  set_count: 0,
+  last_used: null,
+  bought: false,
 })
 
 // 화이트: 색상 가격 없음(필라멘트 가격 14,400) / 블랙: 색상 가격 15,000 / PETG: 가격 미입력
@@ -78,11 +87,18 @@ const setting: CostSetting = {
   shipping_cost: 0,
   target_margin: 40,
 }
-const catalog = makeCatalog(filaments, parts, setting)
+// 포장 세트 1: 포장재 없음(0원) — 기본 포장 경고 없이 다른 계산만 보려고. 2: 봉투 2장(100원)
+const packParts = [{ ...part(9, '봉투', 50), kind: 'pack' as const }]
+const packSets: PackSet[] = [
+  { id: 1, name: '빈 세트', note: '', product_count: 0, lines: [] },
+  { id: 2, name: '봉투 포장', note: '', product_count: 0, lines: [{ id: 1, part: 9, qty: 2 }] },
+]
+const catalog = makeCatalog(filaments, [...parts, ...packParts], setting, packSets)
 
 const product = (p: Partial<CostInput> = {}): CostInput => ({
   print_minutes: 120,
   sale_price: 10000,
+  default_pack: 1,
   filaments: [
     { filament: 1, color: WHITE, grams: 50 },
     { filament: 1, color: BLACK, grams: 20 },
@@ -127,10 +143,18 @@ describe('원가 계산 (PRD 3.6)', () => {
         sale_price: null,
         filaments: [{ filament: 2, color: CLEAR, grams: 30 }],
         parts: [{ part: 2, qty: 1 }],
+        default_pack: null,
       },
       catalog,
     )
-    expect(c.warnings).toEqual(['Esun › PETG 가격 미입력', '출력 시간 미입력', '에어캡 가격 미입력', '판매가 미입력'])
+    expect(c.warnings).toEqual([
+      'Esun › PETG 가격 미입력',
+      '출력 시간 미입력',
+      '에어캡 가격 미입력',
+      '판매가 미입력',
+      '기본 포장 미입력',
+    ])
+    expect(c.packWarnings).toEqual(['기본 포장 미입력'])
     expect(c.cost).toBe(0)
     expect(c.fee).toBe(0)
     expect(c.net).toBeNull()
@@ -190,8 +214,8 @@ describe('부자재비 카테고리별 (TBD-17)', () => {
       ],
     })
     const categories = [
-      { id: 2, name: '부품', part_count: 1 },
-      { id: 1, name: '포장재', part_count: 1 },
+      { id: 2, kind: 'part' as const, name: '부품', part_count: 1 },
+      { id: 1, kind: 'part' as const, name: '포장재', part_count: 1 },
     ]
     expect(partsByCategory(p, cat, categories)).toEqual([
       { name: '부품', amount: 720 },
@@ -206,7 +230,7 @@ describe('원가 내역 계산식 (TBD-19)', () => {
     const p = product()
     const f = costFormulas(p, calcCost(p, catalog), setting)
     expect(f.electricity).toBe('2시간 × 0.36kW × 215원/kWh = 155원')
-    expect(f.cost).toBe('필라멘트비 + 전기료 + 부자재비\n= 1,020원 + 155원 + 120원')
+    expect(f.cost).toBe('필라멘트비 + 전기료 + 부속품비 + 포장비\n= 1,020원 + 155원 + 120원 + 0원')
     expect(f.fee).toBe('판매가 × (주문관리 1.98% + 판매 2.73%)\n= 10,000원 × 4.71%')
     expect(f.net).toBe('판매가 − 원가 − 수수료\n= 10,000원 − 1,295원 − 471원')
     expect(f.recommended).toContain('= (1,295원 + 0원) ÷ (1 − 4.71% − 40%)')
@@ -226,11 +250,20 @@ describe('단가 안내 · 색상 · 순마진율 색', () => {
       '색상 가격 15,000원 / 1000g · g당 15.0원',
     )
     expect(filamentUnitText(catalog, { filament: 1, color: null, grams: 1 })).toBe('14,400원 / 1000g · g당 14.4원')
+    // 보유 스풀이 있으면 원가는 그 구매가 평균 (서버가 spool_price 에 넣어 줌, v2 PL)
+    const held = makeCatalog(
+      [filament(1, 'Bambu Lab › PLA Basic', 14400, [{ ...color(WHITE, 1, '화이트', null, 17500), held_price: 17500 }])],
+      parts,
+      setting,
+    )
+    expect(filamentUnitText(held, { filament: 1, color: WHITE, grams: 1 })).toBe(
+      '보유 스풀 평균 17,500원 / 1000g · g당 17.5원',
+    )
     expect(filamentUnitText(catalog, { filament: 2, color: null, grams: 1 })).toBe(
       '필라멘트 가격 미입력 — 0원으로 계산',
     )
     expect(partUnitText(catalog, { part: 1, qty: 1 })).toBe('개당 60원')
-    expect(partUnitText(catalog, { part: 2, qty: 1 })).toBe('부자재 가격 미입력 — 0원으로 계산')
+    expect(partUnitText(catalog, { part: 2, qty: 1 })).toBe('가격 미입력 — 0원으로 계산')
   })
 
   it('제품 색상: 고른 색상만, 같은 색상은 한 번', () => {
@@ -250,5 +283,15 @@ describe('단가 안내 · 색상 · 순마진율 색', () => {
     expect(marginClass(0.19)).toBe('m-warn')
     expect(marginClass(0.2)).toBe('m-good')
     expect(marginClass(null)).toBe('muted')
+  })
+})
+
+describe('포장비 (v2 STOCK-06)', () => {
+  it('기본 포장 세트 원가가 원가에 들어가고, 판매에 복사할 원가는 포장을 뺀다', () => {
+    const without = calcCost(product(), catalog)
+    const c = calcCost(product({ default_pack: 2 }), catalog)
+    expect(c.pack).toBe(100)
+    expect(c.cost).toBeCloseTo(without.cost + 100)
+    expect(c.warnings).toEqual([])
   })
 })

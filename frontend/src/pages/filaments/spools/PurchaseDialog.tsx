@@ -1,13 +1,15 @@
 import type { Color, Filament, PurchaseInput } from '../../../api/filaments'
 import Dialog from '../../../components/Dialog'
 import Field from '../../../components/Field'
+import Swatch from '../../../components/Swatch'
 import { today } from '../../../format'
 import { useForm } from '../../../useForm'
 import { purchaseSchema } from './schemas'
 import { useSpoolActions } from './spoolActions'
-import Swatch from '../../../components/Swatch'
 
-// 재고 추가: 수량 · 구매일 · 스풀 1개 구매가 · 번호 지정(선택) (PRD INV-02, docs/screens.md 1.7)
+// 재고 추가: 수량 · 구매일 · 스풀 1개 구매가 (PRD INV-02, docs/screens.md 1.7).
+// 지출 없이 들어온 스풀(선물 · 예전 재고)용 — 산 스풀은 필라멘트 지출을 저장하면 생긴다 (v2 TBD-33).
+// 번호는 항상 다음 번호부터 (지운 번호는 다시 안 씀)
 export default function PurchaseDialog({
   filament,
   color,
@@ -22,14 +24,12 @@ export default function PurchaseDialog({
     quantity: '1',
     purchased_at: today(),
     price: color.spool_price != null ? String(color.spool_price) : '',
-    code_nos: '',
   })
 
   const save = () =>
-    submit(async ({ quantity, purchased_at, price, code_nos }) => {
+    submit(async ({ quantity, purchased_at, price }) => {
       const input: PurchaseInput = { quantity, purchased_at }
       if (price != null) input.price = price
-      if (code_nos.length) input.code_nos = code_nos
       await actions.purchase(color, input)
       onClose()
     })
@@ -67,18 +67,9 @@ export default function PurchaseDialog({
             <em>원</em>
           </div>
         </Field>
-        <Field
-          label="번호 지정 (선택)"
-          full
-          error={errors.code_nos}
-          hint="지정한 번호를 먼저 쓰고, 모자란 만큼은 다음 번호부터 자동"
-        >
-          <input
-            value={values.code_nos}
-            placeholder="비우면 자동 · 예: 11, 15, 20-25"
-            onChange={(e) => change('code_nos', e.target.value)}
-          />
-        </Field>
+        <p className="hint full-row">
+          지출 없이 들어온 스풀용 (선물 · 예전 재고). 산 스풀은 <b>지출</b>에 적으면 자동으로 생겨요
+        </p>
       </div>
     </Dialog>
   )

@@ -21,7 +21,7 @@ const expense = (p: Partial<Expense>): Expense => ({
   category: 'etc',
   amount: 1000,
   shop: '',
-  url: '',
+  items: [],
   note: '',
   recurring: null,
   ...p,
@@ -86,9 +86,9 @@ describe('summarize · byCategory', () => {
     expect(summarize([], TODAY).since).toBeNull()
   })
 
-  it('분류별 합계는 7개 분류 모두 (없으면 0)', () => {
+  it('분류별 합계는 9개 분류 모두 (없으면 0)', () => {
     const rows = byCategory(ALL)
-    expect(rows.map((c) => c.amount)).toEqual([1179000, 0, 22000, 15000, 29000, 0, 0])
+    expect(rows.map((c) => c.amount)).toEqual([1179000, 0, 22000, 0, 15000, 29000, 0, 0, 0])
   })
 })
 
@@ -114,8 +114,8 @@ describe('반복 지출', () => {
 describe('expensesCsv', () => {
   it('BOM + 머리 줄 + 분류 이름 + 반복 지출 이름', () => {
     const lines = expensesCsv([ai, box], [recurring({ id: 1 })]).split('\r\n')
-    expect(lines[0]).toBe('﻿"날짜","항목","분류","금액","구매처","주문 링크","메모","반복 지출"')
+    expect(lines[0]).toBe('﻿"날짜","항목","분류","금액","구매처","구매","메모","반복 지출"')
     expect(lines[1]).toBe('"2026-10-05","AI 구독","구독 · 운영","29000","","","","AI 구독"')
-    expect(lines[2]).toBe('"2025-12-08","소형 박스","부자재","22000","","","50개",""')
+    expect(lines[2]).toBe('"2025-12-08","소형 박스","부속품","22000","","","50개",""')
   })
 })

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   createExpense,
   deleteExpense,
@@ -7,12 +8,28 @@ import {
   type ExpenseCategory,
   type RecurringExpense,
 } from '../../api/expenses'
+import { useFilaments } from '../../api/filaments'
+import { useParts } from '../../api/products'
 import Dialog from '../../components/Dialog'
 import Field from '../../components/Field'
 import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
 import { dotDate, today, won } from '../../format'
+import { useNav } from '../../nav'
 import { useForm } from '../../useForm'
+import BuyLines, { type BuyColor } from './BuyLines'
+import {
+  BUY_KINDS,
+  buyField,
+  checkRows,
+  emptyRow,
+  itemsErrorMessage,
+  parseRows,
+  rowsOf,
+  spoolDiff,
+  toInput,
+  type BuyRow,
+} from './buyRows'
 import CategoryPick from './CategoryPick'
 import { expenseSchema } from './schemas'
 
@@ -25,39 +42,127 @@ interface Props {
   onClose: () => void
 }
 
-// 지출 추가 · 복제 · 수정 (EXP-02, docs/screens.md 5.3). 삭제는 그것만 지워져서 확인 한 번
+// 지출 추가 · 복제 · 수정 (EXP-02, docs/screens.md 5.3). 삭제는 그것만 지워져서 확인 한 번.
+// 분류가 필라멘트 · 부속품 · 포장재 · 소모품이면 구매 항목 (v2 TBD-31 · 33) — 저장하면 스풀 · 남은 수량 · 평균 단가로 이어진다
 export default function ExpenseDialog({ expense, copyOf, recurring, shops, onCopy, onClose }: Props) {
   const refresh = useRefreshExpenses()
   const toast = useToast()
+  const nav = useNav()
   const confirm = useConfirm()
+  const filaments = useFilaments()
+  const parts = useParts()
   const src = expense ?? copyOf
+  const [rows, setRows] = useState<BuyRow[]>(() => {
+    const r = rowsOf(src, !expense)
+    return r.length ? r : [emptyRow()]
+  })
+  const [rowsError, setRowsError] = useState<string | null>(null)
   const { values, errors, busy, change, submit } = useForm(expenseSchema, {
     date: expense?.date ?? today(),
     name: src?.name ?? '',
     category: (src?.category ?? '') as ExpenseCategory | '',
     amount: src ? String(src.amount) : '',
     shop: src?.shop ?? '',
-    url: src?.url ?? '',
     note: src?.note ?? '',
   })
   const rec = expense?.recurring != null ? recurring.find((r) => r.id === expense.recurring) : undefined
+  const field = buyField(values.category)
+  const amountNum = Number(values.amount.replace(/,/g, ''))
+  const amount = values.amount.trim() && Number.isFinite(amountNum) ? amountNum : null
+  const colors: BuyColor[] = (filaments.data ?? []).flatMap((f) =>
+    f.colors.map((c) => ({ id: c.id, name: c.name, fil: f.display_name, price: c.spool_price })),
+  )
+  const kind = values.category ? BUY_KINDS[values.category] : undefined
+  const tabParts = (parts.data ?? []).filter((x) => x.kind === kind)
 
-  const save = () =>
-    submit(async (data) => {
-      // 수정할 때 반복 지출 연결은 그대로 둔다 (보내지 않음)
-      if (expense) await updateExpense(expense.id, data)
-      else await createExpense({ ...data, recurring: null })
+  // 분류를 바꾸면 구매 항목은 새로 (다른 분류의 색상 · 품목은 맞지 않음)
+  const changeCategory = (v: ExpenseCategory) => {
+    if (buyField(v) !== field || BUY_KINDS[v] !== kind) setRows([emptyRow()])
+    setRowsError(null)
+    change('category', v)
+  }
+  const changeRows = (next: BuyRow[]) => {
+    setRows(next)
+    if (rowsError) setRowsError(checkRows(values.category, amount, next))
+  }
+
+  // 저장 알림: `저장했어요 · 스풀 +4개 · 재고 네오디뮴 +200개` (단가는 평균이라 알림에 넣지 않음)
+  const savedMessage = () => {
+    if (!field) return '저장했어요'
+    const parsed = parseRows(rows)
+    const nameOf = (pick: number) =>
+      field === 'color'
+        ? colors.find((c) => c.id === pick)?.name
+        : tabParts.find((x) => x.id === pick)?.name.split(' ')[0]
+    const unitOf = (pick: number) => tabParts.find((x) => x.id === pick)?.unit ?? ''
+    // 같은 품목 여러 항목은 합쳐서 (저장 전과 비교한 차이)
+    const qtyBy = (list: { pick: number; qty: number }[]) =>
+      list.reduce((m, x) => m.set(x.pick, (m.get(x.pick) ?? 0) + x.qty), new Map<number, number>())
+    const before = qtyBy((expense?.items ?? []).map((it) => ({ pick: (it[field] ?? 0) as number, qty: it.qty })))
+    const now = qtyBy(parsed)
+    const stock =
+      field === 'part'
+        ? [...new Set([...now.keys(), ...before.keys()])]
+            .map((pick) => [pick, (now.get(pick) ?? 0) - (before.get(pick) ?? 0)] as const)
+            .filter(([, n]) => n)
+            .map(([pick, n]) => `${nameOf(pick)} ${n > 0 ? '+' : ''}${n}${unitOf(pick)}`)
+        : []
+    const spool = field === 'color' ? rows.reduce((a, r) => a + (r.pick == null ? -r.was : spoolDiff(r)), 0) : 0
+    const parts = [
+      spool > 0 ? `스풀 +${spool}개` : spool < 0 ? `재고 스풀 ${-spool}개 지움` : '',
+      stock.length ? `재고 ${stock.join(', ')}` : '',
+    ]
+    return ['저장했어요', ...parts.filter(Boolean)].join(' · ')
+  }
+
+  const save = () => {
+    const problem = field ? checkRows(values.category, amount, rows) : null
+    setRowsError(problem)
+    return submit(async (data) => {
+      if (problem) throw new Error(problem)
+      // 구매 항목: 그 분류일 때만, 고른 항목만. 아닌 분류면 빈 목록 (서버가 기존 항목을 지움)
+      const items = field ? toInput(field, rows) : []
+      let saved
+      try {
+        // 수정할 때 반복 지출 연결은 그대로 둔다 (보내지 않음)
+        saved = expense
+          ? await updateExpense(expense.id, { ...data, items })
+          : await createExpense({ ...data, recurring: null, items })
+      } catch (e) {
+        const msg = itemsErrorMessage(e)
+        if (msg) {
+          setRowsError(msg)
+          throw new Error(msg)
+        }
+        throw e
+      }
+      const msg = savedMessage()
       await refresh()
-      toast('저장했어요')
+      // 새 스풀이 생겼으면 `라벨 인쇄` → 이 지출의 스풀 중 라벨 없는 것을 골라 둔 QR 화면 (TBD-18)
+      const added = field === 'color' && rows.some((r) => r.pick != null && spoolDiff(r) > 0)
+      const buys = saved.items.filter((it) => it.color != null).map((it) => it.id)
+      toast(
+        msg,
+        undefined,
+        added
+          ? { label: '라벨 인쇄', run: () => nav.openLabels({ buys, from: `방금 저장한 지출 ${saved.name}의 스풀` }) }
+          : undefined,
+      )
       onClose()
     })
+  }
 
   const remove = async () => {
+    if (!expense) return
+    // 필라멘트: 사용한 스풀이 있으면 지울 수 없음 (서버도 409). 없으면 재고 스풀도 함께 지워짐
+    const used = expense.items.reduce((a, it) => a + it.used, 0)
+    if (used) return toast(`사용한 스풀 ${used}개가 있어 삭제할 수 없어요`)
+    const spools = expense.items.reduce((a, it) => a + it.spools, 0)
+    const message = `${expense.name} (${dotDate(expense.date)} · ${won(expense.amount)}) 을(를) 삭제할까요?`
     if (
-      !expense ||
       !(await confirm({
         title: '지출 삭제',
-        message: `${expense.name} (${dotDate(expense.date)} · ${won(expense.amount)}) 을(를) 삭제할까요?`,
+        message: spools ? `${message} 재고 스풀 ${spools}개도 함께 지워져요.` : message,
         danger: true,
       }))
     )
@@ -124,10 +229,23 @@ export default function ExpenseDialog({ expense, copyOf, recurring, shops, onCop
         {/* 라디오 버튼 묶음이라 label 이 아닌 div (label 안에 label 이 들어가지 않게) */}
         <div className="field full">
           <span>분류 *</span>
-          <CategoryPick value={values.category} onChange={(v) => change('category', v)} showInfo />
+          <CategoryPick value={values.category} onChange={changeCategory} />
           {errors.category && <span className="err">{errors.category}</span>}
         </div>
-        <Field label="구매처" error={errors.shop}>
+        {field && values.category && (
+          <BuyLines
+            category={values.category}
+            field={field}
+            rows={rows}
+            amount={amount}
+            expense={expense}
+            colors={colors}
+            parts={tabParts}
+            error={rowsError}
+            onChange={changeRows}
+          />
+        )}
+        <Field label="구매처" error={errors.shop} full>
           <input
             list="expense-shops"
             value={values.shop}
@@ -139,14 +257,6 @@ export default function ExpenseDialog({ expense, copyOf, recurring, shops, onCop
               <option key={s} value={s} />
             ))}
           </datalist>
-        </Field>
-        <Field label="주문 링크" error={errors.url}>
-          <input
-            type="url"
-            value={values.url}
-            placeholder="https://… 주문 내역"
-            onChange={(e) => change('url', e.target.value)}
-          />
         </Field>
         <Field label="메모" error={errors.note} full>
           <textarea

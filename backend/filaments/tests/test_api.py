@@ -225,38 +225,19 @@ class PurchaseApiTests(ApiTestCase):
         self.assertEqual({s['price'] for s in res.data}, {20000})
         self.assertEqual({s['status'] for s in res.data}, {'sealed'})
 
-    def test_chosen_numbers_and_price(self):
-        res = self.purchase(quantity=2, code_nos=[100, 7], price=18000)
-        self.assertEqual([s['code'] for s in res.data], ['S00007', 'S00100'])
+    def test_price_and_date(self):
+        res = self.purchase(quantity=2, price=18000)
         self.assertEqual(res.data[0]['price'], 18000)
         self.assertEqual(res.data[0]['purchased_at'], date.today().isoformat())
+        self.assertEqual(res.data[0]['buy'], None)
 
-    def test_reuse_deleted_number_and_fill_the_rest(self):
-        # S00011 을 지워서 비었을 때: 11 을 다시 쓰고 나머지 2개는 다음 번호부터
-        for n in (10, 11, 12, 50):
+    def test_deleted_number_not_reused(self):
+        """번호는 항상 다음 번호부터 — 맨 끝 스풀을 지워도 그 번호는 다시 안 씀 (TBD-33). 보낸 code_nos 는 무시"""
+        for n in (10, 11, 50):
             Spool.objects.create(color=self.color, code_no=n)
-        Spool.objects.get(code_no=11).delete()
-        res = self.purchase(quantity=3, code_nos=[11])
-        self.assertEqual([s['code'] for s in res.data], ['S00011', 'S00051', 'S00052'])
-
-    def test_auto_numbers_skip_chosen_ones(self):
-        Spool.objects.create(color=self.color, code_no=50)
-        res = self.purchase(quantity=3, code_nos=[52])
-        self.assertEqual([s['code'] for s in res.data], ['S00051', 'S00052', 'S00053'])
-
-    def test_taken_number_is_rejected_and_nothing_created(self):
-        Spool.objects.create(color=self.color, code_no=101)
-        res = self.purchase(quantity=3, code_nos=[100, 101])
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.data['code_nos'], ['S00101 는 이미 있습니다.'])
-        self.assertEqual(Spool.objects.count(), 1)
-
-    def test_bad_number_lists(self):
-        res = self.purchase(quantity=1, code_nos=[3, 4])
-        self.assertEqual(res.data['code_nos'], ['지정한 번호가 수량보다 많습니다.'])
-        res = self.purchase(quantity=3, code_nos=[3, 3])
-        self.assertEqual(res.data['code_nos'], ['같은 번호가 두 번 들어 있습니다: S00003'])
-        self.assertEqual(self.purchase(quantity=1, code_nos=[0]).status_code, 400)
+        Spool.objects.get(code_no=50).delete()
+        res = self.purchase(quantity=2, code_nos=[11])
+        self.assertEqual([s['code'] for s in res.data], ['S00051', 'S00052'])
 
     def test_quantity_limits(self):
         self.assertEqual(self.purchase(quantity=0).status_code, 400)
@@ -369,3 +350,63 @@ class SpoolApiTests(ApiTestCase):
         for url in [f'{API}/spools/999/', f'{API}/spools/abc/', f'{API}/spools/code/S00999/']:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).data, {'detail': '찾을 수 없습니다.'})
+
+
+class LabelApiTests(ApiTestCase):
+    """QR 라벨 (v2 TBD-18): 라벨 뽑음 표시 · QR 주소 앞부분 · 폰 스풀 화면"""
+
+    def setUp(self):
+        super().setUp()
+        self.spools = [Spool.objects.create(color=self.color) for _ in range(3)]
+
+    def test_new_spool_has_no_label(self):
+        res = self.client.get(f'{API}/spools/')
+        self.assertEqual({s['label_printed'] for s in res.data}, {False})
+
+    def test_mark_printed_and_undo(self):
+        ids = [s.pk for s in self.spools[:2]]
+        res = self.client.post(f'{API}/spools/labels/', {'ids': ids}, format='json')
+        self.assertEqual(res.data, {'updated': 2})
+        self.assertEqual(list(Spool.objects.filter(label_printed=True).values_list('pk', flat=True)), ids)
+        res = self.client.post(f'{API}/spools/labels/', {'ids': ids, 'printed': False}, format='json')
+        self.assertEqual(res.data, {'updated': 2})
+        self.assertFalse(Spool.objects.filter(label_printed=True).exists())
+
+    def test_mark_printed_bad_input(self):
+        for body in [{}, {'ids': []}, {'ids': ['abc']}, {'ids': list(range(1, 502))}]:
+            with self.subTest(body=str(body)[:30]):
+                res = self.client.post(f'{API}/spools/labels/', body, format='json')
+                self.assertEqual(res.status_code, 400)
+                self.assertIn('ids', res.data)
+
+    def test_public_url(self):
+        with self.settings(PUBLIC_URL='http://192.168.0.10:5173'):
+            self.assertEqual(self.client.get(f'{API}/spools/labels/').data, {'public_url': 'http://192.168.0.10:5173'})
+        with self.settings(PUBLIC_URL=''):
+            self.assertEqual(self.client.get(f'{API}/spools/labels/').data, {'public_url': ''})
+
+    def test_restore_keeps_label(self):
+        # 삭제 되돌리기: 라벨을 붙였던 스풀은 다시 만들어도 `라벨 뽑음`
+        res = self.client.post(f'{API}/spools/', {'color': self.color.pk, 'code_no': 99, 'label_printed': True})
+        self.assertEqual((res.status_code, res.data['label_printed']), (201, True))
+
+    def test_scan_shows_names_and_order(self):
+        from expenses.models import Expense, ExpenseItem
+
+        spool = self.spools[0]
+        res = self.client.get(f'{API}/spools/code/{spool.code}/')
+        self.assertEqual(
+            (res.data['color_name'], res.data['color_hex'], res.data['filament_name'], res.data['order']),
+            ('화이트', '#FFFFFF', 'Bambu Lab › PLA Basic', None),
+        )
+        expense = Expense.objects.create(
+            date=date(2026, 10, 27), name='PLA Basic 10롤', category='filament', amount=140000
+        )
+        spool.buy = ExpenseItem.objects.create(expense=expense, color=self.color, qty=1)
+        spool.save()
+        with CaptureQueriesContext(connection) as queries:
+            res = self.client.get(f'{API}/spools/code/{spool.code}/')
+        self.assertEqual(
+            res.data['order'], {'expense': expense.pk, 'date': date(2026, 10, 27), 'name': 'PLA Basic 10롤'}
+        )
+        self.assertEqual(len(queries), 1)

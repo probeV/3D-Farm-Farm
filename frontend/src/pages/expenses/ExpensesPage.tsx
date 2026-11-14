@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react'
 import { useExpenses, useRecurringExpenses, type Expense, type ExpenseCategory } from '../../api/expenses'
 import Help from '../../components/Help'
-import LinkBadge from '../../components/LinkBadge'
 import SortTh from '../../components/SortTh'
 import { downloadText } from '../../csv'
 import { dotDate, today, won } from '../../format'
 import { nextSort } from '../../sort'
+import { buyMark } from './buyRows'
 import { CATEGORIES, categoryInfo } from './categories'
 import DueDialog from './DueDialog'
 import ExpenseDialog from './ExpenseDialog'
@@ -75,7 +75,9 @@ export default function ExpensesPage() {
   return (
     <>
       <div className="top-row">
-        <span className="hint">장비 · 재료 · 구독 등 사업에 쓴 돈. 주문 내역은 링크로 남겨 두세요.</span>
+        <span className="hint">
+          장비 · 재료 · 구독 등 사업에 쓴 돈. 필라멘트 · 부속품 · 포장재 · 소모품은 산 것을 적으면 재고로 이어져요.
+        </span>
         <div className="spacer" />
         <button className="btn" onClick={() => setDialog({ kind: 'recurring' })}>
           반복 지출 관리
@@ -89,7 +91,7 @@ export default function ExpensesPage() {
         <div className="sum-card invest">
           <span>
             누적 투자금
-            <Help tip="투자(장비) 분류의 지출 합계 · 전체 기간. v2 에서 투자 회수율의 기준이 돼요" />
+            <Help tip="장비 분류의 지출 합계 · 전체 기간. v2 에서 투자 회수율의 기준이 돼요" />
           </span>
           <strong>{won(sum.invest)}</strong>
           <span className="sub">장비 {sum.investCount}건</span>
@@ -246,7 +248,7 @@ export default function ExpensesPage() {
                         ↻ 반복
                       </span>
                     )}
-                    <LinkBadge href={x.url} label="주문" title="주문 내역 열기" />
+                    <BuyMark expense={x} />
                   </td>
                   <td>
                     <span className={x.category === 'invest' ? 'cat invest' : 'cat'}>
@@ -291,4 +293,14 @@ export default function ExpensesPage() {
       />
     )
   }
+}
+
+// 항목 옆 구매 표시 (TBD-31 · 33): 필라멘트 `🧵 6롤` · 품목 `📦 네오디뮴 200개`
+function BuyMark({ expense }: { expense: Expense }) {
+  const mark = buyMark(expense)
+  return mark ? (
+    <span className="rec-mark buy" title={mark.title}>
+      {mark.text}
+    </span>
+  ) : null
 }

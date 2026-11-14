@@ -60,7 +60,7 @@ export default function ColorManageDialog({ filament, color, onClose }: Props) {
     >
       {tab === 'info' ? (
         <div className="hub-info">
-          <ColorFields filament={filament} editor={ed} />
+          <ColorFields filament={filament} color={color} editor={ed} />
           <Summary filament={filament} color={color} using={ed.using} onSpools={() => setTab('spools')} />
         </div>
       ) : (

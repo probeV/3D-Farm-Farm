@@ -1,5 +1,5 @@
-// 제품 원가 설정 항목 · 검증 스키마 (PRD 3.8, docs/screens.md 4장). 공통 규칙은 src/validation.ts,
-// 서버 규칙은 backend/products/models.py CostSetting (소수 자리 · 범위를 같게 맞춘다)
+// 설정 분류 · 항목 · 검증 스키마 (PRD 3.8, docs/screens.md 4장, 목업 docs/mockups/settings.html). 공통 규칙은 src/validation.ts,
+// 서버 규칙은 backend/products/models.py CostSetting (소수 자리 · 범위를 같게 맞춘다). 값은 모두 CostSetting 한 행에 저장
 import { z } from 'zod'
 import type { CostSetting } from '../../api/products'
 import { decimal, intRange, validate } from '../../validation'
@@ -12,49 +12,109 @@ export interface SettingItem {
   desc: string
   unit: string
   def: number // 기본값 (서버 모델 기본값과 같음)
+  uses?: string[] // 이 값을 쓰는 화면 (여러 곳에서 쓰는 값만 표시)
 }
+
+export type CalcKind = 'elec' | 'rec' | 'fee'
 
 export interface SettingGroup {
   icon: string
   title: string
+  calc: CalcKind // 묶음 제목 줄 오른쪽 계산 예시
   items: SettingItem[]
 }
 
-// 프린터 구매가 · 예상 수명 · 출력 실패율은 뺐다 (추후 투자 장비 · 이윤 계산에서, PRD 5장)
-export const GROUPS: SettingGroup[] = [
+export type CategoryKey = 'cost' | 'store'
+
+export interface SettingCategory {
+  key: CategoryKey
+  icon: string
+  label: string
+  desc: string
+  effect: string // 저장 줄: "저장하면 …"
+  groups: SettingGroup[]
+}
+
+// 프린터 구매가 · 예상 수명 · 출력 실패율은 뺐다 (투자 장비는 손익 PL-02 에서)
+// 스마트스토어 연결 상태 묶음은 스마트스토어 연동(STORE-04) 때 이 분류에 추가
+export const CATEGORIES: SettingCategory[] = [
   {
-    icon: '⚡',
-    title: '전기료',
-    items: [
-      { key: 'power_kw', name: '프린터 소비 전력', desc: '출력 중 평균 소비 전력', unit: 'kW', def: 0.36 },
-      { key: 'elec_rate', name: '전기료 단가', desc: '1kWh 당 전기 요금', unit: '원/kWh', def: 215 },
+    key: 'cost',
+    icon: '🧮',
+    label: '제품 원가',
+    desc: '제품 원가 · 권장 판매가 계산에 쓰는 값',
+    effect: '모든 제품 원가에 바로 반영돼요',
+    groups: [
+      {
+        icon: '⚡',
+        title: '전기료',
+        calc: 'elec',
+        items: [
+          { key: 'power_kw', name: '프린터 소비 전력', desc: '출력 중 평균 소비 전력', unit: 'kW', def: 0.36 },
+          { key: 'elec_rate', name: '전기료 단가', desc: '1kWh 당 전기 요금', unit: '원/kWh', def: 215 },
+        ],
+      },
+      {
+        icon: '🏷️',
+        title: '판매가',
+        calc: 'rec',
+        items: [
+          {
+            key: 'target_margin',
+            name: '목표 마진율',
+            desc: '제품 창의 권장 판매가 계산에만 써요',
+            unit: '%',
+            def: 40,
+          },
+        ],
+      },
     ],
   },
   {
+    key: 'store',
     icon: '🛒',
-    title: '스마트스토어',
-    items: [
-      { key: 'fee_order', name: '네이버페이 주문관리 수수료', desc: '판매가 대비', unit: '%', def: 1.98 },
+    label: '스마트스토어',
+    desc: '연결 상태와 수수료 · 배송비',
+    effect: '제품 원가와 새로 넣는 판매의 수수료에 반영돼요 (이미 넣은 판매는 그대로)',
+    groups: [
       {
-        key: 'fee_sales',
-        name: '스마트스토어 판매 수수료',
-        desc: '판매가 대비 (유입 경로에 따라 다를 수 있음)',
-        unit: '%',
-        def: 2.73,
+        icon: '💳',
+        title: '수수료 · 배송비',
+        calc: 'fee',
+        items: [
+          {
+            key: 'fee_order',
+            name: '네이버페이 주문관리 수수료',
+            desc: '판매가 대비',
+            unit: '%',
+            def: 1.98,
+            uses: ['제품 원가', '판매'],
+          },
+          {
+            key: 'fee_sales',
+            name: '스마트스토어 판매 수수료',
+            desc: '판매가 대비 (유입 경로에 따라 다를 수 있음)',
+            unit: '%',
+            def: 2.73,
+            uses: ['제품 원가', '판매'],
+          },
+          {
+            key: 'shipping_cost',
+            name: '건당 판매자 부담 배송비',
+            desc: '무료배송이면 실제 택배비를 입력',
+            unit: '원',
+            def: 0,
+            uses: ['제품 원가', '판매'],
+          },
+        ],
       },
-      {
-        key: 'shipping_cost',
-        name: '건당 판매자 부담 배송비',
-        desc: '무료배송이면 실제 택배비를 입력',
-        unit: '원',
-        def: 0,
-      },
-      { key: 'target_margin', name: '목표 마진율', desc: '제품 창의 권장 판매가 계산에만 써요', unit: '%', def: 40 },
     ],
   },
 ]
 
-export const ITEMS = GROUPS.flatMap((g) => g.items)
+export const categoryOf = (key: CategoryKey) => CATEGORIES.find((c) => c.key === key)!
+export const itemsOf = (c: SettingCategory) => c.groups.flatMap((g) => g.items)
+export const ITEMS = CATEGORIES.flatMap(itemsOf)
 
 const percent = decimal(0, 100, 2)
 
@@ -76,18 +136,23 @@ export const toText = (n: number) => n.toLocaleString('ko-KR', { maximumFraction
 export const initialValues = (s: CostSetting) =>
   Object.fromEntries(ITEMS.map((it) => [it.key, toText(s[it.key])])) as Values
 
-// 입력 중인 값 읽기: 칸별 숫자(틀린 칸은 저장된 값) + 오류 + 저장된 값과 다른 항목 수 + 기본값과 다른 항목 수
-export function readValues(values: Values, saved: CostSetting) {
-  const errors = validate(settingSchema, values)
+// 입력 중인 값 읽기 (한 분류): 칸별 숫자(틀린 칸 · 다른 분류는 저장된 값) + 오류 + 저장된 값과 다른 항목
+export function readValues(values: Values, saved: CostSetting, cat: SettingCategory) {
+  const items = itemsOf(cat)
+  const all = validate(settingSchema, values)
+  const errors = Object.fromEntries(items.filter((it) => all[it.key]).map((it) => [it.key, all[it.key]]))
   const numbers = { ...saved }
-  for (const it of ITEMS) {
+  for (const it of items) {
     if (errors[it.key]) continue
     numbers[it.key] = settingSchema.shape[it.key].parse(values[it.key]) as number
   }
-  const changed = ITEMS.filter((it) => errors[it.key] || numbers[it.key] !== saved[it.key]).map((it) => it.key)
-  const offDefault = ITEMS.filter((it) => !errors[it.key] && numbers[it.key] !== it.def).length
-  return { numbers, errors, changed, offDefault }
+  const changed = items.filter((it) => errors[it.key] || numbers[it.key] !== saved[it.key]).map((it) => it.key)
+  return { numbers, errors, changed }
 }
+
+// 저장할 값: 이 분류의 항목만 (분류마다 저장)
+export const pickCategory = (data: CostSetting, cat: SettingCategory) =>
+  Object.fromEntries(itemsOf(cat).map((it) => [it.key, data[it.key]])) as Partial<CostSetting>
 
 // 묶음 제목 줄의 계산 예시: 1시간 출력 전기료, 수수료 합계, 원가 1만원 제품 권장 판매가 (계산은 PRD 3.6 과 같음)
 export function examples(s: CostSetting) {
@@ -96,6 +161,7 @@ export function examples(s: CostSetting) {
   return {
     hourElectricity: s.power_kw * s.elec_rate,
     feeRate,
+    fee20k: 20000 * feeRate,
     recommended10k: denom > 0 ? Math.ceil((10000 + s.shipping_cost) / denom / 100 - 1e-9) * 100 : null,
   }
 }
