@@ -6,7 +6,7 @@ interface Props {
   onChange: (v: ExpenseCategory) => void
 }
 
-// 분류 고르기: 버튼 8개, 4칸 2줄 (EXP-03). 분류는 고정이라 선택 상자 대신 한눈에 보이게. 예시는 툴팁
+// 분류 고르기: 버튼 9개, 3칸 3줄 (EXP-03). 분류는 고정이라 선택 상자 대신 한눈에 보이게. 예시는 툴팁
 export default function CategoryPick({ value, onChange }: Props) {
   return (
     <div className="cat-pick" role="radiogroup" aria-label="분류">

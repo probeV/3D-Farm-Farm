@@ -25,6 +25,7 @@ const part = (p: Partial<Part>): Part => ({
   pack_qty: 10,
   unit: '개',
   unit_price: 100,
+  avg_price: 100,
   note: '',
   product_count: 0,
   photo: null,
@@ -32,7 +33,7 @@ const part = (p: Partial<Part>): Part => ({
   alert: 0,
   set_count: 0,
   last_used: null,
-  last_buy: null,
+  bought: false,
   ...p,
 })
 

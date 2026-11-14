@@ -65,14 +65,11 @@ export function splitTotals(category: ExpenseCategory | '', amount: number, rows
   return rows.map((r) => r.amount ?? (weights ? (left * weight(r)) / weights : 0))
 }
 
-// 같은 색상 · 품목 항목을 합친 단가 {pick: 합계 ÷ 수량 합계} — 최근 구매가 (서버 refresh_buy_prices 와 같음)
-export function averageEach(rows: ParsedRow[], totals: number[]) {
-  const sum = new Map<number, { total: number; qty: number }>()
-  rows.forEach((r, i) => {
-    const g = sum.get(r.pick) ?? { total: 0, qty: 0 }
-    sum.set(r.pick, { total: g.total + totals[i], qty: g.qty + (r.qty || 0) })
-  })
-  return new Map([...sum].map(([pick, g]) => [pick, g.qty ? g.total / g.qty : 0]))
+// 평균 단가(이동평균, v2 PL — 서버 stock/services.py mix 와 같음): 남은 수량(0 아래면 0) × 지금 평균 + 산 수량 × 단가
+// → 새 평균. 지금 평균을 모르거나 남은 게 없으면 산 단가
+export function nextAverage(stock: number, avg: number | null, qty: number, each: number) {
+  const base = Math.max(stock, 0)
+  return avg == null || base === 0 ? each : (base * avg + qty * each) / (base + qty)
 }
 
 // 필라멘트 항목: 저장하면 스풀이 몇 개 바뀌는지 (+ 생김, − 재고 스풀 지움). 새 항목은 롤 수만큼
@@ -105,17 +102,6 @@ export const toInput = (field: BuyField, rows: BuyRow[]): ExpenseItemInput[] =>
     qty: r.qty,
     amount: r.amount,
   }))
-
-// 이 지출(날짜 date)의 그 색상 · 품목이 '최근 구매'인지 — 더 늦은 지출에 같은 것이 없으면.
-// 같은 날이면 나중에 넣은 지출이 최근 (서버: 지출 날짜 → 지출 id 순). 새 지출은 같은 날 다른 지출보다 나중
-export function isLatest(all: Expense[], current: Expense | null, field: BuyField, pick: number, date: string) {
-  return !all.some(
-    (y) =>
-      y.id !== current?.id &&
-      (y.date > date || (y.date === date && current != null && y.id > current.id)) &&
-      y.items.some((it) => it[field] === pick),
-  )
-}
 
 // 목록 항목 옆 표시: `🧵 6롤` / `📦 네오디뮴 200개 · 소형 50개`
 export function buyMark(x: Expense): { text: string; title: string } | null {

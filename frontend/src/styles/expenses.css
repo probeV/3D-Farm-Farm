@@ -137,10 +137,10 @@
   color: var(--accent);
 }
 
-/* 분류 고르기: 버튼 8개, 4칸 2줄 */
+/* 분류 고르기: 버튼 9개, 3칸 3줄 */
 .cat-pick {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 .cat-pick label {

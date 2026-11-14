@@ -13,7 +13,7 @@ const color = (id: number, c: ByStatus): Color => ({
   spool_price: 14400,
   price_per_g: 14.4,
   counts: c,
-  last_buy: null,
+  held_price: null,
 })
 
 const filament = (spool_g: number, colors: Color[]): Filament => ({

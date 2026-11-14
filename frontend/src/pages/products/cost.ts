@@ -53,7 +53,7 @@ export interface Cost {
   packWarnings: string[] // 그중 포장비 쪽 (판매에 복사하는 원가는 포장을 빼므로 따로, sales/saleList.ts snapshotCost)
 }
 
-// 줄의 스풀 가격: 고른 색상의 가격(색상 가격이 없으면 필라멘트 가격), 색상을 안 고르면 필라멘트 가격
+// 줄의 스풀 가격: 고른 색상의 spool_price(보유 스풀 평균 → 색상 가격 → 필라멘트 가격, 서버 계산), 색상을 안 고르면 필라멘트 가격
 function spoolPrice(catalog: Catalog, filament: Filament, colorId: number | null) {
   const color = colorId == null ? undefined : catalog.colors.get(colorId)
   return color && color.filament === filament.id ? color.spool_price : filament.price
@@ -79,7 +79,8 @@ export function filamentUnitText(catalog: Catalog, row: CostInput['filaments'][n
   const price = spoolPrice(catalog, filament, row.color)
   if (price == null) return '필라멘트 가격 미입력 — 0원으로 계산'
   const color = row.color == null ? undefined : catalog.colors.get(row.color)
-  const prefix = color?.price != null && color.filament === filament.id ? '색상 가격 ' : ''
+  const own = color && color.filament === filament.id ? color : undefined
+  const prefix = own?.held_price != null ? '보유 스풀 평균 ' : own?.price != null ? '색상 가격 ' : ''
   const won = Math.round(price).toLocaleString('ko-KR')
   return `${prefix}${won}원 / ${filament.spool_g}g · g당 ${(price / filament.spool_g).toFixed(1)}원`
 }

@@ -429,13 +429,13 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
                   회사/구매처
                 </SortTh>
                 <SortTh sortKey="price" num {...th}>
-                  {kind === 'supply' ? '최근 구매가' : '구매가'}
+                  구매가
                 </SortTh>
                 <SortTh sortKey="packQty" num {...th}>
                   묶음 수량
                 </SortTh>
                 <SortTh sortKey="unitPrice" num {...th}>
-                  개당 단가
+                  평균 단가
                 </SortTh>
                 <SortTh sortKey="stock" num {...th}>
                   남은 수량
@@ -485,14 +485,29 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
                       )}
                     </td>
                     <td>{p.shop || <span className="muted">-</span>}</td>
+                    {/* 지출로 산 품목은 직접 넣은 구매가를 쓰지 않음 (단가는 지출 기록의 평균) */}
                     <td className="num">
-                      {p.price == null ? <span className="badge warn">미입력</span> : won(p.price)}
+                      {p.bought ? (
+                        <span className="muted" title="지출로 산 품목 — 단가는 지출 기록의 평균">
+                          지출
+                        </span>
+                      ) : p.price == null ? (
+                        <span className="badge warn">미입력</span>
+                      ) : (
+                        won(p.price)
+                      )}
                     </td>
                     <td className="num">
-                      {qty(p.pack_qty)}
-                      {p.unit}
+                      {p.bought ? (
+                        <span className="muted">-</span>
+                      ) : (
+                        <>
+                          {qty(p.pack_qty)}
+                          {p.unit}
+                        </>
+                      )}
                     </td>
-                    <td className="num unit-price">
+                    <td className="num unit-price" title="평균 단가 (원가 계산 · 판매 · 손익)">
                       {p.unit_price == null ? <span className="muted">-</span> : unitWon(p.unit_price)}
                     </td>
                     <td className="num">
@@ -623,7 +638,7 @@ function Tile({ part: p, sub, tip, onOpen, onUse }: TileProps) {
             {qty(p.stock)}
             <small>{p.unit}</small>
           </span>
-          <span className={p.price == null ? 'uprice none' : 'uprice'}>
+          <span className={p.unit_price == null ? 'uprice none' : 'uprice'} title="평균 단가 (원가 계산 · 판매 · 손익)">
             {p.unit_price == null ? '가격 미입력' : `${unitWon(p.unit_price)}/${p.unit}`}
           </span>
         </span>

@@ -21,23 +21,16 @@ export interface Material {
   filament_count: number
 }
 
-// 최근 구매 (지출 장부의 구매 항목, v2 TBD-31 · 33). 가격 옆 `최근 구매가 · 날짜 주문명 (지출)`
-export interface LastBuy {
-  expense: number
-  date: string
-  name: string
-}
-
 export interface Color {
   id: number
   filament: number
   name: string
   hex: string
-  price: number | null
-  spool_price: number | null
+  price: number | null // 등록 가격 (비우면 필라멘트 가격). 보유 스풀이 없을 때만 원가에 씀
+  spool_price: number | null // 원가 계산의 스풀 가격 = 보유 스풀 평균(held_price), 없으면 등록 가격 (v2 PL)
+  held_price: number | null // 보유(재고 · 사용 중) 스풀 구매가 평균, 없으면 null
   price_per_g: number | null
   counts: ByStatus
-  last_buy: LastBuy | null // 있으면 price 는 그 지출의 롤당 금액 (다음 구매 때 다시 바뀜)
 }
 
 export interface Filament {

@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../api/client'
 import type { Expense, ExpenseItem } from '../../api/expenses'
 import {
-  averageEach,
   buyField,
   buyMark,
   checkRows,
   emptyRow,
-  isLatest,
+  nextAverage,
   itemsErrorMessage,
   minRolls,
   parseRows,
@@ -61,7 +60,7 @@ describe('buyField', () => {
   })
 })
 
-describe('splitTotals · averageEach', () => {
+describe('splitTotals', () => {
   it('비운 항목은 남은 금액을 필라멘트는 롤 수대로 나눔', () => {
     const rows = parseRows([row({ pick: 1, qty: '4' }), row({ pick: 2, qty: '2' })])
     expect(splitTotals('filament', 108000, rows)).toEqual([72000, 36000])
@@ -70,11 +69,6 @@ describe('splitTotals · averageEach', () => {
   it('금액 적은 항목은 그대로, 남은 금액은 비운 항목에 (고르지 않은 항목은 뺌)', () => {
     const rows = parseRows([row({ pick: 1, qty: '2', amount: '30,000' }), row({ pick: 2, qty: '1' }), row({})])
     expect(splitTotals('part', 50000, rows)).toEqual([30000, 20000])
-  })
-
-  it('같은 색상 여러 항목이면 단가는 합계 ÷ 롤 수 합계', () => {
-    const rows = parseRows([row({ pick: 1, qty: '9', amount: '180000' }), row({ pick: 1, qty: '1', amount: '10000' })])
-    expect(averageEach(rows, splitTotals('filament', 190000, rows)).get(1)).toBe(19000)
   })
 })
 
@@ -124,24 +118,6 @@ describe('toInput', () => {
   })
 })
 
-describe('isLatest', () => {
-  const june = expense({ id: 1, date: '2026-06-03', items: [item({ part: 5 })] })
-  const oct = expense({ id: 2, date: '2026-10-03', items: [item({ part: 5 })] })
-  const all = [oct, june]
-
-  it('더 늦은 지출에 같은 품목이 있으면 최근 구매 아님', () => {
-    expect(isLatest(all, june, 'part', 5, june.date)).toBe(false)
-    expect(isLatest(all, oct, 'part', 5, oct.date)).toBe(true)
-    expect(isLatest(all, june, 'part', 6, june.date)).toBe(true)
-  })
-
-  it('같은 날이면 나중에 넣은 지출이 최근 (새 지출은 가장 나중)', () => {
-    expect(isLatest(all, null, 'part', 5, '2026-10-03')).toBe(true)
-    const later = expense({ id: 3, date: '2026-10-03', items: [item({ part: 5 })] })
-    expect(isLatest([...all, later], oct, 'part', 5, oct.date)).toBe(false)
-  })
-})
-
 describe('buyMark', () => {
   it('필라멘트는 롤 수, 품목은 첫 단어 + 수량', () => {
     const fil = expense({
@@ -168,5 +144,16 @@ describe('itemsErrorMessage', () => {
       ),
     ).toBe('구매 2번째 항목: 사용한 스풀 2개가 있어 색상을 바꿀 수 없습니다.')
     expect(itemsErrorMessage(new ApiError(400, { name: ['x'] }))).toBeNull()
+  })
+})
+
+describe('nextAverage (이동평균)', () => {
+  it('남은 수량과 섞는다', () => {
+    expect(nextAverage(20, 60, 100, 150)).toBe(135)
+  })
+  it('남은 게 없거나 평균을 모르면 산 단가', () => {
+    expect(nextAverage(0, 60, 100, 150)).toBe(150)
+    expect(nextAverage(-5, 60, 100, 150)).toBe(150)
+    expect(nextAverage(20, null, 100, 150)).toBe(150)
   })
 })

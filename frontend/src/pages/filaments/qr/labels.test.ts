@@ -27,7 +27,7 @@ const color = (id: number, name: string): Color => ({
   spool_price: 14000,
   price_per_g: 14,
   counts: { sealed: 0, open: 0, empty: 0 },
-  last_buy: null,
+  held_price: null,
 })
 
 const filament: Filament = {

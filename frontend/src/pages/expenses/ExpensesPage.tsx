@@ -287,7 +287,6 @@ export default function ExpensesPage() {
         expense={expense}
         copyOf={copyOf}
         recurring={recs}
-        all={all}
         shops={shops}
         onCopy={(x) => setDialog({ kind: 'expense', id: null, copyOf: x })}
         onClose={closeDialog}

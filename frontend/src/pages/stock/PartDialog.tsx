@@ -85,6 +85,8 @@ export default function PartDialog({ kind, part, copyOf, shop, category, categor
 
   const unit = values.unit.trim() || '개'
   const preview = previewUnitPrice(values.price, values.pack_qty)
+  // 지출로 산 품목: 구매가 · 묶음 수량은 숨김 — 단가는 지출 기록으로 계산한 평균만 (서버도 고치지 못하게 막음)
+  const bought = part?.bought ?? false
   const before = part?.unit_price ?? null
   const after = preview?.unitPrice ?? null
   // 서버 단가는 소수 2자리라 비교도 소수 2자리로
@@ -218,67 +220,86 @@ export default function PartDialog({ kind, part, copyOf, shop, category, categor
               onChange={(e) => change('buy_url', e.target.value)}
             />
           </Field>
-          <Field
-            label="구매가 (묶음 전체)"
-            error={errors.price}
-            hint={
-              part?.last_buy
-                ? `최근 구매가 · ${dotDate(part.last_buy.date)} ${part.last_buy.name} (지출)`
-                : `지출에 이 ${L}${kind === 'pack' ? '를' : '을'} 넣으면 최근 구매가로 자동`
-            }
-          >
-            <div className="with-suffix">
-              <input
-                inputMode="numeric"
-                value={values.price}
-                placeholder="미입력"
-                onChange={(e) => change('price', e.target.value)}
-              />
-              <em>원</em>
-            </div>
-          </Field>
-          <Field label="묶음 수량 · 단위" error={errors.pack_qty ?? errors.unit}>
-            <div className="qty-unit">
-              <input
-                inputMode="decimal"
-                aria-label="묶음 수량"
-                value={values.pack_qty}
-                onChange={(e) => change('pack_qty', e.target.value)}
-              />
-              <input
-                list="part-units"
-                aria-label="단위"
-                value={values.unit}
-                onChange={(e) => change('unit', e.target.value)}
-              />
-              <datalist id="part-units">
-                {UNITS.map((u) => (
-                  <option key={u} value={u} />
-                ))}
-              </datalist>
-            </div>
-          </Field>
-          <div className="field full">
-            <div className="unit-preview">
-              {preview == null ? (
-                <>
-                  <span className="muted">구매가를 넣으면 개당 단가를 계산해요</span>
-                  {values.price.trim() === '' && <span className="badge warn">가격 미입력 · 원가에 0원</span>}
-                </>
-              ) : (
-                <>
-                  <span className="muted">
-                    {won(preview.price)} ÷ {preview.packQty.toLocaleString('ko-KR')}
-                    {unit}
-                  </span>
+          {bought && part ? (
+            <>
+              <Field label="단위" error={errors.unit}>
+                <input
+                  list="part-units"
+                  aria-label="단위"
+                  value={values.unit}
+                  onChange={(e) => change('unit', e.target.value)}
+                />
+              </Field>
+              <div className="field full">
+                <div className="unit-preview">
+                  <span className="muted">지출로 산 품목 — 남은 재고와 새로 산 것을 섞은 평균 (지출에서 바뀌어요)</span>
                   <span>
-                    {changed && before != null && <span className="was">{unitWon(before)}</span>}
-                    {unit}당 <b>{unitWon(preview.unitPrice)}</b>
+                    평균 {unit}당 <b>{unitWon(part.unit_price)}</b>
                   </span>
-                </>
-              )}
-            </div>
-          </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <Field
+                label="구매가 (묶음 전체)"
+                error={errors.price}
+                hint={`지출에 이 ${L}${kind === 'pack' ? '를' : '을'} 넣으면 그 뒤로는 평균 단가로`}
+              >
+                <div className="with-suffix">
+                  <input
+                    inputMode="numeric"
+                    value={values.price}
+                    placeholder="미입력"
+                    onChange={(e) => change('price', e.target.value)}
+                  />
+                  <em>원</em>
+                </div>
+              </Field>
+              <Field label="묶음 수량 · 단위" error={errors.pack_qty ?? errors.unit}>
+                <div className="qty-unit">
+                  <input
+                    inputMode="decimal"
+                    aria-label="묶음 수량"
+                    value={values.pack_qty}
+                    onChange={(e) => change('pack_qty', e.target.value)}
+                  />
+                  <input
+                    list="part-units"
+                    aria-label="단위"
+                    value={values.unit}
+                    onChange={(e) => change('unit', e.target.value)}
+                  />
+                </div>
+              </Field>
+              <div className="field full">
+                <div className="unit-preview">
+                  {preview == null ? (
+                    <>
+                      <span className="muted">구매가를 넣으면 개당 단가를 계산해요</span>
+                      {values.price.trim() === '' && <span className="badge warn">가격 미입력 · 원가에 0원</span>}
+                    </>
+                  ) : (
+                    <>
+                      <span className="muted">
+                        {won(preview.price)} ÷ {preview.packQty.toLocaleString('ko-KR')}
+                        {unit}
+                      </span>
+                      <span>
+                        {changed && before != null && <span className="was">{unitWon(before)}</span>}
+                        {unit}당 <b>{unitWon(preview.unitPrice)}</b>
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+          <datalist id="part-units">
+            {UNITS.map((u) => (
+              <option key={u} value={u} />
+            ))}
+          </datalist>
           {part ? (
             <div className="field">
               <span>남은 수량</span>

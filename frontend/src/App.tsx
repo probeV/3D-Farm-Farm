@@ -2,13 +2,14 @@ import { useState, type ReactNode } from 'react'
 import { NavContext, type LabelPick, type Nav } from './nav'
 import ExpensesPage from './pages/expenses/ExpensesPage'
 import SalesPage from './pages/sales/SalesPage'
+import PlPage from './pages/pl/PlPage'
 import StockPage from './pages/stock/StockPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import type { CategoryKey } from './pages/settings/schemas'
 import ProductsPage from './pages/products/ProductsPage'
 import { applyTheme, loadTheme, saveTheme, THEMES, type ThemePref } from './theme'
 
-type Page = 'products' | 'stock' | 'sales' | 'expenses' | 'settings'
+type Page = 'products' | 'stock' | 'sales' | 'expenses' | 'pl' | 'settings'
 
 type NavItem = { page: Page; label: string; icon: ReactNode }
 
@@ -56,6 +57,12 @@ const NAV: NavItem[] = [
         <path d="M9 8h6M9 12h6M9 16h3" />
       </>
     ),
+  },
+  // v2 PL: 판매 · 지출 · 스풀을 더해 현금 기준 / 손익 기준으로
+  {
+    page: 'pl',
+    label: '손익',
+    icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   },
 ]
 
@@ -221,6 +228,8 @@ export default function App() {
             <SalesPage onSettings={() => openSettings('store')} />
           ) : page === 'expenses' ? (
             <ExpensesPage />
+          ) : page === 'pl' ? (
+            <PlPage />
           ) : (
             <SettingsPage tab={settingsTab} onTab={setSettingsTab} />
           )}

@@ -14,22 +14,19 @@ import Dialog from '../../components/Dialog'
 import Field from '../../components/Field'
 import { useConfirm } from '../../components/useConfirm'
 import { useToast } from '../../components/useToast'
-import { dotDate, today, unitWon, won } from '../../format'
+import { dotDate, today, won } from '../../format'
 import { useNav } from '../../nav'
 import { useForm } from '../../useForm'
 import BuyLines, { type BuyColor } from './BuyLines'
 import {
-  averageEach,
   BUY_KINDS,
   buyField,
   checkRows,
   emptyRow,
-  isLatest,
   itemsErrorMessage,
   parseRows,
   rowsOf,
   spoolDiff,
-  splitTotals,
   toInput,
   type BuyRow,
 } from './buyRows'
@@ -40,15 +37,14 @@ interface Props {
   expense: Expense | null // null 이면 추가
   copyOf?: Expense // 복제할 지출 (값만 복사, 날짜는 오늘, 반복 지출 연결은 복사하지 않음)
   recurring: RecurringExpense[] // 머리에 `↻ 반복 지출 · 이름` 표시용
-  all: Expense[] // 구매 항목이 그 색상 · 품목의 최근 구매인지 보려고
   shops: string[] // 구매처 입력 도움 (지금까지 쓴 구매처)
   onCopy: (expense: Expense) => void
   onClose: () => void
 }
 
 // 지출 추가 · 복제 · 수정 (EXP-02, docs/screens.md 5.3). 삭제는 그것만 지워져서 확인 한 번.
-// 분류가 필라멘트 · 부속품 · 포장재 · 소모품이면 구매 항목 (v2 TBD-31 · 33) — 저장하면 스풀 · 남은 수량 · 단가로 이어진다
-export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, onCopy, onClose }: Props) {
+// 분류가 필라멘트 · 부속품 · 포장재 · 소모품이면 구매 항목 (v2 TBD-31 · 33) — 저장하면 스풀 · 남은 수량 · 평균 단가로 이어진다
+export default function ExpenseDialog({ expense, copyOf, recurring, shops, onCopy, onClose }: Props) {
   const refresh = useRefreshExpenses()
   const toast = useToast()
   const nav = useNav()
@@ -90,11 +86,10 @@ export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, 
     if (rowsError) setRowsError(checkRows(values.category, amount, next))
   }
 
-  // 저장 알림: `저장했어요 · 스풀 +4개 · 재고 네오디뮴 +200개 · 단가 화이트 18,000원`
-  const savedMessage = (date: string) => {
+  // 저장 알림: `저장했어요 · 스풀 +4개 · 재고 네오디뮴 +200개` (단가는 평균이라 알림에 넣지 않음)
+  const savedMessage = () => {
     if (!field) return '저장했어요'
     const parsed = parseRows(rows)
-    const avg = averageEach(parsed, splitTotals(values.category, amount ?? 0, parsed))
     const nameOf = (pick: number) =>
       field === 'color'
         ? colors.find((c) => c.id === pick)?.name
@@ -113,13 +108,9 @@ export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, 
             .map(([pick, n]) => `${nameOf(pick)} ${n > 0 ? '+' : ''}${n}${unitOf(pick)}`)
         : []
     const spool = field === 'color' ? rows.reduce((a, r) => a + (r.pick == null ? -r.was : spoolDiff(r)), 0) : 0
-    const price = [...avg]
-      .filter(([pick]) => isLatest(all, expense, field, pick, date))
-      .map(([pick, each]) => `${nameOf(pick)} ${field === 'color' ? won(each) : unitWon(each)}`)
     const parts = [
       spool > 0 ? `스풀 +${spool}개` : spool < 0 ? `재고 스풀 ${-spool}개 지움` : '',
       stock.length ? `재고 ${stock.join(', ')}` : '',
-      price.length ? `단가 ${price.join(', ')}` : '',
     ]
     return ['저장했어요', ...parts.filter(Boolean)].join(' · ')
   }
@@ -145,7 +136,7 @@ export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, 
         }
         throw e
       }
-      const msg = savedMessage(data.date)
+      const msg = savedMessage()
       await refresh()
       // 새 스풀이 생겼으면 `라벨 인쇄` → 이 지출의 스풀 중 라벨 없는 것을 골라 둔 QR 화면 (TBD-18)
       const added = field === 'color' && rows.some((r) => r.pick != null && spoolDiff(r) > 0)
@@ -247,9 +238,7 @@ export default function ExpenseDialog({ expense, copyOf, recurring, all, shops, 
             field={field}
             rows={rows}
             amount={amount}
-            date={values.date}
             expense={expense}
-            all={all}
             colors={colors}
             parts={tabParts}
             error={rowsError}
