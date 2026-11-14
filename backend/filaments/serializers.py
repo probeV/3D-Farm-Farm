@@ -173,6 +173,7 @@ class SpoolSerializer(BaseModelSerializer):
             'finished_at',
             'note',
             'buy',
+            'label_printed',
         ]
         validators = []
         extra_kwargs = {'buy': {'error_messages': {'does_not_exist': '없는 구매 항목입니다.'}}}
@@ -204,6 +205,32 @@ class SpoolSerializer(BaseModelSerializer):
         if status and status != instance.status and not dates_given:
             instance.set_status(validated_data.pop('status'))
         return super().update(instance, validated_data)
+
+
+class ScanSpoolSerializer(SpoolSerializer):
+    """폰 스풀 화면 (QR 라벨을 찍으면, v2 TBD-18): 스풀 + 색상 · 필라멘트 이름 · 주문(지출) — 한 번에 그리도록"""
+
+    color_name = serializers.CharField(source='color.name', read_only=True)
+    color_hex = serializers.CharField(source='color.hex', read_only=True)
+    filament_name = serializers.CharField(source='color.filament.display_name', read_only=True)
+    order = serializers.SerializerMethodField()
+
+    class Meta(SpoolSerializer.Meta):
+        fields = [*SpoolSerializer.Meta.fields, 'color_name', 'color_hex', 'filament_name', 'order']
+
+    def get_order(self, obj):
+        """지출로 생긴 스풀이면 그 지출 {expense, date, name}, 재고 추가로 넣은 스풀이면 None"""
+        if not obj.buy_id:
+            return None
+        expense = obj.buy.expense
+        return {'expense': expense.id, 'date': expense.date, 'name': expense.name}
+
+
+class LabelsSerializer(serializers.Serializer):
+    """라벨 뽑음 표시 (v2 TBD-18) {ids: [3, 4], printed: true}. printed=false 는 되돌리기용"""
+
+    ids = serializers.ListField(child=serializers.IntegerField(min_value=1), min_length=1, max_length=500)
+    printed = serializers.BooleanField(default=True)
 
 
 class PurchaseSerializer(serializers.Serializer):
