@@ -10,8 +10,9 @@ export interface LabelPick {
 
 export interface Nav {
   openLabels: (pick?: LabelPick) => void
+  openStore: () => void // 판매 › 스마트스토어 연동 (v2 STORE)
 }
 
-export const NavContext = createContext<Nav>({ openLabels: () => {} })
+export const NavContext = createContext<Nav>({ openLabels: () => {}, openStore: () => {} })
 
 export const useNav = () => useContext(NavContext)

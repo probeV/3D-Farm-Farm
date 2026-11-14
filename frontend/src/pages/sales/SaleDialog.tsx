@@ -14,6 +14,8 @@ import { CHANNELS } from './channels'
 import { autoFee, snapshotCost } from './saleList'
 import { addSet, packAmount, packInputs, packLine, savedPackLine, type PackLine } from './packLines'
 import SalePacks from './SalePacks'
+import SaleParts from './SaleParts'
+import { applyDiff, defaultUsage, missedNote, partInputs, savedPartLine, type PartLine } from './partLines'
 import { saleSchema } from './schemas'
 
 interface Props {
@@ -33,6 +35,7 @@ interface Line {
   qty: string
   unit_price: string
   unit_cost: number | null
+  store_item_id: string // 스마트스토어 상품주문번호 (가져온 줄). 고쳐도 그대로 보내야 다음 가져오기 때 맞춤, 복제는 ''
 }
 
 let lineKey = 0
@@ -43,6 +46,7 @@ const newLine = (): Line => ({
   qty: '1',
   unit_price: '',
   unit_cost: null,
+  store_item_id: '',
 })
 // 입력칸 글자 → 숫자 (계산 미리보기용, 틀린 값은 0)
 const n = (v: string) => Number(v.replace(/,/g, '')) || 0
@@ -54,11 +58,13 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
   const toast = useToast()
   const allParts = useParts().data ?? []
   const packs = allParts.filter((p) => p.kind === 'pack')
+  const partOptions = allParts.filter((p) => p.kind === 'part')
   const sets = usePackSets().data ?? []
   const partById = new Map(allParts.map((p) => [p.id, p]))
   const confirm = useConfirm()
   const src = sale ?? copyOf
   const rowOf = (id: string) => rows.find((r) => String(r.product.id) === id)
+  const products = new Map(rows.map((r) => [r.product.id, r.product]))
 
   const { values, errors, busy, change, update, submit } = useForm(saleSchema, {
     date: sale?.date ?? today(),
@@ -75,6 +81,7 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
             qty: String(i.qty),
             unit_price: String(i.unit_price),
             unit_cost: sale ? i.unit_cost : r ? snapshotCost(r.cost) : i.unit_cost,
+            store_item_id: sale ? (i.store_item_id ?? '') : '',
           }
         })
       : [newLine()],
@@ -84,6 +91,17 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
     note: src?.note ?? '',
   })
   const lines = values.items as Line[]
+
+  // 부속품 줄 (v2 STORE): 수정 · 복제는 저장된 줄 그대로, 새 판매는 제품을 고르면 그 제품의 사용 부속품으로.
+  // 제품 줄이 바뀔 때마다 기본 부속품의 차이만큼 맞춘다 (바꿔 둔 부속품은 그대로) — 서버는 이 줄을 그대로 믿음
+  const [partLines, setPartLines] = useState<PartLine[]>(() => (src?.parts ?? []).map(savedPartLine))
+  const [partNote, setPartNote] = useState('')
+  const changeItems = (next: Line[]) => {
+    const r = applyDiff(partLines, defaultUsage(lines, products), defaultUsage(next, products))
+    setPartLines(r.lines)
+    setPartNote(missedNote(r.missed, partById))
+    change('items', next)
+  }
 
   // 포장 줄 (SALE-06): 수정은 저장된 줄 그대로, 복제는 지금 단가로, 새 판매는 첫 제품을 고르면 그 제품의 기본 포장으로 채움
   const [packLines, setPackLines] = useState<PackLine[]>(() =>
@@ -120,10 +138,7 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
   const profit = settle - cost - n(values.shipping_cost)
 
   const setLine = (i: number, patch: Partial<Line>) =>
-    change(
-      'items',
-      lines.map((l, j) => (j === i ? { ...l, ...patch } : l)),
-    )
+    changeItems(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   // 제품을 고르면 단가 = 제품 판매가, 원가 = 지금 원가 계산표 값 (원가 없으면 null)
   const pickProduct = (i: number, id: string) => {
     const r = rowOf(id)
@@ -143,7 +158,12 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
 
   const save = () =>
     submit(async (data) => {
-      const body = { ...data, fee: feeManual ? data.fee : auto, packs: packInputs(packLines) }
+      const body = {
+        ...data,
+        fee: feeManual ? data.fee : auto,
+        parts: partInputs(partLines),
+        packs: packInputs(packLines),
+      }
       if (sale) await updateSale(sale.id, body)
       else await createSale(body)
       await Promise.all([refresh(), refreshStock()])
@@ -310,12 +330,7 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
                 title="이 줄 빼기"
                 aria-label="이 줄 빼기"
                 disabled={lines.length <= 1}
-                onClick={() =>
-                  change(
-                    'items',
-                    lines.filter((_, j) => j !== i),
-                  )
-                }
+                onClick={() => changeItems(lines.filter((_, j) => j !== i))}
               >
                 ✕
               </button>
@@ -327,7 +342,7 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
           )
         })}
         <div className="sale-items-foot">
-          <button type="button" className="btn small add" onClick={() => change('items', [...lines, newLine()])}>
+          <button type="button" className="btn small add" onClick={() => changeItems([...lines, newLine()])}>
             + 제품 추가
           </button>
           {errors.items && <span className="err">{errors.items}</span>}
@@ -335,6 +350,16 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
           <span className="hint">{picked.reduce((a, l) => a + n(l.qty), 0)}개</span>
         </div>
       </div>
+
+      <SaleParts
+        lines={partLines}
+        parts={partOptions}
+        note={partNote}
+        onChange={(next) => {
+          setPartNote('')
+          setPartLines(next)
+        }}
+      />
 
       <SalePacks
         lines={packLines}

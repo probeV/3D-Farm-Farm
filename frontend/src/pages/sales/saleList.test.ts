@@ -32,6 +32,7 @@ const item = (p: Partial<SaleItem>): SaleItem => {
     qty: 1,
     unit_price: 18900,
     unit_cost: 3227,
+    store_item_id: '',
     ...p,
   }
   return { ...i, amount: i.qty * i.unit_price }
@@ -48,6 +49,7 @@ const sale = (p: Partial<Sale> & { items?: SaleItem[] }): Sale => {
     date: '2026-10-01',
     channel: 'store',
     order_no: '',
+    parts: [],
     packs: [],
     pack_cost: 0,
     note: '',

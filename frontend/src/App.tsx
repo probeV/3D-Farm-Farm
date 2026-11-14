@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { NavContext, type LabelPick, type Nav } from './nav'
 import ExpensesPage from './pages/expenses/ExpensesPage'
 import SalesPage from './pages/sales/SalesPage'
+import StorePage from './pages/sales/store/StorePage'
 import PlPage from './pages/pl/PlPage'
 import StockPage from './pages/stock/StockPage'
 import SettingsPage from './pages/settings/SettingsPage'
@@ -126,10 +127,16 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<CategoryKey>('cost')
   // QR 라벨 인쇄 화면 (재고 관리 › 필라멘트 › QR, TBD-18). null 이면 재고 관리 탭 화면. key 는 열 때마다 새로 (고른 스풀 다시)
   const [labels, setLabels] = useState<{ pick: LabelPick | null; key: number } | null>(null)
+  // 판매 › 스마트스토어 연동 (v2 STORE). false 면 판매 목록
+  const [storeOpen, setStoreOpen] = useState(false)
   const nav: Nav = {
     openLabels: (pick) => {
       setLabels({ pick: pick ?? null, key: Date.now() })
       setPage('stock')
+    },
+    openStore: () => {
+      setStoreOpen(true)
+      setPage('sales')
     },
   }
   const [collapsed, setCollapsed] = useState(loadCollapsed)
@@ -147,6 +154,7 @@ export default function App() {
       title={n.label}
       onClick={() => {
         setLabels(null)
+        setStoreOpen(false)
         setPage(n.page)
       }}
     >
@@ -219,11 +227,14 @@ export default function App() {
           </div>
         </aside>
         <main>
-          <h1 className="page-title">{current.label}</h1>
+          {/* 스마트스토어 연동은 `판매 ›` 와 자기 제목을 그림 */}
+          {!(page === 'sales' && storeOpen) && <h1 className="page-title">{current.label}</h1>}
           {page === 'stock' ? (
             <StockPage labels={labels} onCloseLabels={() => setLabels(null)} />
           ) : page === 'products' ? (
             <ProductsPage onSettings={() => openSettings('cost')} />
+          ) : page === 'sales' && storeOpen ? (
+            <StorePage onBack={() => setStoreOpen(false)} onSettings={() => openSettings('store')} />
           ) : page === 'sales' ? (
             <SalesPage onSettings={() => openSettings('store')} />
           ) : page === 'expenses' ? (

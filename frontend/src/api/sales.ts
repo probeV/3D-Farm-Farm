@@ -13,7 +13,16 @@ export interface SaleItem {
   qty: number
   unit_price: number
   unit_cost: number | null // 팔 때 복사한 개당 원가, null = 원가 없음
+  store_item_id: string // 스마트스토어 상품주문번호 (가져온 줄). 직접 넣은 줄은 '' — 고칠 때 그대로 보내야 다음 가져오기 때 맞춤
   amount: number // 단가 × 수량 (읽기만)
+}
+
+// 주문의 부속품 줄 — 이 판매로 남은 수량에서 빠지는 부속품. 처음엔 제품의 사용 부속품 × 수량, 판매마다 바꿀 수 있음
+export interface SalePart {
+  id: number
+  part: number | null // 부속품을 지우면 null (이름은 part_name 에 남음)
+  part_name: string
+  qty: number
 }
 
 // 주문의 포장 줄 (SALE-06). 단가는 팔 때 복사 (unit_price 를 안 보내면 서버가 포장재의 지금 단가로)
@@ -32,6 +41,7 @@ export interface Sale {
   channel: SaleChannel
   order_no: string // 빈 문자열 = 없음
   items: SaleItem[]
+  parts: SalePart[]
   packs: SalePack[]
   shipping_received: number // 손님이 낸 배송비
   fee: number
@@ -59,17 +69,19 @@ export function useRefreshSales() {
 // ---------------------------------------------------------------- 쓰기
 
 export type SaleItemInput = Omit<SaleItem, 'id' | 'amount'>
+export type SalePartInput = Omit<SalePart, 'id'>
 export type SalePackInput = Omit<SalePack, 'id' | 'amount'>
 export type SaleInput = Omit<
   Sale,
-  'id' | 'items' | 'packs' | 'gross' | 'settle' | 'pack_cost' | 'cost' | 'profit' | 'created_at'
+  'id' | 'items' | 'parts' | 'packs' | 'gross' | 'settle' | 'pack_cost' | 'cost' | 'profit' | 'created_at'
 > & {
   items: SaleItemInput[]
+  parts: SalePartInput[]
   packs: SalePackInput[]
 }
 
-// items · packs 를 보내면 그 목록으로 통째로 바꾼다 (보내지 않으면 줄은 그대로).
-// 저장하면 서버가 부속품 · 포장재를 남은 수량에서 뺀다 (고치면 차이만) → 재고 쪽 목록도 다시 불러온다
+// items · parts · packs 를 보내면 그 목록으로 통째로 바꾼다 (보내지 않으면 줄은 그대로 — 화면은 늘 셋 다 보냄).
+// 저장하면 서버가 부속품 줄 · 포장 줄만큼 남은 수량에서 뺀다 (고치면 차이만) → 재고 쪽 목록도 다시 불러온다
 // 같은 주문번호가 이미 있으면 400 `{"order_no": ["이미 넣은 주문번호입니다."]}`
 export const createSale = (body: SaleInput) => send<Sale>('POST', '/sales/', body)
 export const updateSale = (id: number, body: Partial<SaleInput>) => send<Sale>('PATCH', `/sales/${id}/`, body)

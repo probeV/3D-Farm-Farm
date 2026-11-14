@@ -74,7 +74,7 @@ export const CATEGORIES: SettingCategory[] = [
     key: 'store',
     icon: '🛒',
     label: '스마트스토어',
-    desc: '수수료 · 배송비',
+    desc: '연결 상태와 수수료 · 배송비',
     effect: '제품 원가와 새로 넣는 판매의 수수료에 반영돼요 (이미 넣은 판매는 그대로)',
     groups: [
       {

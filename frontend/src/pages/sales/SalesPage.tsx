@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useSales, type Sale, type SaleChannel } from '../../api/sales'
 import Help from '../../components/Help'
 import SettingsButton from '../../components/SettingsButton'
+import { useNav } from '../../nav'
 import SortTh from '../../components/SortTh'
 import { downloadText } from '../../csv'
 import { dotDate, pct, today, won } from '../../format'
@@ -29,6 +30,7 @@ type DialogState = { id: number | null; copyOf?: Sale }
 // 판매 화면: 요약 카드 → 제품별 판매 → 판매 목록 (docs/screens.md 판매, 목업 docs/mockups/sales.html)
 export default function SalesPage({ onSettings }: { onSettings: () => void }) {
   const sales = useSales()
+  const nav = useNav()
   const cost = useCostData() // 판매 창의 제품 목록 · 원가 계산표 · 수수료 설정
   const [filter, setFilter] = useState<ListFilter>(NO_FILTER)
   const [dialog, setDialog] = useState<DialogState | null>(null)
@@ -76,6 +78,9 @@ export default function SalesPage({ onSettings }: { onSettings: () => void }) {
       <div className="top-row">
         <span className="hint">팔린 주문을 기록해요. 한 주문에 제품 여러 개를 넣을 수 있어요.</span>
         <div className="spacer" />
+        <button className="btn" title="스마트스토어 주문을 가져와 판매 장부에 넣어요" onClick={() => nav.openStore()}>
+          스마트스토어 가져오기
+        </button>
         <button className="btn primary" onClick={() => setDialog({ id: null })}>
           + 판매 추가
         </button>

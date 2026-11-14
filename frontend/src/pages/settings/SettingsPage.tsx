@@ -4,6 +4,7 @@ import Help from '../../components/Help'
 import { useToast } from '../../components/useToast'
 import { won } from '../../format'
 import { useForm } from '../../useForm'
+import StoreConn from './StoreConn'
 import {
   CATEGORIES,
   categoryOf,
@@ -197,6 +198,7 @@ function SettingsForm({ saved, tab, onTab }: Props & { saved: CostSetting }) {
             if (!busy && dirty && !nErrors) save()
           }}
         >
+          {tab === 'store' && <StoreConn />}
           {cat.groups.map((g) => (
             <section key={g.title} className="group">
               <div className="group-head">
