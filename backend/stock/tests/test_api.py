@@ -104,10 +104,11 @@ class KindApiTests(APITestCase):
         self.box = PartCategory.objects.create(kind=PartKind.PACK, name='박스')
 
     def test_create_with_kind_and_initial_stock(self):
-        body = {'kind': 'pack', 'name': '소형 박스', 'category': self.box.pk, 'stock': 50, 'alert': 10}
+        body = {'kind': 'pack', 'name': '소형 박스', 'category': self.box.pk, 'stock': 50}
         res = self.client.post(f'{API}/parts/', body)
         self.assertEqual(res.status_code, 201)
-        self.assertEqual((res.data['kind'], res.data['stock'], res.data['alert']), ('pack', 50, 10))
+        self.assertEqual((res.data['kind'], res.data['stock']), ('pack', 50))
+        self.assertNotIn('alert', res.data)  # 부족 알림 기준은 설정 (탭마다 하나)
         row = StockHistory.objects.get()
         self.assertEqual((row.kind, row.qty, row.after, row.note), ('adjust', 50, 50, '처음 수량'))
 
@@ -157,7 +158,7 @@ class PhotoApiTests(TempMediaMixin, BaseAPITestCase):
 class AdjustApiTests(APITestCase):
     def setUp(self):
         super().setUp()
-        self.glue = Part.objects.create(kind=PartKind.SUPPLY, name='순간접착제', stock=3, alert=1)
+        self.glue = Part.objects.create(kind=PartKind.SUPPLY, name='순간접착제', stock=3)
 
     def test_adjust_modes_and_history(self):
         url = f'{API}/parts/{self.magnet.pk}/adjust/'

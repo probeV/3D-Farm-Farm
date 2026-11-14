@@ -96,8 +96,7 @@ class Part(ShrinkImageMixin):
     # — 원가 계산 · 판매 · 손익에 쓴다.
     # 직접 고치지 않고 services.recalc() 가 입출고 기록을 날짜순으로 다시 따라가며 계산한다. NULL = 들어온 값이 없음
     avg_price = models.DecimalField('평균 단가', max_digits=14, decimal_places=4, null=True, blank=True, editable=False)
-    # 남은 수량이 이 값 이하면 `부족`, 0 이하면 `없음` (STOCK-04)
-    alert = qty_field('부족 알림 기준', default=0, validators=[MinValueValidator(0)])
+    # 부족 알림 기준은 탭마다 하나 — products.CostSetting.alert_<kind> (v2.1.0)
     note = models.TextField('메모', blank=True)
 
     class Meta:

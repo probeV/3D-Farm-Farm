@@ -144,6 +144,18 @@ class CostSettingTests(TestCase):
         self.assertEqual(setting.fee_sales, Decimal('2.73'))
         self.assertEqual(setting.shipping_cost, 0)
         self.assertEqual(setting.target_margin, 40)
+        self.assertEqual((setting.alert_part, setting.alert_pack, setting.alert_supply), (0, 0, 0))
+
+    def test_alert_for_kind(self):
+        setting = CostSetting(alert_part=5, alert_pack=Decimal('2.5'), alert_supply=1)
+        self.assertEqual(
+            [setting.alert_for(k) for k in ['part', 'pack', 'supply']],
+            [5, Decimal('2.5'), 1],
+        )
+
+    def test_alert_not_negative(self):
+        with self.assertRaises(ValidationError):
+            CostSetting(alert_pack=-1).full_clean()
 
     def test_always_one_row(self):
         CostSetting.load()

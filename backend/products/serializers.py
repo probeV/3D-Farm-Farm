@@ -168,4 +168,7 @@ class CostSettingSerializer(BaseModelSerializer):
             'fee_sales',
             'shipping_cost',
             'target_margin',
+            'alert_part',
+            'alert_pack',
+            'alert_supply',
         ]

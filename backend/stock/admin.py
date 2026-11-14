@@ -26,7 +26,7 @@ class StockHistoryInline(admin.TabularInline):
 
 @admin.register(Part)
 class PartAdmin(admin.ModelAdmin):
-    list_display = ['name', 'kind', 'category', 'shop', 'price', 'pack_qty', 'unit', 'unit_price', 'stock', 'alert']
+    list_display = ['name', 'kind', 'category', 'shop', 'price', 'pack_qty', 'unit', 'unit_price', 'stock']
     list_filter = ['kind', 'category']
     search_fields = ['name', 'shop']
     # 남은 수량은 입출고 기록과 함께 바꿔야 해서 여기서는 보기만

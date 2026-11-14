@@ -87,7 +87,6 @@ class PartSerializer(BaseModelSerializer):
             'unit_price',
             'avg_price',
             'stock',
-            'alert',
             'note',
             'product_count',
             'set_count',

@@ -300,8 +300,19 @@ class CostSettingApiTests(APITestCase):
                 'fee_sales': 2.73,
                 'shipping_cost': 0,
                 'target_margin': 40,
+                'alert_part': 0,
+                'alert_pack': 0,
+                'alert_supply': 0,
             },
         )
+
+    def test_patch_stock_alerts(self):
+        res = self.client.patch(f'{API}/cost-setting/', {'alert_part': 10, 'alert_supply': 1.5}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual((res.data['alert_part'], res.data['alert_pack'], res.data['alert_supply']), (10, 0, 1.5))
+        res = self.client.patch(f'{API}/cost-setting/', {'alert_pack': -1}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('alert_pack', res.data)
 
     def test_patch(self):
         res = self.client.patch(f'{API}/cost-setting/', {'elec_rate': 230, 'shipping_cost': 3000}, format='json')

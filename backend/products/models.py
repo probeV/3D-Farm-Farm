@@ -3,7 +3,7 @@
 카테고리(Category) → 세부 분류(Subcategory) · 제품(Product)
 제품 → 사용 필라멘트(ProductFilament, filaments 앱의 Filament · Color) · 사용 부속품(ProductPart → stock 앱의 Part)
      · 기본 포장(stock 앱의 PackSet)
-원가 계산 설정값은 CostSetting 1개 행
+설정값(원가 계산 · 스마트스토어 배송비 · 재고 부족 알림 기준)은 CostSetting 1개 행
 """
 
 from decimal import Decimal
@@ -13,7 +13,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from filaments.models import MONEY, Color, Filament
-from stock.models import PackSet, Part
+from stock.models import PackSet, Part, qty_field
 
 
 def percent(**kwargs):
@@ -194,6 +194,11 @@ class CostSetting(models.Model):
     fee_sales = percent(verbose_name='판매 수수료(%)', default=Decimal('2.73'))
     shipping_cost = models.DecimalField('건당 판매자 부담 배송비', default=0, **MONEY)
     target_margin = percent(verbose_name='목표 마진율(%)', default=40)
+    # 재고 관리 탭마다 부족 알림 기준 (v2.1.0 — 품목마다 따로 두던 것을 탭 하나로).
+    # 남은 수량이 이 값 이하면 `부족`, 0 이하면 `없음` (STOCK-04). 단위는 품목 단위 그대로 (개 · 장 · ml …)
+    alert_part = qty_field('부속품 부족 알림 기준', default=0, validators=[MinValueValidator(0)])
+    alert_pack = qty_field('포장재 부족 알림 기준', default=0, validators=[MinValueValidator(0)])
+    alert_supply = qty_field('소모품 부족 알림 기준', default=0, validators=[MinValueValidator(0)])
 
     class Meta:
         verbose_name = '원가 설정'
@@ -211,3 +216,7 @@ class CostSetting(models.Model):
         """설정 행을 읽는다. 없으면 기본값으로 만든다"""
         setting, _ = cls.objects.get_or_create(pk=1)
         return setting
+
+    def alert_for(self, kind):
+        """재고 관리 탭(PartKind 값: part · pack · supply)의 부족 알림 기준"""
+        return getattr(self, f'alert_{kind}')
