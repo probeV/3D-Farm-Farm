@@ -73,6 +73,11 @@
 | GET · POST | `/api/v0/sales/` | **판매 화면 데이터 전부** (제품 줄 · 포장 줄 · 합계 포함) / 판매 추가 |
 | GET · PATCH · DELETE | `/api/v0/sales/{id}/` | 판매 하나 / 수정 / 삭제 |
 | GET | `/api/v0/pl/` | **손익 화면 데이터** — 달마다 판매 · 지출(분류별) · 사용 시작한 스풀 합계 (v2 PL) |
+| GET · POST | `/api/v0/store/connection/` | 스마트스토어 연결 상태 / `연결 확인` (v2 STORE) |
+| GET · POST | `/api/v0/store/orders/` | 주문 미리보기(`?date_from=&date_to=`) / 고른 주문을 판매 장부에 넣기 · 맞추기 |
+| GET | `/api/v0/store/imports/` | 가져오기 기록 (최근 20) |
+| GET · POST | `/api/v0/store/links/` | 상품 연결 목록 / 옵션 연결 추가 |
+| PATCH · DELETE | `/api/v0/store/links/{id}/` | 연결 제품 바꾸기 / 옵션 연결 삭제 |
 
 ---
 
@@ -612,3 +617,65 @@
 | `spools_unpriced` | 그중 세 가격이 모두 없는 스풀 수 (0원으로 들어감) |
 | `parts_used` · `parts_unpriced` | 그 달 부속품 · 포장재 **쓴 만큼**: 입출고 기록 중 판매 · 조정(처음 수량 빼고)의 −수량 × 그때 단가 합계(원 단위, 조정으로 늘면 줄어듦) · 그중 단가가 없던 기록 수 |
 | `expenses` | 그 달(지출 날짜) 지출 분류별 합계, 9개 분류 모두 (없으면 0). 장비 · 필라멘트 · 부속품 · 포장재도 그대로 (현금 기준 · 두 기준 차이용) — 어느 기준에 넣을지는 화면이 고른다 |
+
+---
+
+# 스마트스토어 연동 (v2 STORE)
+
+네이버 커머스API(내스토어 애플리케이션, `type=SELF`)로 주문을 **조회만** 한다 — 주문 상태를 바꾸는 API 는 부르지 않는다.
+키는 `backend/.env` 의 `NAVER_COMMERCE_KEY_FILE` 이 가리키는 파일(`NAVER_CLIENT_ID` · `NAVER_CLIENT_SECRET`)에서 읽고,
+응답 · DB · 로그에 넣지 않는다. 토큰(3시간)은 메모리에. 호출 IP 등록은 필요 없었다 (2026-11-14 확인).
+
+## 연결 상태 `GET · POST /api/v0/store/connection/`
+```json
+{ "state": "ok", "detail": "", "last_import": { "id": 3, "created_at": "…", "date_from": "2026-11-01", "date_to": "2026-11-14", "added": 1, "updated": 0, "skipped": 0, "note": "" } }
+```
+- `state`: `ok` 연결됨 · `nokey` 키 파일 · 값이 없음 · `fail` 네이버가 거절(`detail` 에 네이버 오류 코드). GET 은 받아 둔 토큰을 쓰고, POST(`연결 확인`)는 새로 받아 본다
+
+## 주문 미리보기 `GET /api/v0/store/orders/?date_from=2026-11-01&date_to=2026-11-14`
+그 기간(한국 날짜, 양 끝 포함, **31일까지**)에 **바뀐** 상품 주문(결제 · 배송 · 취소 · 반품 · 구매확정 …)을 하루씩 묻고(변경 상품 주문 내역 API,
+`more` 가 있으면 이어서) 상세를 300개씩 받아 주문번호로 묶는다. 처음 보는 스토어 상품은 기본 연결 줄(`product: null`)을 만든다.
+```json
+{ "orders": [ {
+  "order_id": "2026111074714211", "date": "2026-11-10", "kind": "ok", "manual": false, "sale": null,
+  "status": "PAYED", "status_label": "결제완료", "changes": [],
+  "gross": 450000, "shipping": 0, "fee": 29835, "settle": 420165, "naver_settle": 420165,
+  "lines": [ { "store_item_id": "2026111094085851", "store_product_id": "13860694961", "store_name": "[한층공방] ABC 키캡 클리커 키링 1구",
+               "option": "글자: A / 스위치: 청축", "qty": 150, "amount": 450000, "status": "PAYED", "status_label": "결제완료",
+               "alive": true, "link": 1, "product": 5, "product_name": "ABC 1구 클리커" } ]
+} ] }
+```
+| `kind` | 뜻 | 넣기(POST)에서 |
+|---|---|---|
+| `ok` | 새 주문, 모든 줄이 제품에 연결됨 | 판매를 만든다 |
+| `need` | 새 주문, 연결 안 된 스토어 상품이 있음 | 뺌 (연결하고 다시 미리보기) |
+| `cancel` · `wait` | 새 주문인데 전부 취소 · 반품 / 아직 결제 전 | 뺌 |
+| `dup` | 이미 판매 장부에 있고 그대로 (`manual: true` = 주문번호만 같은 직접 넣은 판매 — 맞추지 않음) | 그대로 |
+| `sync` | 이미 있는데 수량 · 금액 · 배송비 · 수수료가 바뀜 (`changes` 에 `ABC 1구 클리커 150개 → 100개` · `수수료 29,835 → 19,890`) | 판매를 맞춘다 |
+| `gone` | 이미 있는데 전부 취소 · 반품 | 판매를 지우고 재고를 되돌린다 |
+
+- 줄 `alive` = 취소 · 반품 · 결제 전이 아니고 남은 수량 > 0. 합계는 `alive` 줄만
+- `settle` = `gross + shipping − fee` (이 앱의 정산 금액), `naver_settle` = Σ `expectedSettlementAmount`. 다르면 화면이 알림
+
+## 판매 장부에 넣기 `POST /api/v0/store/orders/`
+```json
+{ "date_from": "2026-11-01", "date_to": "2026-11-14", "product_order_ids": ["2026111094085851"], "costs": {"5": 1200}, "total": 3 }
+```
+- 고른 주문의 상품주문번호로 상세를 **다시** 받아 미리보기와 같은 규칙으로 처리한다 (`ok` 는 만들고 `sync` · `gone` 은 맞추고 나머지는 뺌) → 201 가져오기 기록 한 줄
+- `costs`: 제품 id → 개당 원가(포장 빼고, 원가 없으면 `null`). 화면의 원가 계산표 값 (판매 창과 같음, SALE-05)
+- `total`: 미리보기에 보였던 주문 수 — `skipped = total − added − updated`
+- 만드는 판매: 날짜 = 결제일 · 판매처 `store` · `order_no` = orderId · 줄마다 `store_item_id` = productOrderId · 수량 = `remainQuantity` ·
+  단가 = `remainPaymentAmount ÷ 수량`(원 단위) · 받은 배송비 = Σ `deliveryFeeAmount` ·
+  수수료 = Σ (`paymentCommission` + `saleCommission` + `knowledgeShoppingSellingInterlockCommission` + `channelCommission`) ·
+  낸 택배비 = 설정 SET-08 · 메모 = 옵션 글자 · 포장 줄 = 첫 제품의 기본 포장 세트. 저장하면 재고가 빠진다 (STOCK-04)
+- 맞추기: 상품주문번호로 줄을 찾아 수량 · 단가를 지금 값으로, 취소된 줄은 지우고 배송비 · 수수료도. 재고는 차이만 (`sync_sale`). 날짜 · 메모 · 포장 줄은 그대로
+- 네이버 오류: 키 없음 409 `{"state": "nokey"}` · 네이버 거절 502 `{"state": "fail", "detail": …}`
+
+## 상품 연결 `store/links` (STORE-02)
+```json
+{ "id": 2, "store_product_id": "13860694961", "store_name": "[한층공방] ABC 키캡 클리커 키링 1구", "option": "스위치: 적축", "product": 7, "product_name": "ABC 1구 클리커 (적축)", "updated_at": "…" }
+```
+- 기본 연결 줄(`option: ""`)은 미리보기가 만들고, 화면은 `product` 만 바꾼다 (지우기 400 `기본 연결은 지울 수 없어요. 제품을 비우세요.`)
+- 옵션 연결은 POST `{store_product_id, option, product}` — 같은 스토어 상품의 기본 줄이 있어야 하고(`가져온 적이 없는 스토어 상품입니다.`), 상품명은 거기서 복사.
+  (상품번호 + 옵션) 중복 400 `이미 있는 옵션 연결입니다.`
+- 고르기: 주문 옵션에 들어 있는 옵션 글자 중 가장 긴 줄, 없으면 기본 줄 (`StoreLink.resolve`)

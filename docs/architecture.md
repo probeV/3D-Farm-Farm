@@ -29,6 +29,7 @@ frontend/ (React)                          backend/ (Django)
 | `expenses` | `Expense`, `RecurringExpense` | 모델 · API 완료 |
 | `sales` | `Sale`, `SaleItem`, `SalePack` | 모델 · API · 화면 완료 (v2, 포장 줄은 API 까지) |
 | `pl` | — (모델 없음) 판매 · 지출 · 스풀을 달마다 더하는 API 하나 | API · 화면 완료 (v2 PL) |
+| `smartstore` | `StoreLink`, `StoreImport` (+ `naver.py` 커머스API 호출 · `services.py` 미리보기 · 넣기) | 모델 · API (v2 STORE) |
 | `config` | — (앱 아님) 설정 · 최상위 URL | 완료 |
 
 - **참조 방향은 한쪽으로만** (`→` = import 함):
@@ -38,7 +39,8 @@ frontend/ (React)                          backend/ (Django)
     └──→ stock ←┘ ───────────┘        expenses → filaments (공통 MONEY · BaseViewSet 만)
   ```
   `products` → `filaments` · `stock` (제품이 필라멘트 · 부속품 · 기본 포장 세트를 씀). `sales` → `products` · `stock` (판매 줄이 제품 · 포장재를 씀).
-  `pl` → `sales` · `expenses` · `filaments` (읽기만, 다른 앱은 `pl` 을 import 하지 않음).
+  `pl` → `sales` · `expenses` · `filaments` (읽기만, 다른 앱은 `pl` 을 import 하지 않음). `smartstore` → `sales` · `products` · `stock` (판매를 만들고 재고를 뺌).
+  네이버를 부르는 코드는 `smartstore/naver.py` 한 곳 — 테스트는 이 모듈을 mock 으로 바꾼다.
   `filaments` · `stock` 은 `products` · `sales` 를 import 하지 않는다 — 입출고 기록(`StockHistory.sale`)만 문자열 `'sales.Sale'` 로
   판매를 가리키고(판매를 고칠 때 차이 계산용), `stock/services.py` 는 판매 · 제품의 줄을 역참조로 읽는다.
 - 화면의 `재고 관리` 메뉴는 `filaments`(필라멘트 탭)와 `stock`(부속품 · 포장 · 소모품 탭) 두 앱을 쓴다 — 앱은 화면이 아니라 데이터 묶음 단위.
@@ -82,6 +84,7 @@ DRF 기본 추가 · 수정은 저장한 객체를 그대로 응답에 써서 �
   path('api/v0/', include('expenses.urls')),
   path('api/v0/', include('sales.urls')),
   path('api/v0/', include('pl.urls')),
+  path('api/v0/', include('smartstore.urls')),
   ```
 - 주소 · 응답 모양이 바뀌는 변경은 `v1` 을 새로 만들고 `v0` 는 그대로 둔다. 칸을 추가하는 정도는 같은 버전에서
 - 주소는 복수형 명사: `/api/v0/brands/`, `/api/v0/filaments/`, `/api/v0/colors/{id}/`, `/api/v0/spools/`

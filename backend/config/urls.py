@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/v0/', include('expenses.urls')),
     path('api/v0/', include('sales.urls')),
     path('api/v0/', include('pl.urls')),
+    path('api/v0/', include('smartstore.urls')),
 ]
 
 # 개발 중에는 업로드 파일을 Django 가 직접 제공 (DEBUG=True 일 때만 동작)

@@ -143,6 +143,12 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # 비우면 화면이 지금 연 주소를 쓴다 (localhost 로 열었으면 폰에서 안 열림)
 PUBLIC_URL = env('PUBLIC_URL', '').strip().rstrip('/')
 
+# 스마트스토어 연동 (v2 STORE-04): 커머스API 내스토어 애플리케이션 ID · 시크릿.
+# 프로젝트 밖 파일에 두고 그 경로만 적는다 (파일 안: NAVER_CLIENT_ID=… / NAVER_CLIENT_SECRET=…).
+# 이 .env 에 직접 NAVER_COMMERCE_CLIENT_ID · NAVER_COMMERCE_CLIENT_SECRET 을 적어도 된다.
+# 화면 · DB · 백업에는 저장하지 않음
+NAVER_COMMERCE_KEY_FILE = env('NAVER_COMMERCE_KEY_FILE', '').strip()
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
