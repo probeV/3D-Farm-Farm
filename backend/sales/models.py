@@ -1,8 +1,10 @@
 """판매 장부 모델 — docs/ERD.md · docs/plans/v2.md SALE 기준.
 
-판매(Sale) 한 건 = 주문 하나. 주문 안에 제품 여러 줄(SaleItem, SALE-04) · 포장 줄(SalePack, SALE-06).
+판매(Sale) 한 건 = 주문 하나. 주문 안에 제품 여러 줄(SaleItem, SALE-04) · 부속품 줄(SalePart) ·
+포장 줄(SalePack, SALE-06).
 배송비 · 수수료 · 포장은 주문 단위
-판매를 저장하면 부속품(제품 × 수량)과 포장재(포장 줄)가 남은 수량에서 빠진다 (stock/services.py sync_sale)
+판매를 저장하면 부속품 줄과 포장 줄만큼 남은 수량에서 빠진다 (stock/services.py sync_sale).
+부속품 줄은 처음에 제품의 사용 부속품 × 수량으로 채우고 판매마다 바꿀 수 있다 (예: 적축 클리커는 청축 스위치 대신 적축)
 판매처는 고정 3개. 손익(PL)이 판매가 · 수수료 · 정산 금액을 쓰고, 개당 원가는 주문별 이익(참고, SALE-05)에만 쓴다
 """
 
@@ -149,3 +151,38 @@ class SalePack(models.Model):
     def amount(self):
         """금액 = 단가 × 수량. 단가가 없으면 None"""
         return None if self.unit_price is None else self.unit_price * self.qty
+
+
+class SalePart(models.Model):
+    """판매 주문의 부속품 줄 — 이 판매로 남은 수량에서 빠지는 부속품 (v2 STORE 하며 추가).
+    처음엔 제품의 사용 부속품 × 판매 수량으로 채우고, 판매마다 바꾸기 · 더하기 · 빼기 (옵션별 스위치 등).
+    스마트스토어에서 가져올 때도 제품의 사용 부속품 × 수량으로 채운다
+    옵션(적축 · 청축 …)에 따라 다르면 판매 창에서 확인하고 고친다.
+    원가(SaleItem.unit_cost)는 원가 계산표 값 그대로 — 이 줄은 재고용.
+    부속품을 지워도 줄은 남고 저장할 때 이름으로 보인다"""
+
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='parts', verbose_name='판매')
+    part = models.ForeignKey(
+        Part,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sale_parts',
+        verbose_name='부속품',
+    )
+    # 저장할 때의 부속품 이름. 비우면 저장할 때 부속품 이름으로
+    part_name = models.CharField('부속품 이름', max_length=100, blank=True)
+    qty = qty_field('수량', default=1, validators=[MinValueValidator(Decimal('0.01'))])
+
+    class Meta:
+        verbose_name = '판매 부속품'
+        verbose_name_plural = '판매 부속품'
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.part_name} × {self.qty}'
+
+    def save(self, *args, **kwargs):
+        if not self.part_name and self.part_id:
+            self.part_name = self.part.name
+        super().save(*args, **kwargs)
