@@ -79,11 +79,20 @@ class SaleItem(models.Model):
     unit_price = models.DecimalField('단가', **MONEY)
     # 팔 때 원가 계산표에서 복사한 개당 원가 (SALE-05). NULL = 원가 계산표에 입력이 덜 돼 원가 없음
     unit_cost = models.DecimalField('개당 원가', null=True, blank=True, **MONEY)
+    # 스마트스토어 상품주문번호 (v2 STORE). 가져온 줄이면 있음
+    # — 다음 가져오기 때 취소 · 반품 · 정산 금액을 맞출 때 찾는다.
+    # 직접 넣은 줄은 빈 값. 비어 있지 않으면 중복 불가
+    store_item_id = models.CharField('상품주문번호', max_length=30, blank=True)
 
     class Meta:
         verbose_name = '판매 제품'
         verbose_name_plural = '판매 제품'
         ordering = ['id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['store_item_id'], condition=~Q(store_item_id=''), name='unique_sale_item_store_item_id'
+            ),
+        ]
 
     def __str__(self):
         return f'{self.product_name} × {self.qty}'

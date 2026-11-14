@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'expenses',
     'sales',
     'pl',
+    'smartstore',
 ]
 
 MIDDLEWARE = [
