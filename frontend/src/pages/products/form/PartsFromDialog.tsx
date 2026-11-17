@@ -13,7 +13,7 @@ interface Props {
 // 다른 제품에서 부속품 가져오기 (TBD-22): 고른 제품의 부속품 항목만 넣는다. 수량은 넣은 뒤 직접 입력, 이미 있는 부속품는 건너뜀.
 // 세트 · 연결은 하지 않는다 (넣은 뒤에는 보통 줄)
 export default function PartsFromDialog({ products, parts, existing, onPick, onClose }: Props) {
-  const candidates = products.filter((p) => p.parts.length).sort((a, b) => a.no - b.no)
+  const candidates = products.filter((p) => p.parts.length).sort((a, b) => a.id - b.id)
   const [pickedId, setPickedId] = useState(candidates[0]?.id)
   const picked = candidates.find((p) => p.id === pickedId)
   // 같은 부속품 줄이 여러 개면 한 번만

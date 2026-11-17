@@ -58,7 +58,7 @@ function PlView({ months }: { months: PlMonth[] }) {
 
   const label =
     period.kind === 'month'
-      ? monthLabel(period.m) + (period.m === thisMonth ? ' (진행 중)' : '')
+      ? monthLabel(period.m)
       : period.kind === 'year'
         ? `${period.y}년`
         : `전체 (${first.replace('-', '.')}~)`

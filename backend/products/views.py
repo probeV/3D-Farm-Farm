@@ -81,7 +81,7 @@ class ReplacePartView(generics.GenericAPIView):
 class ProductViewSet(BaseViewSet):
     """제품 목록 = 제품 원가 화면에 필요한 제품 데이터 전부 (사용 필라멘트 · 부자재 줄 포함)"""
 
-    queryset = Product.objects.prefetch_related('filaments', 'parts').order_by('no')
+    queryset = Product.objects.prefetch_related('filaments', 'parts').order_by('id')
     serializer_class = ProductSerializer
 
 

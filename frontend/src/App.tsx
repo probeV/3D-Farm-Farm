@@ -230,7 +230,7 @@ export default function App() {
           {/* 스마트스토어 연동은 `판매 ›` 와 자기 제목을 그림 */}
           {!(page === 'sales' && storeOpen) && <h1 className="page-title">{current.label}</h1>}
           {page === 'stock' ? (
-            <StockPage labels={labels} onCloseLabels={() => setLabels(null)} />
+            <StockPage labels={labels} onCloseLabels={() => setLabels(null)} onSettings={() => openSettings('stock')} />
           ) : page === 'products' ? (
             <ProductsPage onSettings={() => openSettings('cost')} />
           ) : page === 'sales' && storeOpen ? (

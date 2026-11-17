@@ -17,8 +17,7 @@ export const partSchema = z.object({
   price: money,
   pack_qty: decimal(0.01, 99_999_999.99, 2),
   unit: text(10, false).transform((v) => v || '개'), // 비우면 기본 단위
-  // v2 STOCK: 부족 알림 기준 · 처음 수량 (추가할 때만 보냄). 소수 2자리, 0 이상
-  alert: decimal(0, 9_999_999_999.99, 2),
+  // v2 STOCK: 처음 수량 (추가할 때만 보냄). 소수 2자리, 0 이상. 부족 알림 기준은 설정 › 재고 관리 (탭마다 하나)
   stock: decimal(0, 9_999_999_999.99, 2),
   note: z.string().trim(),
 })

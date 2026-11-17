@@ -21,6 +21,9 @@ const SETTING: CostSetting = {
   fee_sales: 2.73,
   shipping_cost: 0,
   target_margin: 40,
+  alert_part: 0,
+  alert_pack: 0,
+  alert_supply: 0,
 }
 
 let nextId = 1

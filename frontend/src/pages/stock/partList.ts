@@ -67,13 +67,13 @@ export function usagesByPart(products: Product[]) {
 }
 
 // 검색: 품목 · 구매처 · 비고
-export function filterParts(parts: Part[], filter: ListFilter) {
+export function filterParts(parts: Part[], filter: ListFilter, alert = 0) {
   const q = filter.q.trim().toLowerCase()
   return parts
     .filter(
       (p) =>
         (!filter.noPriceOnly || p.price == null) &&
-        (!filter.lowOnly || levelOf(p) !== 'ok') &&
+        (!filter.lowOnly || levelOf(p, alert) !== 'ok') &&
         inCategory(p, filter.category) &&
         (!q || [p.name, p.shop, p.note].join(' ').toLowerCase().includes(q)),
     )
@@ -85,15 +85,15 @@ export function partsCost(product: Product, parts: Map<number, Part>) {
   return product.parts.reduce((sum, row) => sum + (parts.get(row.part)?.unit_price ?? 0) * row.qty, 0)
 }
 
-// 맨 위 요약 (PART-03 · STOCK-04). 한 탭의 품목만 넘긴다
-export function summarize(parts: Part[]) {
+// 맨 위 요약 (PART-03 · STOCK-04). 한 탭의 품목과 그 탭의 부족 알림 기준을 넘긴다
+export function summarize(parts: Part[], alert = 0) {
   const used = parts.filter((p) => p.product_count > 0).length
   return {
     total: parts.length,
     used, // 제품에서 쓰는 부속품
     unused: parts.length - used,
     noPrice: parts.filter((p) => p.price == null).length,
-    low: parts.filter((p) => levelOf(p) !== 'ok'), // 부족 · 없음
+    low: parts.filter((p) => levelOf(p, alert) !== 'ok'), // 부족 · 없음
     // 남은 금액 = Σ 남은 수량 × 개당 단가 (0 아래 · 가격 없는 것은 0)
     value: parts.reduce((sum, p) => sum + Math.max(0, p.stock) * (p.unit_price ?? 0), 0),
   }

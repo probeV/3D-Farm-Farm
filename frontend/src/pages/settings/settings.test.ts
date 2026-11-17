@@ -18,6 +18,9 @@ const saved: CostSetting = {
   fee_sales: 2.73,
   shipping_cost: 0,
   target_margin: 40,
+  alert_part: 0,
+  alert_pack: 0,
+  alert_supply: 0,
 }
 const cost = categoryOf('cost')
 const store = categoryOf('store')
@@ -26,7 +29,7 @@ describe('설정 (PRD 3.8 · TBD-16)', () => {
   it('항목 기본값은 서버 기본값과 같고, 모든 항목이 분류 하나에만 있다', () => {
     expect(Object.fromEntries(ITEMS.map((it) => [it.key, it.def]))).toEqual(saved)
     expect(ITEMS).toHaveLength(Object.keys(saved).length)
-    expect(CATEGORIES.map((c) => c.key)).toEqual(['cost', 'store'])
+    expect(CATEGORIES.map((c) => c.key)).toEqual(['cost', 'stock', 'store'])
   })
 
   it('분류: 제품 원가 = 전기료 · 목표 마진율 / 스마트스토어 = 수수료 2개 · 배송비', () => {

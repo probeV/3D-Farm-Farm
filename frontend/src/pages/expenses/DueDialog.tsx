@@ -1,50 +1,49 @@
 import { useState } from 'react'
-import { createExpenses, useRefreshExpenses, type RecurringExpense } from '../../api/expenses'
+import { createExpenses, useRefreshExpenses } from '../../api/expenses'
 import Dialog from '../../components/Dialog'
 import { useToast } from '../../components/useToast'
-import { dotDate, today, won } from '../../format'
+import { dotDate, won } from '../../format'
 import { amount } from '../../validation'
 import { categoryInfo } from './categories'
-import { payDate } from './expenseList'
+import type { Due } from './expenseList'
 
 interface Props {
-  due: RecurringExpense[] // 결제일이 지났는데 이번 달에 안 넣은 반복 지출
+  due: Due[] // 결제일이 지났는데 아직 안 넣은 반복 지출 × 달
   onClose: () => void
 }
 
-// 이번 달 반복 지출 넣기 (EXP-04, docs/screens.md 5.5): 줄마다 체크 · 이번 달 금액 고치기 → 한 번에 넣기
-// 금액을 고쳐도 반복 지출의 금액은 그대로 (이번 달만). 날짜 = 이번 달 결제일
+// 반복 지출 넣기 (EXP-04, docs/screens.md 5.5): 반복 지출 × 달마다 한 줄. 체크 · 그 달 금액 고치기 → 한 번에 넣기
+// 지난달을 놓친 것도 그 달 결제일로 넣는다. 금액을 고쳐도 반복 지출의 금액은 그대로 (그 달만)
 export default function DueDialog({ due, onClose }: Props) {
   const refresh = useRefreshExpenses()
   const toast = useToast()
-  const month = today().slice(0, 7)
-  const [off, setOff] = useState<Set<number>>(new Set())
-  const [amounts, setAmounts] = useState<Record<number, string>>(() =>
-    Object.fromEntries(due.map((r) => [r.id, String(r.amount)])),
+  const [off, setOff] = useState<Set<string>>(new Set())
+  const [amounts, setAmounts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(due.map((d) => [d.key, String(d.recurring.amount)])),
   )
   const [busy, setBusy] = useState(false)
 
-  const picked = due.filter((r) => !off.has(r.id))
-  const parsed = Object.fromEntries(due.map((r) => [r.id, amount.safeParse(amounts[r.id])]))
-  const total = picked.reduce((a, r) => a + (parsed[r.id].success ? (parsed[r.id].data as number) : 0), 0)
-  const toggle = (id: number) =>
+  const picked = due.filter((d) => !off.has(d.key))
+  const parsed = Object.fromEntries(due.map((d) => [d.key, amount.safeParse(amounts[d.key])]))
+  const total = picked.reduce((a, d) => a + (parsed[d.key].success ? (parsed[d.key].data as number) : 0), 0)
+  const toggle = (key: string) =>
     setOff((s) => {
       const next = new Set(s)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
 
   const save = async () => {
-    if (!picked.length || picked.some((r) => !parsed[r.id].success)) return
+    if (!picked.length || picked.some((d) => !parsed[d.key].success)) return
     setBusy(true)
     try {
       await createExpenses(
-        picked.map((r) => ({
-          date: payDate(r, month),
+        picked.map(({ key, recurring: r, date }) => ({
+          date,
           name: r.name,
           category: r.category,
-          amount: parsed[r.id].data as number,
+          amount: parsed[key].data as number,
           shop: '',
           note: '',
           recurring: r.id,
@@ -62,11 +61,7 @@ export default function DueDialog({ due, onClose }: Props) {
 
   return (
     <Dialog
-      title={
-        <>
-          이번 달 반복 지출 넣기 <span className="copy-from">{month.replace('-', '년 ')}월</span>
-        </>
-      }
+      title="반복 지출 넣기"
       size="wide"
       onClose={onClose}
       submitLabel={`${picked.length}건 넣기`}
@@ -79,34 +74,39 @@ export default function DueDialog({ due, onClose }: Props) {
       }
     >
       <p className="hint" style={{ margin: '0 0 8px' }}>
-        넣을 것만 체크하세요. 이번 달 금액이 다르면 고쳐서 넣어요 (반복 지출 금액은 그대로).
+        넣을 것만 체크하세요. 그 달 금액이 다르면 고쳐서 넣어요 (반복 지출 금액은 그대로).
       </p>
-      {due.map((r) => {
-        const p = parsed[r.id]
+      {due.map(({ key, recurring: r, date }) => {
+        const p = parsed[key]
         const changed = p.success && p.data !== r.amount
         return (
-          <div key={r.id} className={off.has(r.id) ? 'due-row off' : 'due-row'}>
-            <input type="checkbox" checked={!off.has(r.id)} aria-label={r.name} onChange={() => toggle(r.id)} />
+          <div key={key} className={off.has(key) ? 'due-row off' : 'due-row'}>
+            <input
+              type="checkbox"
+              checked={!off.has(key)}
+              aria-label={`${r.name} ${date}`}
+              onChange={() => toggle(key)}
+            />
             <span>
               <b>{r.name}</b> <span className="cat">{categoryInfo(r.category).label}</span>
-              <span className="hint">{dotDate(payDate(r, month))}</span>
+              <span className="hint">{dotDate(date)}</span>
             </span>
             <span className="hint num">평소 {won(r.amount)}</span>
             <span>
               <span className="with-suffix">
                 <input
                   inputMode="numeric"
-                  aria-label={`${r.name} 금액`}
-                  value={amounts[r.id]}
-                  disabled={off.has(r.id)}
-                  onChange={(e) => setAmounts((a) => ({ ...a, [r.id]: e.target.value }))}
+                  aria-label={`${r.name} ${date} 금액`}
+                  value={amounts[key]}
+                  disabled={off.has(key)}
+                  onChange={(e) => setAmounts((a) => ({ ...a, [key]: e.target.value }))}
                 />
                 <em>원</em>
               </span>
-              {!p.success && !off.has(r.id) ? (
+              {!p.success && !off.has(key) ? (
                 <span className="err">{p.error.issues[0].message}</span>
               ) : (
-                changed && <span className="changed">이번 달만 다른 금액</span>
+                changed && <span className="changed">이 달만 다른 금액</span>
               )}
             </span>
           </div>

@@ -12,7 +12,6 @@ import { useToast } from '../../../components/useToast'
 
 interface ProductOption {
   id: number
-  no: number
   name: string
   status: string
 }
@@ -70,7 +69,7 @@ export default function LinkDialog({ products, onClose }: { products: ProductOpt
       <option value="">연결 안 함</option>
       {products.map((p) => (
         <option key={p.id} value={p.id}>
-          {String(p.no).padStart(3, '0')} {p.name}
+          {p.name}
           {p.status === 'developing' ? ' (개발중)' : p.status === 'discontinued' ? ' (판매중지)' : ''}
         </option>
       ))}

@@ -46,7 +46,7 @@ class PartTests(TestCase):
 
     def test_new_part_starts_empty(self):
         part = Part.objects.create(name='자석')
-        self.assertEqual((part.kind, part.stock, part.alert), (PartKind.PART, 0, 0))
+        self.assertEqual((part.kind, part.stock), (PartKind.PART, 0))
 
 
 class PackSetTests(TestCase):

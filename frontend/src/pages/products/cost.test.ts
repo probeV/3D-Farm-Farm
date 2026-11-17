@@ -61,7 +61,6 @@ const part = (id: number, name: string, unit_price: number | null): Part => ({
   product_count: 0,
   photo: null,
   stock: 100,
-  alert: 0,
   set_count: 0,
   last_used: null,
   bought: false,
@@ -86,6 +85,9 @@ const setting: CostSetting = {
   fee_sales: 2.73,
   shipping_cost: 0,
   target_margin: 40,
+  alert_part: 0,
+  alert_pack: 0,
+  alert_supply: 0,
 }
 // 포장 세트 1: 포장재 없음(0원) — 기본 포장 경고 없이 다른 계산만 보려고. 2: 봉투 2장(100원)
 const packParts = [{ ...part(9, '봉투', 50), kind: 'pack' as const }]

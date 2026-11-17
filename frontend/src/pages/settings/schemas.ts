@@ -20,11 +20,11 @@ export type CalcKind = 'elec' | 'rec' | 'fee'
 export interface SettingGroup {
   icon: string
   title: string
-  calc: CalcKind // 묶음 제목 줄 오른쪽 계산 예시
+  calc?: CalcKind // 묶음 제목 줄 오른쪽 계산 예시 (없으면 안 보임)
   items: SettingItem[]
 }
 
-export type CategoryKey = 'cost' | 'store'
+export type CategoryKey = 'cost' | 'stock' | 'store'
 
 export interface SettingCategory {
   key: CategoryKey
@@ -66,6 +66,30 @@ export const CATEGORIES: SettingCategory[] = [
             unit: '%',
             def: 40,
           },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'stock',
+    icon: '📦',
+    label: '재고 관리',
+    desc: '부속품 · 포장재 · 소모품 탭의 부족 알림',
+    effect: '그 탭 품목의 부족 표시에 바로 반영돼요',
+    groups: [
+      {
+        icon: '🔔',
+        title: '부족 알림 기준',
+        items: [
+          {
+            key: 'alert_part',
+            name: '부속품',
+            desc: '남은 수량이 이 값 이하면 부족 · 0 이하면 없음',
+            unit: '이하',
+            def: 0,
+          },
+          { key: 'alert_pack', name: '포장재', desc: '단위는 품목 단위 그대로 (개 · 장 …)', unit: '이하', def: 0 },
+          { key: 'alert_supply', name: '소모품', desc: '0 이면 다 떨어졌을 때만 알림', unit: '이하', def: 0 },
         ],
       },
     ],
@@ -126,6 +150,10 @@ export const settingSchema = z.object({
   fee_sales: percent,
   shipping_cost: intRange(0, 9_999_999_999),
   target_margin: percent,
+  // 서버: qty_field (12, 2), 0 이상
+  alert_part: decimal(0, 9_999_999_999.99, 2),
+  alert_pack: decimal(0, 9_999_999_999.99, 2),
+  alert_supply: decimal(0, 9_999_999_999.99, 2),
 })
 
 export type Values = Record<SettingKey, string>

@@ -36,20 +36,13 @@ class ProductPartInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['no', 'name', 'category', 'subcategory', 'status', 'print_minutes', 'sale_price']
-    list_display_links = ['no', 'name']
+    list_display = ['name', 'category', 'subcategory', 'status', 'print_minutes', 'sale_price']
+    list_display_links = ['name']
     list_filter = ['status', 'category']
     search_fields = ['name']
     list_select_related = ['category', 'subcategory__category']
     autocomplete_fields = ['category', 'subcategory', 'default_pack']
     inlines = [ProductFilamentInline, ProductPartInline]
-
-    def get_search_results(self, request, queryset, search_term):
-        """제품명 검색에 더해, 숫자를 넣으면 No. 로도 찾기"""
-        results, may_have_duplicates = super().get_search_results(request, queryset, search_term)
-        if search_term.strip().isdigit():
-            results |= queryset.filter(no=int(search_term))
-        return results, may_have_duplicates
 
 
 @admin.register(CostSetting)

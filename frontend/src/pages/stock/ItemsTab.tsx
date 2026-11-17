@@ -3,6 +3,7 @@ import { useExpenses } from '../../api/expenses'
 import { spendPart, useRefreshProducts, type PackSet, type Part, type PartKind } from '../../api/products'
 import { useSales } from '../../api/sales'
 import Help from '../../components/Help'
+import SettingsButton from '../../components/SettingsButton'
 import SortTh from '../../components/SortTh'
 import { useToast } from '../../components/useToast'
 import { dotDate, today, unitWon, won } from '../../format'
@@ -45,7 +46,7 @@ function loadView(kind: PartKind): View {
 
 // 재고 관리의 부속품 · 포장 · 소모품 탭 (STOCK-01 ~ 08, docs/screens.md 3장)
 // 맨 위 개수 · 버튼 → 요약 카드 → (포장: 포장 세트) → 품목 목록 (카테고리별 카드 / 표)
-export default function ItemsTab({ kind }: { kind: PartKind }) {
+export default function ItemsTab({ kind, onSettings }: { kind: PartKind; onSettings: () => void }) {
   const { error, retry, data } = usePartsData(kind)
   const sales = useSales().data
   const expenses = useExpenses().data
@@ -69,12 +70,12 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
   }
   if (!data) return <div className="empty">불러오는 중…</div>
 
-  const { parts, allParts, categories, products, packSets, usagesOf } = data
+  const { parts, allParts, categories, products, packSets, usagesOf, alert } = data
   const byId = new Map(allParts.map((p) => [p.id, p]))
   const setsOf = setsByPart(packSets)
   const categoryName = (id: number | null) => categories.find((c) => c.id === id)?.name
   const set = (patch: Partial<ListFilter>) => setFilter((f) => ({ ...f, ...patch }))
-  const sum = summarize(parts)
+  const sum = summarize(parts, alert)
   // 가격 미입력 · 부족이 모두 풀렸으면 필터도 풀림
   const noPriceOnly = filter.noPriceOnly && sum.noPrice > 0
   const lowOnly = filter.lowOnly && sum.low.length > 0
@@ -83,7 +84,7 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
     filter.category === '' || filter.category === 'none' || categoryName(Number(filter.category.slice(2)))
       ? filter.category
       : ''
-  const list = filterParts(parts, { ...filter, noPriceOnly, lowOnly, category })
+  const list = filterParts(parts, { ...filter, noPriceOnly, lowOnly, category }, alert)
   const filtered = filter.q !== '' || noPriceOnly || lowOnly || category !== ''
   const th = {
     sort: filter.sort,
@@ -219,6 +220,7 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
         <button className="btn" onClick={() => setDialog({ kind: 'manage' })}>
           {L} 관리
         </button>
+        <SettingsButton label="재고 관리" onClick={onSettings} />
       </div>
 
       {kind === 'part' && (
@@ -375,7 +377,7 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
             .map((g) => ({ ...g, items: list.filter((p) => p.category === g.key) }))
             .filter((g) => g.items.length)
             .map((g) => {
-              const low = g.items.filter((p) => levelOf(p) !== 'ok').length
+              const low = g.items.filter((p) => levelOf(p, alert) !== 'ok').length
               return (
                 <section key={g.key ?? 'none'} className="cat-card">
                   <div className={g.key == null ? 'cat-title none' : 'cat-title'}>
@@ -394,6 +396,7 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
                       <Tile
                         key={p.id}
                         part={p}
+                        alert={alert}
                         sub={`${p.shop || '구매처 없음'} · ${usedText(p)}`}
                         tip={usedTip(p)}
                         onOpen={() => setDialog({ kind: 'part', partId: p.id })}
@@ -461,7 +464,7 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
             </thead>
             <tbody>
               {list.map((p) => {
-                const level = levelOf(p)
+                const level = levelOf(p, alert)
                 const n = kind === 'part' ? p.product_count : p.set_count
                 return (
                   <tr key={p.id} onClick={() => setDialog({ kind: 'part', partId: p.id })}>
@@ -580,6 +583,7 @@ export default function ItemsTab({ kind }: { kind: PartKind }) {
 
 interface TileProps {
   part: Part
+  alert: number // 이 탭의 부족 알림 기준
   sub: string // 구매처 · 사용 제품 수 (탭마다)
   tip: string
   onOpen: () => void
@@ -587,15 +591,15 @@ interface TileProps {
 }
 
 // 사진 타일 (STOCK-02): 사진(없으면 첫 글자) · 부족/없음 배지 · 구매 링크 · 이름 · 구매처 · 남은 수량 · 개당 단가
-function Tile({ part: p, sub, tip, onOpen, onUse }: TileProps) {
-  const level = levelOf(p)
+function Tile({ part: p, alert, sub, tip, onOpen, onUse }: TileProps) {
+  const level = levelOf(p, alert)
   return (
     // 안에 구매 링크 · 다 씀 버튼이 있어 button 대신 div (button 안에 a · button 을 넣을 수 없음)
     <div
       role="button"
       tabIndex={0}
       className={level === 'ok' ? 'ptile' : `ptile ${level}`}
-      title={`${p.name} · 알림 기준 ${qty(p.alert)}${p.unit}${tip ? `\n${tip}` : ''}`}
+      title={`${p.name} · 알림 기준 ${qty(alert)}${p.unit}${tip ? `\n${tip}` : ''}`}
       onClick={onOpen}
       onKeyDown={(e) => e.key === 'Enter' && onOpen()}
     >

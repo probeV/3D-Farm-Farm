@@ -321,7 +321,7 @@ function OrderRows({
   order: StoreOrder
   checked: boolean
   onCheck: (on: boolean) => void
-  products: { id: number; no: number; name: string }[]
+  products: { id: number; name: string }[]
   onLink: (link: number, product: string) => void
 }) {
   const badge = KIND_BADGE[o.kind]
@@ -367,7 +367,7 @@ function OrderRows({
                   <option value="">제품 고르기</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {String(p.no).padStart(3, '0')} {p.name}
+                      {p.name}
                     </option>
                   ))}
                 </select>

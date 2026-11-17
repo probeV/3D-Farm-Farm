@@ -75,9 +75,6 @@ export default function ExpensesPage() {
   return (
     <>
       <div className="top-row">
-        <span className="hint">
-          장비 · 재료 · 구독 등 사업에 쓴 돈. 필라멘트 · 부속품 · 포장재 · 소모품은 산 것을 적으면 재고로 이어져요.
-        </span>
         <div className="spacer" />
         <button className="btn" onClick={() => setDialog({ kind: 'recurring' })}>
           반복 지출 관리
@@ -119,8 +116,9 @@ export default function ExpensesPage() {
       {due.length > 0 && (
         <div className="due">
           <span>
-            결제일이 지난 반복 지출 <b>{due.length}건</b>을 아직 넣지 않았어요 · {due.map((r) => r.name).join(', ')} (
-            {won(due.reduce((a, r) => a + r.amount, 0))})
+            결제일이 지난 반복 지출 <b>{due.length}건</b>을 아직 넣지 않았어요 ·{' '}
+            {due.map((d) => `${d.recurring.name} ${Number(d.month.slice(5))}월`).join(', ')} (
+            {won(due.reduce((a, d) => a + d.recurring.amount, 0))})
           </span>
           <div className="spacer" />
           <button className="btn small primary" onClick={() => setDialog({ kind: 'due' })}>

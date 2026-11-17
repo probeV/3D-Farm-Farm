@@ -30,7 +30,6 @@ const part = (p: Partial<Part>): Part => ({
   product_count: 0,
   photo: null,
   stock: 100,
-  alert: 0,
   set_count: 0,
   last_used: null,
   bought: false,
@@ -39,7 +38,6 @@ const part = (p: Partial<Part>): Part => ({
 
 const product = (p: Partial<Product>): Product => ({
   id: 1,
-  no: 1,
   category: null,
   subcategory: null,
   name: '',
@@ -145,7 +143,7 @@ describe('사용하는 제품 · 요약 (PART-03)', () => {
     // 남은 수량 100 × 단가 (가격 없는 것은 0)
     expect(s.value).toBe(parts.reduce((a, p) => a + 100 * (p.unit_price ?? 0), 0))
     expect(s.low).toEqual([])
-    const low = summarize([part({ id: 1, stock: 3, alert: 5 }), part({ id: 2, stock: 0 }), part({ id: 3, stock: -2 })])
+    const low = summarize([part({ id: 1, stock: 3 }), part({ id: 2, stock: 0 }), part({ id: 3, stock: -2 })], 5)
     expect(low.low.map((p) => p.id)).toEqual([1, 2, 3])
     expect(low.value).toBe(300) // 0 아래는 0 으로
   })
@@ -167,7 +165,6 @@ describe('부자재 폼 검증 (PART-02)', () => {
     price: '12,000',
     pack_qty: '200',
     unit: '',
-    alert: '0',
     stock: '0',
     note: '',
   }
@@ -181,7 +178,6 @@ describe('부자재 폼 검증 (PART-02)', () => {
       price: 12000,
       pack_qty: 200,
       unit: '개',
-      alert: 0,
       stock: 0,
       note: '',
     })
@@ -222,8 +218,10 @@ describe('부족 · 포장 세트 (STOCK-04 · 06)', () => {
   })
 
   it('부족 · 없음만 보기', () => {
-    const list = [part({ id: 1, stock: 3, alert: 5 }), part({ id: 2, stock: 10, alert: 5 }), part({ id: 3, stock: 0 })]
-    expect(filterParts(list, { ...NO_FILTER, lowOnly: true }).map((p) => p.id)).toEqual([1, 3])
+    const list = [part({ id: 1, stock: 3 }), part({ id: 2, stock: 10 }), part({ id: 3, stock: 0 })]
+    expect(filterParts(list, { ...NO_FILTER, lowOnly: true }, 5).map((p) => p.id)).toEqual([1, 3])
+    // 기준 0 (기본): 다 떨어진 것만
+    expect(filterParts(list, { ...NO_FILTER, lowOnly: true }).map((p) => p.id)).toEqual([3])
   })
 
   it('세트 원가: 가격 없는 포장재는 0원', () => {

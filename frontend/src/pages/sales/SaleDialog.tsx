@@ -286,7 +286,7 @@ export default function SaleDialog({ sale, copyOf, rows, setting, onCopy, onClos
                       <optgroup key={st} label={STATUS_LABEL[st]}>
                         {list.map((x) => (
                           <option key={x.product.id} value={x.product.id}>
-                            {String(x.product.no).padStart(3, '0')} {x.product.name}
+                            {x.product.name}
                             {x.product.sale_price != null && ` · ${won(x.product.sale_price)}`}
                           </option>
                         ))}

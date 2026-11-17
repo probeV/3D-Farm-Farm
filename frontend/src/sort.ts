@@ -20,7 +20,7 @@ export function nextSort<T, K extends string>(columns: SortColumns<T, K>, cur: S
   return { key, dir: columns[key].first ?? 'asc' }
 }
 
-// 값이 같으면 tie (예: No. 순 · 이름순) 로
+// 값이 같으면 tie (예: 추가한 순서 · 이름순) 로
 export function compareBy<T, K extends string>(
   columns: SortColumns<T, K>,
   sort: SortState<K>,

@@ -1,5 +1,5 @@
 // 제품 추가 · 수정 폼 검증 스키마. 공통 규칙은 src/validation.ts, 서버 규칙은 backend/products/serializers.py
-// No. 중복 · 세부 분류와 카테고리 짝 · 색상과 필라멘트 짝은 서버도 검사한다 (2차)
+// 세부 분류와 카테고리 짝 · 색상과 필라멘트 짝은 서버도 검사한다 (2차)
 import { z } from 'zod'
 import { decimal, money, optionalInt, selectedId, text } from '../../../validation'
 
@@ -14,7 +14,6 @@ const lineAmount = (max: number, places: number) =>
 //       ProductFilament.grams DecimalField(max_digits=8, decimal_places=2), ProductPart.qty (max_digits=10, decimal_places=2)
 export const productSchema = z
   .object({
-    no: optionalInt(1, 2_147_483_647), // 비우면 서버가 다음 번호
     name: text(100),
     category: optionalId,
     subcategory: optionalId,

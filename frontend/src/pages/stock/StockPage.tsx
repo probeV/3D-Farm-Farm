@@ -10,9 +10,11 @@ import { TABS, type StockTab } from './kinds'
 export default function StockPage({
   labels,
   onCloseLabels,
+  onSettings,
 }: {
   labels: { pick: LabelPick | null; key: number } | null
   onCloseLabels: () => void
+  onSettings: () => void // 설정 › 재고 관리 (부족 알림 기준)
 }) {
   const [tab, setTab] = useState<StockTab>('filament')
   return (
@@ -45,7 +47,7 @@ export default function StockPage({
       ) : tab === 'filament' ? (
         <FilamentsPage />
       ) : (
-        <ItemsTab key={tab} kind={tab} />
+        <ItemsTab key={tab} kind={tab} onSettings={onSettings} />
       )}
     </>
   )

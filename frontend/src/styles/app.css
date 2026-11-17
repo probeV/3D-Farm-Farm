@@ -149,8 +149,8 @@ textarea {
   flex-direction: column;
   gap: 4px;
 }
-.layout.collapsed .label,
-.layout.collapsed .side-brand .label {
+/* 사이드바 글자만 숨김 — `.layout .label` 로 두면 본문 `.label`(원가 내역 등)까지 숨는다 */
+.layout.collapsed .sidebar .label {
   display: none;
 }
 .layout.collapsed .nav-item,
@@ -1830,7 +1830,7 @@ input[type='color'] {
   .layout {
     --side-w: 64px;
   }
-  .layout .label {
+  .layout .sidebar .label {
     display: none;
   }
   .layout .nav-item,
