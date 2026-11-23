@@ -143,7 +143,7 @@ pages/filaments/
   list/                목록 (screens 1.2~1.4): BrandSummary(회사별 요약), FilamentCard(필라멘트 묶음 · 색상 타일), TileMenu
   spools/              스풀 동작 (PRD 3.4 · 3.5): PurchaseDialog, PickDialog, SpoolTable(스풀 조정 표),
                        spoolActions.ts(동작 + 되돌리기), schemas.ts(재고 추가 검증)
-  qr/                  QR 스풀 관리 (TBD-18, screens 1.10): LabelsPage(라벨 인쇄 · 인쇄용 라벨), labels.ts(라벨 없음 · 골라 둘 스풀 · QR 주소)
+  qr/                  QR 스풀 관리 (TBD-18, screens 1.10): LabelsPage(라벨 인쇄 · 인쇄용 라벨), labels.ts(라벨 없음 · 골라 둘 스풀 · QR 주소 · 라벨 크기 · 감열 프린터 점에 맞춘 QR 크기 · 위치 보정)
   ColorManageDialog.tsx  색상 · 스풀 관리 (TBD-13): 색상 정보 탭(catalog) + 스풀 탭(spools/SpoolTable) — 두 기능 폴더를 써서 여기에
   catalog/             회사 · 재질 · 필라멘트 · 색상 편집 (PRD 3.1): ManageDialog(필라멘트 관리),
                        BrandDialog, MaterialDialog, FilamentDialog, ColorDialog(색상 추가 + 입력칸 · 머리 띠),
@@ -162,8 +162,8 @@ pages/products/
 pages/stock/           재고 관리 (v2 STOCK, screens 3장). 필라멘트 탭은 pages/filaments 그대로
   StockPage.tsx        화면 진입점: 탭 필라멘트 | 부속품 | 포장 | 소모품
   ItemsTab.tsx         부속품 · 포장 · 소모품 탭 (kind 로 나눔): 개수 · 요약 카드 · (포장) 세트 카드 · 카드 / 표 목록
-  kinds.ts             탭 이름 · 품목 이름 · 남은 수량 상태(부족 · 없음)
-  usePartsData.ts      한 탭의 품목 · 카테고리 + 포장 세트 + 제품(부속품 줄)을 함께 (목록 · 관리 창이 같이 씀)
+  kinds.ts             탭 이름 · 품목 이름 · 남은 수량 상태(부족 · 없음 — 기준은 탭마다 설정값)
+  usePartsData.ts      한 탭의 품목 · 카테고리 + 포장 세트 + 제품(부속품 줄) + 그 탭의 부족 알림 기준(설정)을 함께 (목록 · 관리 창이 같이 씀)
   partList.ts          검색 · 정렬 · 요약 · 사용하는 제품 · 구매처 고르기 · 세트 원가 · 바로 쌀 수 있는 수
   ManageDialog.tsx     ○○ 관리 (구매처 / 카테고리 → 품목, screens 3.4), PartDialog.tsx 추가 · 복제 · 수정(사진 · 입출고 기록),
                        AdjustDialog.tsx 남은 수량 조정, PackSetDialog.tsx 포장 세트, ReplaceDialog.tsx 부속품 바꾸기, schemas.ts

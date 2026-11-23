@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { Color, Filament, Spool, SpoolStatus } from '../../../api/filaments'
-import { baseUrl, chunk, initialPick, localOnly, needsLabel, qrUrl, search, toRows } from './labels'
+import {
+  baseUrl,
+  chunk,
+  initialPick,
+  localOnly,
+  needsLabel,
+  parseOffset,
+  qrPrintMm,
+  qrUrl,
+  search,
+  toRows,
+} from './labels'
 
 const spool = (id: number, extra: Partial<Spool> = {}): Spool => ({
   id,
@@ -115,4 +126,23 @@ describe('처음 골라 둘 스풀', () => {
 
 it('A4 라벨지는 24칸씩 나눔', () => {
   expect(chunk([...Array(50).keys()], 24).map((g) => g.length)).toEqual([24, 24, 2])
+})
+
+describe('감열 라벨 (30x20, 203dpi)', () => {
+  it('QR 칸 하나 = 프린터 점 정수 개, 들어갈 수 있는 가장 크게', () => {
+    // 29칸 + 둘레 4 = 33칸, 18mm 안: 칸당 4점(0.5mm) → 16.5mm
+    expect(qrPrintMm(33, 18)).toBe(16.5)
+    // 25칸 + 4 = 29칸: 칸당 4점 → 14.5mm (5점이면 18.125mm 라 넘침)
+    expect(qrPrintMm(29, 18)).toBe(14.5)
+    // 아주 좁아도 적어도 1점
+    expect(qrPrintMm(100, 5)).toBe(12.5)
+  })
+
+  it('위치 보정: 숫자만, 소수 1자리, ±10mm 까지', () => {
+    expect(parseOffset('-1.5')).toBe(-1.5)
+    expect(parseOffset('0,25')).toBe(0.3)
+    expect(parseOffset('25')).toBe(10)
+    expect(parseOffset('')).toBe(0)
+    expect(parseOffset('abc')).toBe(0)
+  })
 })

@@ -23,11 +23,15 @@ import {
   initialPick,
   localOnly,
   needsLabel,
+  PAGE_SIZE,
+  parseOffset,
+  QR_MAX_MM,
   qrUrl,
   search,
   SIZES,
   toRows,
   type LabelSize,
+  type Offset,
   type Row,
 } from './labels'
 
@@ -39,6 +43,17 @@ function loadSize(): LabelSize {
     return v && v in SIZES ? (v as LabelSize) : '40x30'
   } catch {
     return '40x30'
+  }
+}
+
+// 인쇄 위치 보정(mm)도 이 PC 에 기억 (라벨 프린터마다 찍히는 위치가 달라서)
+const OFFSET_KEY = 'pff-label-offset'
+function loadOffset(): { x: string; y: string } {
+  try {
+    const v = JSON.parse(localStorage.getItem(OFFSET_KEY) ?? '{}') as Partial<Offset>
+    return { x: String(v.x ?? 0), y: String(v.y ?? 0) }
+  } catch {
+    return { x: '0', y: '0' }
   }
 }
 
@@ -90,6 +105,8 @@ function Labels({ rows, spools, base, pick }: { rows: Row[]; spools: Spool[]; ba
   const [only, setOnly] = useState<'nolabel' | 'all'>('nolabel')
   const [q, setQ] = useState('')
   const [size, setSize] = useState(loadSize)
+  const [offsetText, setOffsetText] = useState(loadOffset)
+  const offset: Offset = { x: parseOffset(offsetText.x), y: parseOffset(offsetText.y) }
   // 처음 한 번: 지출 저장 · 재고 추가 알림의 `라벨 인쇄` 로 왔으면 그 스풀을 골라 둔다
   const [picked, setPicked] = useState(() => initialPick(spools, pick))
   const [from, setFrom] = useState(pick?.from ?? '')
@@ -123,6 +140,15 @@ function Labels({ rows, spools, base, pick }: { rows: Row[]; spools: Spool[]; ba
     setSize(v)
     try {
       localStorage.setItem(SIZE_KEY, v)
+    } catch {
+      /* 저장 불가 */
+    }
+  }
+  const changeOffset = (axis: 'x' | 'y', text: string) => {
+    const next = { ...offsetText, [axis]: text }
+    setOffsetText(next)
+    try {
+      localStorage.setItem(OFFSET_KEY, JSON.stringify({ x: parseOffset(next.x), y: parseOffset(next.y) }))
     } catch {
       /* 저장 불가 */
     }
@@ -183,6 +209,31 @@ function Labels({ rows, spools, base, pick }: { rows: Row[]; spools: Spool[]; ba
               </option>
             ))}
           </select>
+          {/* 인쇄 위치 보정: 라벨이 한쪽으로 치우쳐 찍히면 그만큼 반대로 (예: 오른쪽으로 1.5mm 치우침 → 가로 -1.5) */}
+          <span className="offset">
+            위치 보정
+            <Help tip="라벨이 한쪽으로 치우쳐 찍히면 그만큼 반대로 옮겨요. 가로 + 오른쪽 · − 왼쪽, 세로 + 아래 · − 위 (mm, ±10까지). 이 PC 에 기억" />
+            <label className="with-suffix">
+              <em>가로</em>
+              <input
+                inputMode="decimal"
+                aria-label="가로 보정 (mm)"
+                value={offsetText.x}
+                onChange={(e) => changeOffset('x', e.target.value)}
+              />
+              <em>mm</em>
+            </label>
+            <label className="with-suffix">
+              <em>세로</em>
+              <input
+                inputMode="decimal"
+                aria-label="세로 보정 (mm)"
+                value={offsetText.y}
+                onChange={(e) => changeOffset('y', e.target.value)}
+              />
+              <em>mm</em>
+            </label>
+          </span>
         </div>
         <div className="pick-list">
           {list.length ? (
@@ -237,7 +288,7 @@ function Labels({ rows, spools, base, pick }: { rows: Row[]; spools: Spool[]; ba
         {chosen.length > 0 && (
           <div className="labels">
             {chosen.slice(0, PREVIEW).map((r) => (
-              <LabelCard key={r.spool.id} row={r} base={base} />
+              <LabelCard key={r.spool.id} row={r} base={base} size={size} />
             ))}
             {chosen.length > PREVIEW && <div className="more">외 {chosen.length - PREVIEW}장</div>}
           </div>
@@ -260,43 +311,46 @@ function Labels({ rows, spools, base, pick }: { rows: Row[]; spools: Spool[]; ba
           {chosen.length}장 인쇄
         </button>
       </div>
-      {chosen.length > 0 && <PrintSheet rows={chosen} base={base} size={size} />}
+      {chosen.length > 0 && <PrintSheet rows={chosen} base={base} size={size} offset={offset} />}
     </section>
   )
 }
 
-// 라벨 한 장: QR + 코드 + 색상 · 필라멘트 (같은 색 스풀은 아무 라벨이나 붙여도 됨)
-function LabelCard({ row, base }: { row: Row; base: string }) {
+// 라벨 한 장: QR + 코드 + 색상 · 필라멘트 (같은 색 스풀은 아무 라벨이나 붙여도 됨).
+// 30×20 은 자리가 좁아 코드 + 색상 이름 + 회사 재질(시리즈 빼고). print = 인쇄용 (QR 크기를 프린터 점에 맞춤)
+function LabelCard({ row, base, size, print }: { row: Row; base: string; size: LabelSize; print?: boolean }) {
+  const small = size === '30x20'
   return (
-    <div className="lbl">
-      <QrCode text={qrUrl(base, row.spool.code)} />
+    <div className={small ? 'lbl small' : 'lbl'}>
+      <QrCode text={qrUrl(base, row.spool.code)} fitMm={print ? QR_MAX_MM[size] : undefined} />
       <div className="lbl-text">
         <div className="lbl-code">{row.spool.code}</div>
         <div className="lbl-name">
-          {row.color.name} · {row.filament.material_name} {row.filament.series}
+          {small ? row.color.name : `${row.color.name} · ${row.filament.material_name} ${row.filament.series}`}
         </div>
-        <div className="lbl-brand">{row.filament.brand_name}</div>
+        <div className="lbl-brand">
+          {small ? `${row.filament.brand_name} ${row.filament.material_name}` : row.filament.brand_name}
+        </div>
       </div>
     </div>
   )
 }
 
 // 인쇄용 라벨 (화면에는 안 보이고 인쇄할 때만). body 바로 아래에 그려서 인쇄할 때 나머지를 숨긴다 (qr.css)
-// 라벨 프린터: 한 장 = 한 페이지 / A4: 24칸씩 한 페이지
-function PrintSheet({ rows, base, size }: { rows: Row[]; base: string; size: LabelSize }) {
-  const page = size === 'a4' ? 'A4' : size === '40x30' ? '40mm 30mm' : '50mm 30mm'
+// 라벨 프린터: 한 장 = 한 페이지 / A4: 24칸씩 한 페이지. 위치 보정만큼 라벨 내용을 옮긴다
+function PrintSheet({ rows, base, size, offset }: { rows: Row[]; base: string; size: LabelSize; offset: Offset }) {
+  const card = (r: Row) => <LabelCard key={r.spool.id} row={r} base={base} size={size} print />
   return createPortal(
     <div className={`print-sheet size-${size}`}>
-      <style>{`@page { size: ${page}; margin: 0; }`}</style>
+      <style>{`@page { size: ${PAGE_SIZE[size]}; margin: 0; }
+.print-sheet .lbl { translate: ${offset.x}mm ${offset.y}mm; }`}</style>
       {size === 'a4'
         ? chunk(rows, A4_PER_PAGE).map((group, i) => (
             <div key={i} className="print-page">
-              {group.map((r) => (
-                <LabelCard key={r.spool.id} row={r} base={base} />
-              ))}
+              {group.map(card)}
             </div>
           ))
-        : rows.map((r) => <LabelCard key={r.spool.id} row={r} base={base} />)}
+        : rows.map(card)}
     </div>,
     document.body,
   )
