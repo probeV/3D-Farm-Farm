@@ -196,6 +196,22 @@
   width: 72px;
   height: 72px;
 }
+/* 30×20 미리보기: 3:2, 코드 + 색상 이름만 */
+.labels .lbl.small {
+  aspect-ratio: 3 / 2;
+}
+/* 인쇄 위치 보정 (가로 · 세로 mm, 이 PC 에 기억) */
+.qr-tools .offset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.qr-tools .offset .with-suffix input {
+  width: 56px;
+  text-align: right;
+}
 .lbl {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -253,6 +269,46 @@
     display: block;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  /* 감열 프린터는 회색을 못 찍는다 (점을 듬성듬성 찍어 흉내 → 작은 글자는 사라짐): 글자는 모두 진한 검정 · 굵게 (v2.1.0) */
+  .print-sheet .lbl,
+  .print-sheet .lbl-name,
+  .print-sheet .lbl-brand {
+    color: #000;
+    font-weight: 700;
+  }
+  .print-sheet .lbl-code {
+    font-weight: 800;
+  }
+  /* 30×20 (작은 라벨): 왼쪽 QR(프린터 점에 맞춘 크기) + 오른쪽 코드 · 색상 이름 */
+  .print-sheet.size-30x20 .lbl {
+    width: 30mm;
+    height: 20mm;
+    padding: 1mm;
+    gap: 1mm;
+    break-after: page;
+  }
+  .print-sheet.size-30x20 .lbl-code {
+    font-size: 8.5pt;
+    letter-spacing: 0;
+  }
+  /* 색상 이름 · 회사 재질: 줄마다 2줄까지 */
+  .print-sheet.size-30x20 .lbl-name,
+  .print-sheet.size-30x20 .lbl-brand {
+    line-height: 1.15;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere; /* 띄어쓰기에서 먼저 줄바꿈, 너무 긴 단어만 끊음 */
+  }
+  .print-sheet.size-30x20 .lbl-name {
+    font-size: 7pt;
+    margin-top: 0.8mm;
+  }
+  .print-sheet.size-30x20 .lbl-brand {
+    font-size: 6pt;
+    margin-top: 0.6mm;
   }
   /* 라벨 프린터: 라벨 한 장 = 한 페이지 */
   .print-sheet.size-40x30 .lbl,
